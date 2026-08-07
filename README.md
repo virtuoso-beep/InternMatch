@@ -6,7 +6,7 @@ InternMatch is an intelligent **student internship placement and monitoring syst
 
 - **Odruña, Twinkle Pril**
 - **Pancho, Angeli Sophia**
-- **Talamillo, Trisha**
+- **Talamillo, Trisha** 
 
 ## Academic Project
 
