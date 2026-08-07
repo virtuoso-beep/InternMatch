@@ -10,6 +10,6 @@ InternMatch is an intelligent **student internship placement and monitoring syst
 
 ## Academic Project
 
-This system is developed as a **Capstone Project** for the **University of Mindanao Tagum College, College of Computing Education** for **Academic Year 2026–2027**.
+This system is developed as a **Capstone Project** for the **University of Mindanao Tagum College, Department of Computing Education** for **Academic Year 2026–2027**.
 
 > **InternMatch** aims to support competency-based, accessible, and data-driven student internship placement through the integration of semantic matching, machine learning, and geospatial accessibility analysis.
