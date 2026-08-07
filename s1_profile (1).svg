@@ -1,0 +1,79 @@
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <rect width="1200" height="800" fill="#F4F5F7"/>
+  <rect x="0" y="0" width="1200" height="64" fill="#7A1F2B"/>
+  <text x="30" y="38" font-size="18" font-weight="bold" fill="#FFFFFF">InternMatch</text>
+  <text x="990" y="38" font-size="13" fill="#F1DADD">Trisha Talamillo · Student Intern</text>
+  <circle cx="1160" cy="32" r="16" fill="#EFE1E3"/>
+  <text x="1160" y="37" font-size="12" text-anchor="middle" fill="#7A1F2B">TT</text>
+
+  <!-- sidebar -->
+  <rect x="0" y="64" width="220" height="736" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <text x="24" y="102" font-size="11" fill="#9AA0A8">MAIN</text>
+  <text x="30" y="130" font-size="13" fill="#4A4E55">Dashboard</text>
+  <rect x="14" y="150" width="196" height="36" rx="6" fill="#F6E9EA"/>
+  <text x="30" y="173" font-size="13" fill="#7A1F2B" font-weight="bold">My Profile</text>
+  <text x="30" y="215" font-size="13" fill="#4A4E55">Competencies</text>
+  <text x="30" y="257" font-size="13" fill="#4A4E55">Recommendations</text>
+  <text x="24" y="293" font-size="11" fill="#9AA0A8">INTERNSHIP</text>
+  <text x="30" y="321" font-size="13" fill="#4A4E55">My Internship</text>
+  <text x="30" y="363" font-size="13" fill="#4A4E55">Requirements</text>
+  <text x="30" y="405" font-size="13" fill="#4A4E55">Accessibility Map</text>
+
+  <text x="248" y="108" font-size="20" font-weight="bold" fill="#22252A">My profile</text>
+  <text x="248" y="130" font-size="13" fill="#6B7078">Keep your information current for accurate matching</text>
+  <rect x="1060" y="150" width="112" height="32" rx="6" fill="#7A1F2B"/>
+  <text x="1116" y="171" font-size="11" fill="#FFFFFF" text-anchor="middle">Save changes</text>
+
+  <!-- progress -->
+  <rect x="248" y="150" width="600" height="12" rx="6" fill="#EFEEEA"/>
+  <rect x="248" y="150" width="516" height="12" rx="6" fill="#0F6E56"/>
+  <text x="248" y="180" font-size="12" fill="#6B7078">Profile completeness: 86% · Add your certifications to reach 100%</text>
+
+  <!-- basic info card -->
+  <rect x="248" y="200" width="600" height="200" rx="10" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <text x="268" y="230" font-size="14" font-weight="bold" fill="#22252A">Basic information</text>
+  <circle cx="300" cy="280" r="30" fill="#EFE1E3"/>
+  <text x="300" y="286" font-size="14" text-anchor="middle" fill="#7A1F2B" font-weight="bold">TT</text>
+  <rect x="342" y="264" width="90" height="26" rx="6" fill="#FFFFFF" stroke="#B9BEC6"/>
+  <text x="360" y="281" font-size="10" fill="#4A4E55">Change photo</text>
+
+  <text x="268" y="330" font-size="11" fill="#6B7078">Full name</text>
+  <rect x="268" y="336" width="270" height="30" rx="6" fill="#F4F5F7" stroke="#D9DCE1"/>
+  <text x="280" y="356" font-size="12" fill="#22252A">Trisha Talamillo</text>
+  <text x="558" y="330" font-size="11" fill="#6B7078">Student ID</text>
+  <rect x="558" y="336" width="270" height="30" rx="6" fill="#F4F5F7" stroke="#D9DCE1"/>
+  <text x="570" y="356" font-size="12" fill="#22252A">141715-TC</text>
+
+  <!-- academic info -->
+  <rect x="868" y="200" width="304" height="200" rx="10" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <text x="888" y="230" font-size="14" font-weight="bold" fill="#22252A">Academic background</text>
+  <text x="888" y="256" font-size="11" fill="#6B7078">Program</text>
+  <text x="888" y="274" font-size="12" fill="#22252A">BS Information Technology</text>
+  <text x="888" y="300" font-size="11" fill="#6B7078">Year level</text>
+  <text x="888" y="318" font-size="12" fill="#22252A">4th Year</text>
+  <text x="888" y="344" font-size="11" fill="#6B7078">GPA</text>
+  <text x="888" y="362" font-size="12" fill="#22252A">1.75</text>
+  <text x="888" y="388" font-size="11" fill="#6B7078">Preferred locality: Tagum City</text>
+
+  <!-- resume / documents -->
+  <rect x="248" y="416" width="600" height="180" rx="10" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <text x="268" y="446" font-size="14" font-weight="bold" fill="#22252A">Resume &amp; portfolio</text>
+  <rect x="268" y="462" width="560" height="50" rx="8" fill="#F4F5F7" stroke="#E4E6EA"/>
+  <text x="284" y="491" font-size="12" fill="#22252A">Talamillo_Resume_2026.pdf</text>
+  <text x="700" y="491" font-size="11" fill="#7A1F2B" text-anchor="end">Replace</text>
+  <rect x="268" y="522" width="560" height="50" rx="8" fill="#F4F5F7" stroke="#E4E6EA"/>
+  <text x="284" y="551" font-size="12" fill="#22252A">Portfolio_link.com/trisha-t</text>
+  <text x="700" y="551" font-size="11" fill="#7A1F2B" text-anchor="end">Edit</text>
+
+  <!-- certifications -->
+  <rect x="868" y="416" width="304" height="180" rx="10" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <text x="888" y="446" font-size="14" font-weight="bold" fill="#22252A">Certifications</text>
+  <rect x="888" y="462" width="264" height="34" rx="6" fill="#F4F5F7" stroke="#E4E6EA"/>
+  <text x="900" y="483" font-size="11" fill="#22252A">AWS Cloud Practitioner</text>
+  <rect x="888" y="504" width="264" height="34" rx="6" fill="#F4F5F7" stroke="#E4E6EA"/>
+  <text x="900" y="525" font-size="11" fill="#22252A">Google UX Design Cert.</text>
+  <rect x="888" y="552" width="120" height="28" rx="6" fill="#FFFFFF" stroke="#B9BEC6"/>
+  <text x="948" y="570" font-size="10" fill="#4A4E55" text-anchor="middle">+ Add certificate</text>
+
+  <text x="600" y="775" font-size="11" text-anchor="middle" fill="#9AA0A8">Fig. 3.4.5.11 — Student profile management screen (FR-02)</text>
+</svg>

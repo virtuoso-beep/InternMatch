@@ -1,0 +1,81 @@
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <rect width="1200" height="800" fill="#F4F5F7"/>
+  <rect x="0" y="0" width="1200" height="64" fill="#7A1F2B"/>
+  <text x="30" y="38" font-size="18" font-weight="bold" fill="#FFFFFF">InternMatch</text>
+  <text x="990" y="38" font-size="13" fill="#F1DADD">Trisha Talamillo · Student Intern</text>
+  <circle cx="1160" cy="32" r="16" fill="#EFE1E3"/>
+  <text x="1160" y="37" font-size="12" text-anchor="middle" fill="#7A1F2B">TT</text>
+
+  <rect x="0" y="64" width="220" height="736" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <text x="24" y="102" font-size="11" fill="#9AA0A8">MAIN</text>
+  <text x="30" y="130" font-size="13" fill="#4A4E55">Dashboard</text>
+  <text x="30" y="172" font-size="13" fill="#4A4E55">My Profile</text>
+  <rect x="14" y="192" width="196" height="36" rx="6" fill="#F6E9EA"/>
+  <text x="30" y="215" font-size="13" fill="#7A1F2B" font-weight="bold">Competencies</text>
+  <text x="30" y="257" font-size="13" fill="#4A4E55">Recommendations</text>
+  <text x="24" y="293" font-size="11" fill="#9AA0A8">INTERNSHIP</text>
+  <text x="30" y="321" font-size="13" fill="#4A4E55">My Internship</text>
+  <text x="30" y="363" font-size="13" fill="#4A4E55">Requirements</text>
+  <text x="30" y="405" font-size="13" fill="#4A4E55">Accessibility Map</text>
+
+  <text x="248" y="108" font-size="20" font-weight="bold" fill="#22252A">Competencies &amp; skills</text>
+  <text x="248" y="130" font-size="13" fill="#6B7078">These are analyzed against internship task descriptions using semantic matching</text>
+  <rect x="1040" y="150" width="132" height="32" rx="6" fill="#7A1F2B"/>
+  <text x="1106" y="171" font-size="11" fill="#FFFFFF" text-anchor="middle">+ Add competency</text>
+
+  <!-- add competency box -->
+  <rect x="248" y="150" width="760" height="34" rx="6" fill="#FFFFFF" stroke="#D9DCE1"/>
+  <text x="264" y="172" font-size="11" fill="#9AA0A8">Describe a skill in your own words, e.g. "Built a REST API using Laravel and MySQL for..."</text>
+
+  <!-- technical skills -->
+  <rect x="248" y="200" width="600" height="230" rx="10" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <text x="268" y="230" font-size="14" font-weight="bold" fill="#22252A">Declared technical skills</text>
+
+  <rect x="268" y="248" width="150" height="30" rx="15" fill="#EAF2FB"/>
+  <text x="343" y="268" font-size="11" fill="#0C447C" text-anchor="middle">Web Development</text>
+  <rect x="430" y="248" width="140" height="30" rx="15" fill="#EAF2FB"/>
+  <text x="500" y="268" font-size="11" fill="#0C447C" text-anchor="middle">Database Design</text>
+  <rect x="582" y="248" width="120" height="30" rx="15" fill="#EAF2FB"/>
+  <text x="642" y="268" font-size="11" fill="#0C447C" text-anchor="middle">PHP / Laravel</text>
+
+  <rect x="268" y="290" width="130" height="30" rx="15" fill="#E1F5EE"/>
+  <text x="333" y="310" font-size="11" fill="#085041" text-anchor="middle">JavaScript</text>
+  <rect x="410" y="290" width="130" height="30" rx="15" fill="#E1F5EE"/>
+  <text x="475" y="310" font-size="11" fill="#085041" text-anchor="middle">REST APIs</text>
+  <rect x="552" y="290" width="150" height="30" rx="15" fill="#E1F5EE"/>
+  <text x="627" y="310" font-size="11" fill="#085041" text-anchor="middle">UI/UX Fundamentals</text>
+
+  <rect x="268" y="332" width="140" height="30" rx="15" fill="#FBEAF0"/>
+  <text x="338" y="352" font-size="11" fill="#4B1528" text-anchor="middle">Git &amp; GitHub</text>
+  <rect x="420" y="332" width="150" height="30" rx="15" fill="#FBEAF0"/>
+  <text x="495" y="352" font-size="11" fill="#4B1528" text-anchor="middle">Agile / Scrum</text>
+
+  <text x="268" y="400" font-size="11" fill="#6B7078">9 skills declared · Skills are re-embedded automatically when updated</text>
+
+  <!-- similarity preview panel -->
+  <rect x="868" y="200" width="304" height="230" rx="10" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <text x="888" y="230" font-size="14" font-weight="bold" fill="#22252A">Skill coverage preview</text>
+  <text x="888" y="252" font-size="11" fill="#6B7078">Compared with recent internship postings</text>
+
+  <text x="888" y="282" font-size="11" fill="#4A4E55">Web Development</text>
+  <rect x="888" y="288" width="264" height="10" rx="5" fill="#EFEEEA"/>
+  <rect x="888" y="288" width="240" height="10" rx="5" fill="#0F6E56"/>
+  <text x="888" y="314" font-size="11" fill="#4A4E55">Database Design</text>
+  <rect x="888" y="320" width="264" height="10" rx="5" fill="#EFEEEA"/>
+  <rect x="888" y="320" width="210" height="10" rx="5" fill="#0F6E56"/>
+  <text x="888" y="346" font-size="11" fill="#4A4E55">Networking</text>
+  <rect x="888" y="352" width="264" height="10" rx="5" fill="#EFEEEA"/>
+  <rect x="888" y="352" width="90" height="10" rx="5" fill="#F09595"/>
+  <text x="888" y="386" font-size="10" fill="#9AA0A8">Low coverage in Networking may limit</text>
+  <text x="888" y="400" font-size="10" fill="#9AA0A8">recommendations in that track.</text>
+
+  <!-- portfolio description -->
+  <rect x="248" y="448" width="924" height="150" rx="10" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <text x="268" y="478" font-size="14" font-weight="bold" fill="#22252A">Portfolio description</text>
+  <rect x="268" y="494" width="884" height="80" rx="8" fill="#F4F5F7" stroke="#D9DCE1"/>
+  <text x="282" y="516" font-size="11" fill="#4A4E55">Developed a capstone web application using Laravel and MySQL, integrating a</text>
+  <text x="282" y="534" font-size="11" fill="#4A4E55">FastAPI-based recommendation microservice and Leaflet.js for map visualization.</text>
+  <text x="282" y="552" font-size="11" fill="#9AA0A8">Collaborated in a 3-person team using Git feature branches...</text>
+
+  <text x="600" y="775" font-size="11" text-anchor="middle" fill="#9AA0A8">Fig. 3.4.5.12 — Competency and skills management screen (FR-05)</text>
+</svg>
