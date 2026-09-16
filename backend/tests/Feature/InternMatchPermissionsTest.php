@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\AccountStatus;
-use App\EnrollmentStatus;
-use App\EvaluationStatus;
+use App\Enums\AccountStatus;
+use App\Enums\EnrollmentStatus;
+use App\Enums\EvaluationStatus;
+use App\Enums\Permission;
+use App\Enums\Role;
+use App\Enums\SubmissionStatus;
 use App\Models\Evaluation;
 use App\Models\Placement;
 use App\Models\ProgramTerm;
@@ -12,9 +15,6 @@ use App\Models\RequirementSubmission;
 use App\Models\StudentEnrollment;
 use App\Models\TimeLog;
 use App\Models\User;
-use App\Permission;
-use App\Role;
-use App\SubmissionStatus;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use PHPUnit\Framework\Attributes\DataProvider;

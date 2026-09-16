@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\MoaStatus;
+use App\Enums\MoaStatus;
 use App\Models\HostEstablishment;
 use App\Models\Moa;
 use Illuminate\Database\Eloquent\Factories\Factory;

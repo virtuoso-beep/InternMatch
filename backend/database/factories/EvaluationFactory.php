@@ -2,13 +2,13 @@
 
 namespace Database\Factories;
 
-use App\AccountStatus;
-use App\EvaluationStatus;
+use App\Enums\AccountStatus;
+use App\Enums\EvaluationStatus;
+use App\Enums\Role;
 use App\Models\Evaluation;
 use App\Models\EvaluationRubric;
 use App\Models\Placement;
 use App\Models\User;
-use App\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<Evaluation> */

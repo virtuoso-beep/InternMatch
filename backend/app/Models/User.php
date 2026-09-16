@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use App\AccountStatus;
-use App\Permission;
-use App\Role;
+use App\Enums\AccountStatus;
+use App\Enums\Permission;
+use App\Enums\Role;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;

@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\RiskSeverity;
+use App\Enums\RiskSeverity;
 use Database\Factories\MonitoringFlagFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

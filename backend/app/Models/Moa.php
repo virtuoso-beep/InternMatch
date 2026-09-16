@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\MoaStatus;
+use App\Enums\MoaStatus;
 use Database\Factories\MoaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

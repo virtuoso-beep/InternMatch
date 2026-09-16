@@ -2,12 +2,12 @@
 
 namespace Database\Factories;
 
-use App\AccountStatus;
+use App\Enums\AccountStatus;
+use App\Enums\PlacementDecisionType;
+use App\Enums\Role;
 use App\Models\Placement;
 use App\Models\PlacementDecision;
 use App\Models\User;
-use App\PlacementDecisionType;
-use App\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<PlacementDecision> */

@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\SubmissionStatus;
+use App\Enums\SubmissionStatus;
 use Database\Factories\RequirementSubmissionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

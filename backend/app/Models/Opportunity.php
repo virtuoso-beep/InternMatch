@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\OpportunityStatus;
+use App\Enums\OpportunityStatus;
 use Database\Factories\OpportunityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

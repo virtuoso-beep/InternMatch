@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\EnrollmentStatus;
+use App\Enums\EnrollmentStatus;
 use App\Models\ProgramTerm;
 use App\Models\Student;
 use App\Models\StudentEnrollment;

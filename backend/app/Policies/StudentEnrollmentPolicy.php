@@ -2,10 +2,10 @@
 
 namespace App\Policies;
 
-use App\EnrollmentStatus;
+use App\Enums\EnrollmentStatus;
+use App\Enums\Permission;
 use App\Models\StudentEnrollment;
 use App\Models\User;
-use App\Permission;
 
 class StudentEnrollmentPolicy
 {

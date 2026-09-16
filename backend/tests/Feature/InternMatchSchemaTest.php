@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PlacementStatus;
 use App\Models\Competency;
 use App\Models\CompetencyEvidence;
 use App\Models\Document;
@@ -23,7 +24,6 @@ use App\Models\StudentEnrollment;
 use App\Models\TimeLog;
 use App\Models\User;
 use App\Models\UserProfile;
-use App\PlacementStatus;
 use Database\Seeders\InternMatchReferenceSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;

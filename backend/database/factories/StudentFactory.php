@@ -2,10 +2,10 @@
 
 namespace Database\Factories;
 
-use App\AccountStatus;
+use App\Enums\AccountStatus;
+use App\Enums\Role;
 use App\Models\Student;
 use App\Models\User;
-use App\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<Student> */

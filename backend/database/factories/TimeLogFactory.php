@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\TimeLogStatus;
 use App\Models\Placement;
 use App\Models\TimeLog;
-use App\TimeLogStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<TimeLog> */

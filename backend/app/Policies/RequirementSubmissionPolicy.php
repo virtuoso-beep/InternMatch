@@ -2,10 +2,10 @@
 
 namespace App\Policies;
 
+use App\Enums\Permission;
+use App\Enums\SubmissionStatus;
 use App\Models\RequirementSubmission;
 use App\Models\User;
-use App\Permission;
-use App\SubmissionStatus;
 
 class RequirementSubmissionPolicy
 {

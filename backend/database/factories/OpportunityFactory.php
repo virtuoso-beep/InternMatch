@@ -2,10 +2,10 @@
 
 namespace Database\Factories;
 
+use App\Enums\OpportunityStatus;
 use App\Models\AcademicTerm;
 use App\Models\HostEstablishment;
 use App\Models\Opportunity;
-use App\OpportunityStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<Opportunity> */
