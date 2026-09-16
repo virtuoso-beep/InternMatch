@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\PlacementStatus;
+use App\Enums\PlacementStatus;
 use Database\Factories\PlacementFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

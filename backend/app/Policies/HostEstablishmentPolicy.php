@@ -2,9 +2,9 @@
 
 namespace App\Policies;
 
+use App\Enums\Permission;
 use App\Models\HostEstablishment;
 use App\Models\User;
-use App\Permission;
 
 class HostEstablishmentPolicy
 {

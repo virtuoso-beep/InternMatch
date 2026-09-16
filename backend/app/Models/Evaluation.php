@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\EvaluationStatus;
+use App\Enums\EvaluationStatus;
 use Database\Factories\EvaluationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

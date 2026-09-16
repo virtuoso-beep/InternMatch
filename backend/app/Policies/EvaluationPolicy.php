@@ -2,11 +2,11 @@
 
 namespace App\Policies;
 
-use App\EvaluationStatus;
+use App\Enums\EvaluationStatus;
+use App\Enums\Permission;
 use App\Models\Evaluation;
 use App\Models\Placement;
 use App\Models\User;
-use App\Permission;
 
 class EvaluationPolicy
 {

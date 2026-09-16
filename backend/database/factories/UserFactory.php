@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use App\AccountStatus;
+use App\Enums\AccountStatus;
+use App\Enums\Role;
 use App\Models\User;
-use App\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;

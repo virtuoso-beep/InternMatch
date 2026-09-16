@@ -2,11 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Enums\PlacementStatus;
 use App\Models\Moa;
 use App\Models\Opportunity;
 use App\Models\Placement;
 use App\Models\StudentEnrollment;
-use App\PlacementStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<Placement> */

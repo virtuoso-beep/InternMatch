@@ -1,57 +1,87 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# InternMatch backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## InternMatch backend structure
 
-## About Laravel
+This Laravel application serves the REST/JSON API for the separate TanStack Start + React application in `../frontend`. Keep files grouped by their Laravel responsibility; add new directories only when implemented code needs them.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```text
+app/
+  Enums/                    Fixed roles, permissions, and domain statuses
+  Http/
+    Controllers/            Account access and the shared controller base
+      Auth/                 Session login, identity, and logout
+    Middleware/             Disabled-account request checks
+    Requests/               Account-access validation and authorization
+      Auth/                 Login validation and authentication
+    Resources/              Explicit authenticated-user JSON representation
+  Models/                   Domain records, casts, and relationships
+  Policies/                 Resource authorization and assignment scope
+  Providers/                Application bootstrapping and permission Gates
+bootstrap/                  Route, middleware, exception, and provider registration
+config/                     Framework, database, CORS, and Sanctum configuration
+database/
+  factories/                Model factories and reusable test states
+  migrations/               Ordered schema history
+  seeders/                  Default seeder and InternMatch reference data
+routes/
+  api.php                   Session and account-access API endpoints
+  web.php                   Existing welcome page
+  console.php               Existing console command
+resources/                  Welcome-page Blade view and its CSS/JS assets
+public/                     HTTP entry point and public assets
+storage/                    Private/public files and generated runtime data
+tests/
+  Feature/                  HTTP, authorization, and database integration tests
+  Unit/                     Tests independent of the Laravel application
+  TestCase.php              Shared Laravel test base
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### Domain index
 
-## Contributing
+All models remain directly in `app/Models`, with matching factories in `database/factories`. This preserves the existing namespaces, relationship references, factory resolution, and conventional policy discovery in `app/Policies`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Domain | Models |
+| --- | --- |
+| Account / access | `User`, `UserProfile` |
+| Academic | `Program`, `AcademicTerm`, `ProgramTerm`, `Student`, `StudentEnrollment` |
+| Hosts / opportunities | `HostEstablishment`, `Moa`, `Opportunity`, `OpportunityInterest` |
+| Competencies / documents | `Competency`, `StudentCompetency`, `CompetencyEvidence`, `Document` |
+| Requirements | `RequirementType`, `ProgramTermRequirement`, `RequirementSubmission`, `RequirementReview` |
+| Placement / monitoring | `Placement`, `PlacementDecision`, `TimeLog`, `JournalEntry`, `MonitoringFlag` |
+| Evaluation | `EvaluationRubric`, `EvaluationCriterion`, `Evaluation`, `EvaluationScore` |
 
-## Code of Conduct
+### Responsibility and discovery boundaries
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Controllers coordinate HTTP operations, Form Requests validate and authorize incoming data, Resources define JSON output, and middleware checks cross-cutting request conditions. Policies retain resource-level access rules; `Role` and `Permission` in `app/Enums` define the fixed permission matrix. `AppServiceProvider` registers permission Gates and session-only Sanctum behavior.
 
-## Security Vulnerabilities
+`bootstrap/app.php` registers the three route files, the `/up` health endpoint, the stateful API middleware, the `account.enabled` alias, and API exception rendering. `bootstrap/providers.php` registers `AppServiceProvider`. Keep the existing protected route group in `routes/api.php`; the current API does not need additional route files.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+`AuthenticationTest` and `AccountAccessTest` cover the HTTP boundary. `InternMatchPermissionsTest` and `InternMatchSchemaTest` remain in `tests/Feature` because they boot Laravel and use database records, policies, relationships, factories, and seeders. `tests/Feature/ExampleTest.php` checks the existing welcome route; `tests/Unit/ExampleTest.php` is the isolated starter test.
+
+There are currently no application-owned Actions, Services, Jobs, Events, Listeners, Notifications, Rules, Exceptions, or Console command classes requiring additional folders. The console closure stays in `routes/console.php`; exception configuration stays in `bootstrap/app.php`. AI/ML has not been implemented.
+
+The welcome view, `resources/css/app.css`, `resources/js/app.js`, `vite.config.js`, and backend `package.json` support the existing web page. They remain separate from the application frontend. The starter unit test, `inspire` command, and default sample-user seeder require a separate cleanup decision; retaining them preserves existing tests, commands, and seeding behavior. `InternMatchReferenceSeeder` remains independently invokable and is not automatically added to `DatabaseSeeder`.
+
+Dependencies and generated runtime files belong in ignored locations such as `vendor/`, `bootstrap/cache/`, `storage/framework/`, and `storage/logs/`. Keep the existing `.gitignore` placeholders that preserve required writable directories.
+
+## InternMatch authentication
+
+The backend exposes first-party SPA session authentication for the separate TanStack Start frontend. The installed dependency lock requires PHP 8.4.1 or newer. Run tests with that runtime using `php vendor/phpunit/phpunit/phpunit`; tests use SQLite in memory, not the application MySQL database.
+
+Local defaults allow `http://localhost:8080` and `http://127.0.0.1:8080`. Use the same hostname for frontend and backend (for example, `localhost:8080` and `localhost:8000`). For deployment, configure `FRONTEND_URL` (comma-separated full origins), `SANCTUM_STATEFUL_DOMAINS` (hosts including nonstandard ports), and session domain/secure-cookie settings for the actual HTTPS domains. Cookie SPA authentication requires a shared parent domain. The existing `.env` and MySQL settings are preserved.
+
+The browser must send credentials, `Accept: application/json`, and its Origin/Referer. First request `GET /sanctum/csrf-cookie`, then send the URL-decoded `XSRF-TOKEN` cookie as `X-XSRF-TOKEN` on mutations. Cookies and CSRF tokens rotate on login/logout; use the current cookie. There is no bearer-token login or token table requirement.
+
+| Endpoint | Behavior |
+| --- | --- |
+| `POST /api/login` | Email/password login; five failed attempts per email/IP trigger a 60-second lockout. |
+| `POST /api/logout` | Authenticated logout; invalidates session and regenerates CSRF token. |
+| `GET /api/user` | Authenticated identity, role, status, and effective permissions under `data`. |
+| `PATCH /api/users/{user}/access` | Active administrators may update another user's role and/or status using existing enum values. Self-modification is forbidden; other fields are ignored. |
+
+Pending accounts may log in, inspect their identity, and log out, but receive no effective permissions. Active accounts retain the existing role and resource-policy rules. Disabled accounts cannot log in; an existing session is rejected and invalidated on its next protected request. Role assignment and activation are separate explicit changes; assigning a role does not activate an account. An initial active administrator must be provisioned through a trusted administrative process; there is no public elevation or registration endpoint.
+
+Protected application operations must apply authentication, `account.enabled`, the appropriate permission Gate, and the relevant resource policy. There is no administrator bypass: only an assigned Practicum Coordinator can decide placements. Existing policy discovery, ownership, host membership, and program-term assignment checks remain authoritative.
 
 ## License
 

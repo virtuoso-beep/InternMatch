@@ -2,11 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Enums\SubmissionStatus;
 use App\Models\Document;
 use App\Models\ProgramTermRequirement;
 use App\Models\RequirementSubmission;
 use App\Models\StudentEnrollment;
-use App\SubmissionStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<RequirementSubmission> */

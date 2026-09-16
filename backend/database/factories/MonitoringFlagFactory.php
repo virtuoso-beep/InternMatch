@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\RiskSeverity;
 use App\Models\MonitoringFlag;
 use App\Models\Placement;
-use App\RiskSeverity;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<MonitoringFlag> */

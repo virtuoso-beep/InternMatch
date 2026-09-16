@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\SubmissionStatus;
 use App\Models\JournalEntry;
 use App\Models\Placement;
-use App\SubmissionStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<JournalEntry> */

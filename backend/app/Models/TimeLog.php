@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\TimeLogStatus;
+use App\Enums\TimeLogStatus;
 use Database\Factories\TimeLogFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

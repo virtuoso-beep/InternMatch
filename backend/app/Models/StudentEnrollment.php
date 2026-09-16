@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\EnrollmentStatus;
-use App\PlacementStatus;
+use App\Enums\EnrollmentStatus;
+use App\Enums\PlacementStatus;
 use Database\Factories\StudentEnrollmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

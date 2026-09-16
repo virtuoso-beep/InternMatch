@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\PlacementDecisionType;
+use App\Enums\PlacementDecisionType;
 use Database\Factories\PlacementDecisionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
