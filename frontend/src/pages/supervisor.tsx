@@ -1,4 +1,9 @@
+import { useState } from "react";
+import { toast } from "sonner";
+import { useNavigate } from "@tanstack/react-router";
 import {
+  ActionDialog,
+  downloadText,
   Bars,
   Button,
   Card,
@@ -92,6 +97,8 @@ function Dashboard() {
 }
 
 function Interns() {
+  const navigate = useNavigate();
+  const [journal, setJournal] = useState<string | null>(null);
   return (
     <>
       <PageHeader title="Assigned interns" subtitle="Students currently deployed to your establishment." />
@@ -114,23 +121,32 @@ function Interns() {
               <Meter value={(i.hours / i.required) * 100} tone={i.status === "At risk" ? "warn" : "success"} />
             </div>
             <div className="mt-4 flex gap-2">
-              <Button>Log evaluation</Button>
-              <Button variant="outline">View journal</Button>
+              <Button onClick={() => navigate({ to: "/supervisor/$section", params: { section: "evaluations" } })}>Log evaluation</Button>
+              <Button variant="outline" onClick={() => setJournal(i.name)}>View journal</Button>
             </div>
           </Card>
         ))}
       </div>
+      {journal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 px-4" role="presentation" onClick={() => setJournal(null)}>
+          <div role="dialog" aria-modal="true" className="w-full max-w-lg rounded-lg border border-border bg-card p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <CardTitle right={<Button variant="ghost" onClick={() => setJournal(null)}>Close</Button>}>Journal · {journal}</CardTitle>
+            <p className="text-sm text-muted-foreground">Week 6 journal: completed assigned development tasks, reviewed pull requests, and documented testing results.</p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
 function Attendance() {
+  const [verified, setVerified] = useState(false);
   return (
     <>
       <PageHeader
         title="Attendance & hours"
         subtitle="Verify daily time records before they count toward required hours."
-        action={<Button>Verify all pending</Button>}
+        action={<Button onClick={() => setVerified(true)}>{verified ? "All verified" : "Verify all pending"}</Button>}
       />
       <Card>
         <Table head={["Date", "Intern", "Time in", "Time out", "Hours", "Status"]}>
@@ -142,7 +158,7 @@ function Attendance() {
               <td>{a.timeOut}</td>
               <td>{a.hours}</td>
               <td>
-                <Pill tone={statusTone(a.status)}>{a.status}</Pill>
+                <Pill tone={verified || a.status !== "Pending" ? "success" : statusTone(a.status)}>{verified || a.status !== "Pending" ? "Verified" : a.status}</Pill>
               </td>
             </Row>
           ))}
@@ -153,6 +169,15 @@ function Attendance() {
 }
 
 function Evaluations() {
+  const [scores, setScores] = useState<Record<string, number>>({
+    "Technical skill": 4,
+    "Work ethic": 4,
+    Communication: 4,
+    Initiative: 4,
+  });
+  const [submitted, setSubmitted] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+
   return (
     <>
       <PageHeader title="Evaluations" subtitle="Rate interns on technical skill, work ethic, and communication." />
@@ -164,23 +189,30 @@ function Evaluations() {
               <span className="text-sm">{c}</span>
               <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map((n) => (
-                  <span
+                  <button
+                    type="button"
+                    aria-label={`${c}: ${n} out of 5`}
+                    onClick={() => setScores((current) => ({ ...current, [c]: n }))}
                     key={n}
                     className={`flex size-8 items-center justify-center rounded-md border text-sm ${
-                      n <= 4 ? "border-brand bg-brand-soft font-semibold text-brand" : "border-border text-muted-foreground"
+                      n <= (scores[c] ?? 0)
+                        ? "border-brand bg-brand-soft font-semibold text-brand"
+                        : "border-border text-muted-foreground"
                     }`}
                   >
                     {n}
-                  </span>
+                  </button>
                 ))}
               </div>
             </div>
           ))}
         </div>
         <div className="mt-5 flex gap-2">
-          <Button>Submit evaluation</Button>
-          <Button variant="outline">Save draft</Button>
+          <Button onClick={() => { setSubmitted(true); setDraftSaved(false); }}>Submit evaluation</Button>
+          <Button variant="outline" onClick={() => { setDraftSaved(true); setSubmitted(false); }}>Save draft</Button>
         </div>
+        {submitted && <p className="mt-3 text-sm font-medium text-success">Evaluation submitted for review.</p>}
+        {draftSaved && <p className="mt-3 text-sm font-medium text-brand">Draft saved. You can continue later.</p>}
       </Card>
       <Card>
         <CardTitle>Submitted evaluations</CardTitle>
@@ -202,9 +234,10 @@ function Evaluations() {
 }
 
 function Company() {
+  const navigate = useNavigate();
   return (
     <>
-      <PageHeader title="Company profile" subtitle="Details shown to students in recommendations." action={<Button>Edit profile</Button>} />
+      <PageHeader title="Company profile" subtitle="Details shown to students in recommendations." action={<Button onClick={() => navigate({ to: "/supervisor/$section", params: { section: "profile" } })}>Edit profile</Button>} />
       <div className="grid gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardTitle>Establishment details</CardTitle>
@@ -232,9 +265,10 @@ function Company() {
 }
 
 function Opportunities() {
+  const [dialogOpen, setDialogOpen] = useState(false);
   return (
     <>
-      <PageHeader title="Internship opportunities" subtitle="Postings matched against student competency profiles." action={<Button>Post opportunity</Button>} />
+      <PageHeader title="Internship opportunities" subtitle="Postings matched against student competency profiles." action={<Button onClick={() => setDialogOpen(true)}>Post opportunity</Button>} />
       <div className="grid gap-4 xl:grid-cols-2">
         {OPPORTUNITIES.map((o) => (
           <Card key={o.title}>
@@ -253,11 +287,19 @@ function Opportunities() {
           </Card>
         ))}
       </div>
+      <ActionDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Post internship opportunity"
+        fields={[{ name: "title", label: "Opportunity title", placeholder: "e.g. Frontend Developer Intern" }, { name: "slots", label: "Available slots", type: "number", placeholder: "2" }]}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values.title} posted with ${values.slots} slot(s).`); }}
+      />
     </>
   );
 }
 
 function Moa() {
+  const [renewalRequested, setRenewalRequested] = useState(false);
   return (
     <>
       <PageHeader title="Memorandum of agreement" subtitle="Agreement status between your establishment and the university." />
@@ -273,9 +315,10 @@ function Moa() {
             <Field label="Max interns per term" value="4" />
           </div>
           <div className="mt-5 flex gap-2">
-            <Button variant="outline">Download PDF</Button>
-            <Button>Request renewal</Button>
+            <Button variant="outline" onClick={() => downloadText("MOA-2025-0142.txt", "Memorandum of Agreement\nReference: MOA-2025-0142\nStatus: Active\n")}>Download PDF</Button>
+            <Button onClick={() => setRenewalRequested(true)}>{renewalRequested ? "Renewal requested" : "Request renewal"}</Button>
           </div>
+          {renewalRequested && <p className="mt-3 text-sm font-medium text-success">Renewal request submitted to the practicum office.</p>}
         </Card>
         <Card>
           <CardTitle>Compliance</CardTitle>

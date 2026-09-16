@@ -1,7 +1,18 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { toast } from "sonner";
 
 export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
+}
+
+export function downloadText(filename: string, content: string, type = "text/plain") {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
@@ -102,7 +113,7 @@ export function Button({
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={onClick ?? (() => toast(`${typeof children === "string" ? children : "Action"} selected`))}
       className={cx(
         "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         styles,
@@ -111,6 +122,77 @@ export function Button({
     >
       {children}
     </button>
+  );
+}
+
+export function ActionDialog({
+  title,
+  description,
+  fields,
+  submitLabel = "Save",
+  initialValues,
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  title: string;
+  description?: string;
+  fields: Array<{ name: string; label: string; placeholder?: string; type?: "text" | "email" | "number" | "select"; options?: string[] }>;
+  submitLabel?: string;
+  initialValues?: Record<string, string>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: Record<string, string>) => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>(initialValues ?? {});
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 px-4" role="presentation">
+      <div role="dialog" aria-modal="true" aria-labelledby="action-dialog-title" className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-xl">
+        <h2 id="action-dialog-title" className="text-lg font-semibold text-foreground">{title}</h2>
+        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+        <form
+          className="mt-5 space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit(values);
+            setValues({});
+          }}
+        >
+          {fields.map((field) => (
+            <label key={field.name} className="block">
+              <span className="mb-1.5 block text-xs font-semibold tracking-wide text-muted-foreground uppercase">{field.label}</span>
+              {field.type === "select" ? (
+                <select
+                  required
+                  value={values[field.name] ?? ""}
+                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/25"
+                >
+                  <option value="">Select an option</option>
+                  {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              ) : (
+                <input
+                  required
+                  type={field.type ?? "text"}
+                  value={values[field.name] ?? ""}
+                  placeholder={field.placeholder}
+                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/25"
+                />
+              )}
+            </label>
+          ))}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit">{submitLabel}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { AccessibilityMap } from "@/components/im/AccessibilityMap";
 import {
   Bars,
+  ActionDialog,
   Button,
   Card,
   CardTitle,
@@ -58,6 +61,7 @@ export function CoordinatorSection({ section }: { section: string }) {
 }
 
 function Dashboard() {
+  const navigate = useNavigate();
   return (
     <>
       <PageHeader title="Practicum dashboard" subtitle="AY 2026–2027 · 160 enrolled practicum students" />
@@ -69,7 +73,7 @@ function Dashboard() {
       </StatGrid>
       <div className="grid gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardTitle right={<Button variant="ghost">View all</Button>}>Recommendations awaiting review</CardTitle>
+          <CardTitle right={<Button variant="ghost" onClick={() => navigate({ to: "/coordinator/$section", params: { section: "recommendations" } })}>View all</Button>}>Recommendations awaiting review</CardTitle>
           <Table head={["Student", "Program", "Recommended host", "Match", "Distance"]}>
             {PENDING_RECOMMENDATIONS.slice(0, 5).map((r) => (
               <Row key={r.student}>
@@ -105,18 +109,21 @@ function Dashboard() {
 
 function Recommendations() {
   const [filter, setFilter] = useState("All programs");
-  const rows = PENDING_RECOMMENDATIONS.filter((r) => filter === "All programs" || r.program === filter);
+  const [rows, setRows] = useState(PENDING_RECOMMENDATIONS);
+  const [regenerating, setRegenerating] = useState(false);
+  const [overrideTarget, setOverrideTarget] = useState<string | null>(null);
+  const visibleRows = rows.filter((r) => filter === "All programs" || r.program === filter);
   return (
     <>
       <PageHeader
         title="Recommendation review"
         subtitle="Machine-generated matches ranked by competency similarity and accessibility."
-        action={<Button>Regenerate batch</Button>}
+        action={<Button onClick={() => { setRegenerating(true); window.setTimeout(() => setRegenerating(false), 700); }}> {regenerating ? "Regenerating..." : "Regenerate batch"}</Button>}
       />
       <FilterChips options={["All programs", "BSIT", "BSCS", "BSIS"]} value={filter} onChange={setFilter} />
       <Card>
         <Table head={["Student", "Program", "Recommended host", "Match", "Distance", "Action"]}>
-          {rows.map((r) => (
+          {visibleRows.map((r) => (
             <Row key={r.student}>
               <td className="font-medium">{r.student}</td>
               <td className="text-muted-foreground">{r.program}</td>
@@ -126,10 +133,10 @@ function Recommendations() {
               </td>
               <td className="text-muted-foreground">{r.km} km</td>
               <td className="space-x-3">
-                <button type="button" className="text-sm font-semibold text-brand hover:underline">
+                <button type="button" onClick={() => setRows((current) => current.filter((item) => item.student !== r.student))} className="text-sm font-semibold text-brand hover:underline">
                   Approve
                 </button>
-                <button type="button" className="text-sm font-semibold text-muted-foreground hover:underline">
+                <button type="button" onClick={() => setOverrideTarget(r.student)} className="text-sm font-semibold text-muted-foreground hover:underline">
                   Override
                 </button>
               </td>
@@ -137,11 +144,21 @@ function Recommendations() {
           ))}
         </Table>
       </Card>
+      <ActionDialog
+        open={overrideTarget !== null}
+        onOpenChange={(open) => { if (!open) setOverrideTarget(null); }}
+        title={`Override ${overrideTarget ?? "recommendation"}`}
+        fields={[{ name: "host", label: "Selected host", placeholder: "Enter host establishment" }, { name: "reason", label: "Reason", placeholder: "Explain the override" }]}
+        submitLabel="Apply override"
+        onSubmit={(values) => { setOverrideTarget(null); toast.success(`${overrideTarget} assigned to ${values.host}.`); }}
+      />
     </>
   );
 }
 
 function Approvals() {
+  const [approved, setApproved] = useState<string[]>([]);
+  const [reassigning, setReassigning] = useState<string | null>(null);
   return (
     <>
       <PageHeader title="Pending approvals" subtitle="9 placements and 12 documents require your action." />
@@ -149,7 +166,7 @@ function Approvals() {
         <Card>
           <CardTitle>Placement approvals</CardTitle>
           <div className="space-y-3">
-            {PENDING_RECOMMENDATIONS.slice(0, 4).map((r) => (
+            {PENDING_RECOMMENDATIONS.slice(0, 4).filter((r) => !approved.includes(r.student)).map((r) => (
               <div key={r.student} className="rounded-md border border-border p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-semibold">{r.student}</p>
@@ -159,8 +176,8 @@ function Approvals() {
                   {r.host} · {r.km} km
                 </p>
                 <div className="mt-3 flex gap-2">
-                  <Button>Approve</Button>
-                  <Button variant="outline">Reassign</Button>
+                  <Button onClick={() => setApproved((current) => [...current, r.student])}>Approve</Button>
+                  <Button variant="outline" onClick={() => setReassigning(r.student)}>Reassign</Button>
                 </div>
               </div>
             ))}
@@ -181,6 +198,14 @@ function Approvals() {
           </Table>
         </Card>
       </div>
+      <ActionDialog
+        open={reassigning !== null}
+        onOpenChange={(open) => { if (!open) setReassigning(null); }}
+        title={`Reassign ${reassigning ?? "placement"}`}
+        fields={[{ name: "host", label: "New host establishment", type: "select", options: HOSTS.map((host) => host.name) }, { name: "reason", label: "Reason", placeholder: "Explain the reassignment" }]}
+        submitLabel="Reassign"
+        onSubmit={(values) => { setReassigning(null); toast.success(`${reassigning} reassigned to ${values.host}.`); }}
+      />
     </>
   );
 }
@@ -215,12 +240,13 @@ function Students() {
 }
 
 function Hosts() {
+  const [dialogOpen, setDialogOpen] = useState(false);
   return (
     <>
       <PageHeader
         title="Host establishments"
         subtitle="Partner organisations, slot capacity, and agreement status."
-        action={<Button>Add establishment</Button>}
+        action={<Button onClick={() => setDialogOpen(true)}>Add establishment</Button>}
       />
       <div className="grid gap-4 xl:grid-cols-2">
         {HOSTS.map((h) => (
@@ -242,6 +268,13 @@ function Hosts() {
           </Card>
         ))}
       </div>
+      <ActionDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Add host establishment"
+        fields={[{ name: "name", label: "Establishment name", placeholder: "e.g. Davao Tech Hub" }, { name: "contact", label: "Contact email", type: "email", placeholder: "contact@example.com" }]}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values.name} was added for review.`); }}
+      />
     </>
   );
 }

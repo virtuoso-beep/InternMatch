@@ -295,6 +295,24 @@ export const COMPETENCIES = [
   { name: "UI Design", level: 61, source: "Portfolio" },
 ];
 
+export function getCompetencyMatch(host: Host) {
+  const matched = host.tags
+    .map((tag) => COMPETENCIES.find((competency) => competency.name.toLowerCase() === tag.toLowerCase()))
+    .filter((competency): competency is (typeof COMPETENCIES)[number] => Boolean(competency));
+  const missing = host.tags.filter(
+    (tag) => !matched.some((competency) => competency.name.toLowerCase() === tag.toLowerCase()),
+  );
+  const coverage = host.tags.length ? Math.round((matched.length / host.tags.length) * 100) : 0;
+  const proficiency = matched.length
+    ? Math.round(matched.reduce((total, competency) => total + competency.level, 0) / matched.length)
+    : 0;
+  const accessibility = host.accessibility === "High" ? 100 : host.accessibility === "Moderate" ? 75 : 50;
+  const availability = host.slotsTotal ? Math.round((host.slotsOpen / host.slotsTotal) * 100) : 0;
+  const score = Math.round(proficiency * 0.7 + accessibility * 0.2 + availability * 0.1);
+
+  return { matched, missing, coverage, proficiency, score };
+}
+
 export const INTERNS = [
   { name: "Trisha Talamillo", program: "BSIT", hours: 214, required: 486, status: "On track", rating: 4.6 },
   { name: "Twinkle Odruña", program: "BSIT", hours: 268, required: 486, status: "On track", rating: 4.4 },

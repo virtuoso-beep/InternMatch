@@ -1,7 +1,9 @@
 import { AccessibilityMap } from "@/components/im/AccessibilityMap";
+import { toast } from "sonner";
 import {
   Bars,
   Button,
+  downloadText,
   Card,
   CardTitle,
   Field,
@@ -237,7 +239,7 @@ function Accreditation() {
                 <Pill tone={statusTone(r.status)}>{r.status}</Pill>
               </td>
               <td>
-                <button type="button" className="text-sm font-semibold text-brand hover:underline">
+                <button type="button" onClick={() => downloadText(`${r.name.toLowerCase().replaceAll(" ", "-")}.txt`, `${r.name}\nCoverage: ${r.period}\nStatus: Generated\n`)} className="text-sm font-semibold text-brand hover:underline">
                   Generate
                 </button>
               </td>
@@ -250,6 +252,7 @@ function Accreditation() {
 }
 
 function Export() {
+  const exportDataset = (title: string) => downloadText(`${title.toLowerCase().replaceAll(" ", "-")}.csv`, `Dataset,Records\n${title},Available in InternMatch\n`, "text/csv");
   return (
     <>
       <PageHeader title="Export data" subtitle="Download practicum datasets for institutional reporting." />
@@ -266,7 +269,7 @@ function Export() {
                 <p className="font-semibold">{title}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{meta}</p>
               </div>
-              <Button variant="outline">Export</Button>
+              <Button variant="outline" onClick={() => exportDataset(title)}>Export</Button>
             </div>
           </Card>
         ))}

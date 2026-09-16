@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { AccessibilityMap } from "@/components/im/AccessibilityMap";
 import {
   Bars,
+  ActionDialog,
   Button,
   Card,
   CardTitle,
@@ -18,7 +20,7 @@ import {
   statusTone,
 } from "@/components/im/ui";
 import { ProfileEditor } from "@/components/im/ProfileEditor";
-import { COMPETENCIES, HOSTS, REQUIREMENTS } from "@/lib/internmatch";
+import { COMPETENCIES, getCompetencyMatch, HOSTS, REQUIREMENTS } from "@/lib/internmatch";
 
 export function StudentSection({ section }: { section: string }) {
   switch (section) {
@@ -100,12 +102,13 @@ function Dashboard() {
 }
 
 function Competencies() {
+  const [dialogOpen, setDialogOpen] = useState(false);
   return (
     <>
       <PageHeader
         title="Competencies"
         subtitle="Your skill vector feeds the recommendation engine's similarity search."
-        action={<Button variant="outline">Add competency</Button>}
+        action={<Button variant="outline" onClick={() => setDialogOpen(true)}>Add competency</Button>}
       />
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
@@ -125,14 +128,24 @@ function Competencies() {
           </Table>
         </Card>
       </div>
+      <ActionDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Add competency"
+        description="Add a skill to your competency profile."
+        fields={[{ name: "name", label: "Competency", placeholder: "e.g. API Development" }, { name: "level", label: "Proficiency (%)", type: "number", placeholder: "75" }]}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values.name} added at ${values.level}% proficiency.`); }}
+      />
     </>
   );
 }
 
 function Recommendations() {
   const [filter, setFilter] = useState("Best match");
+  const [interested, setInterested] = useState<string[]>([]);
+  const [details, setDetails] = useState<(typeof HOSTS)[number] | null>(null);
   const sorted = [...HOSTS].sort((a, b) =>
-    filter === "Nearest" ? a.km - b.km : filter === "Most slots" ? b.slotsOpen - a.slotsOpen : b.match - a.match,
+    filter === "Nearest" ? a.km - b.km : filter === "Most slots" ? b.slotsOpen - a.slotsOpen : getCompetencyMatch(b).score - getCompetencyMatch(a).score,
   );
   return (
     <>
@@ -144,6 +157,10 @@ function Recommendations() {
       <div className="grid gap-4 xl:grid-cols-2">
         {sorted.map((h) => (
           <Card key={h.name}>
+            {(() => {
+              const competencyMatch = getCompetencyMatch(h);
+              return (
+                <>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold">{h.name}</h3>
@@ -151,27 +168,46 @@ function Recommendations() {
                   {h.field} · {h.city}
                 </p>
               </div>
-              <Pill tone={matchTone(h.match)}>{h.match}% match</Pill>
+              <Pill tone={matchTone(competencyMatch.score)}>{competencyMatch.score}% match</Pill>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              {h.tags.map((t) => (
-                <Pill key={t} tone="muted">
-                  {t}
+              {competencyMatch.matched.map((competency) => (
+                <Pill key={competency.name} tone="success">
+                  {competency.name} · {competency.level}%
                 </Pill>
               ))}
+              {competencyMatch.missing.map((tag) => <Pill key={tag} tone="warn">Missing: {tag}</Pill>)}
             </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {competencyMatch.coverage}% competency coverage · {competencyMatch.proficiency}% average proficiency
+            </p>
             <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
               <Field label="Distance" value={`${h.km} km`} />
               <Field label="Travel" value={h.travel} />
               <Field label="Slots" value={`${h.slotsOpen}/${h.slotsTotal}`} />
             </div>
             <div className="mt-5 flex gap-2">
-              <Button>Express interest</Button>
-              <Button variant="outline">View details</Button>
+              <Button onClick={() => setInterested((current) => current.includes(h.name) ? current.filter((name) => name !== h.name) : [...current, h.name])}>
+                {interested.includes(h.name) ? "Interest sent" : "Express interest"}
+              </Button>
+              <Button variant="outline" onClick={() => setDetails(h)}>View details</Button>
             </div>
+                </>
+              );
+            })()}
           </Card>
         ))}
       </div>
+      {details && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 px-4" role="presentation" onClick={() => setDetails(null)}>
+          <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <h2 className="text-lg font-semibold">{details.name}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{details.field} · {details.city}</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm"><Field label="Distance" value={`${details.km} km`} /><Field label="Travel" value={details.travel} /><Field label="Rating" value={`${details.rating} / 5`} /><Field label="Open slots" value={`${details.slotsOpen}/${details.slotsTotal}`} /></div>
+            <div className="mt-5 flex justify-end"><Button onClick={() => setDetails(null)}>Close</Button></div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -223,12 +259,26 @@ function Internship() {
 }
 
 function Requirements() {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [viewing, setViewing] = useState<(typeof REQUIREMENTS)[number] | null>(null);
+  const chooseDocument = () => fileRef.current?.click();
   return (
     <>
       <PageHeader
         title="Requirements"
         subtitle="Upload and track the documents required before and during deployment."
-        action={<Button>Upload document</Button>}
+        action={<Button onClick={chooseDocument}>Upload document</Button>}
+      />
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) toast.success(`${file.name} selected for upload.`);
+          event.target.value = "";
+        }}
       />
       <Card>
         <Table head={["Document", "Status", "Date", "Action"]}>
@@ -240,7 +290,7 @@ function Requirements() {
               </td>
               <td className="text-muted-foreground">{r.date}</td>
               <td>
-                <button type="button" className="text-sm font-semibold text-brand hover:underline">
+                <button type="button" onClick={r.status === "Missing" ? chooseDocument : () => setViewing(r)} className="text-sm font-semibold text-brand hover:underline">
                   {r.status === "Missing" ? "Upload" : "View"}
                 </button>
               </td>
@@ -248,6 +298,19 @@ function Requirements() {
           ))}
         </Table>
       </Card>
+      {viewing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 px-4" role="presentation" onClick={() => setViewing(null)}>
+          <div role="dialog" aria-modal="true" className="w-full max-w-2xl rounded-lg border border-border bg-card p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+              <div><h2 className="text-lg font-semibold">{viewing.name}</h2><p className="text-sm text-muted-foreground">Uploaded document preview</p></div>
+              <Button variant="ghost" onClick={() => setViewing(null)}>Close</Button>
+            </div>
+            <div className="mt-5 flex min-h-80 items-center justify-center rounded-md border border-border bg-muted p-8 text-center">
+              <div><p className="font-semibold">{viewing.name}</p><p className="mt-2 text-sm text-muted-foreground">This uploaded document is available for viewing.</p><p className="mt-1 text-xs text-muted-foreground">Status: {viewing.status} · Submitted: {viewing.date}</p></div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

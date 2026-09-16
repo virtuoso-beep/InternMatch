@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Bars,
+  ActionDialog,
   Button,
+  downloadText,
   Card,
   CardTitle,
   Field,
@@ -89,13 +92,16 @@ function Dashboard() {
 
 function Users() {
   const [filter, setFilter] = useState("All");
-  const rows = USERS.filter((u) => filter === "All" || u.role.includes(filter));
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editUser, setEditUser] = useState<(typeof USERS)[number] | null>(null);
+  const [users, setUsers] = useState(USERS);
+  const rows = users.filter((u) => filter === "All" || u.role.includes(filter));
   return (
     <>
       <PageHeader
         title="User accounts"
         subtitle="612 active accounts across all roles"
-        action={<Button>+ Add user</Button>}
+        action={<Button onClick={() => setDialogOpen(true)}>+ Add user</Button>}
       />
       <FilterChips
         options={["All", "Student", "Coordinator", "Supervisor", "Dean"]}
@@ -113,7 +119,7 @@ function Users() {
                 <Pill tone={statusTone(u.status)}>{u.status}</Pill>
               </td>
               <td>
-                <button type="button" className="text-sm font-semibold text-brand hover:underline">
+                <button type="button" onClick={() => u.status === "Pending" ? toast.success(`Invite resent to ${u.name}.`) : setEditUser(u)} className="text-sm font-semibold text-brand hover:underline">
                   {u.status === "Pending" ? "Resend invite" : "Edit"}
                 </button>
               </td>
@@ -122,6 +128,32 @@ function Users() {
         </Table>
         <p className="mt-4 text-sm text-muted-foreground">Showing {rows.length} of 612 accounts</p>
       </Card>
+      <ActionDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Add user"
+        fields={[{ name: "name", label: "Full name", placeholder: "e.g. Juan Dela Cruz" }, { name: "email", label: "Email", type: "email", placeholder: "name@example.com" }]}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`Invitation sent to ${values.name} (${values.email}).`); }}
+      />
+      <ActionDialog
+        key={editUser?.name ?? "edit-user"}
+        open={editUser !== null}
+        onOpenChange={(open) => { if (!open) setEditUser(null); }}
+        title={`Edit ${editUser?.name ?? "user"}`}
+        fields={[
+          { name: "name", label: "Full name", placeholder: "Full name" },
+          { name: "role", label: "Role", type: "select", options: ["Student", "Practicum Coordinator", "Host Supervisor", "Dean", "System Administrator"] },
+          { name: "status", label: "Account status", type: "select", options: ["Active", "Pending", "Disabled"] },
+        ]}
+        initialValues={editUser ? { name: editUser.name, role: editUser.role, status: editUser.status } : undefined}
+        submitLabel="Save changes"
+        onSubmit={(values) => {
+          if (!editUser) return;
+          setUsers((current) => current.map((user) => user.name === editUser.name ? { ...user, name: values.name, role: values.role, status: values.status } : user));
+          setEditUser(null);
+          toast.success(`${values.name}'s account was updated.`);
+        }}
+      />
     </>
   );
 }
@@ -158,9 +190,10 @@ function Roles() {
 }
 
 function Hosts() {
+  const [dialogOpen, setDialogOpen] = useState(false);
   return (
     <>
-      <PageHeader title="Host establishments" subtitle="Master record of partner organisations." action={<Button>+ Add establishment</Button>} />
+      <PageHeader title="Host establishments" subtitle="Master record of partner organisations." action={<Button onClick={() => setDialogOpen(true)}>+ Add establishment</Button>} />
       <Card>
         <Table head={["Establishment", "Industry", "City", "Slots", "MOA"]}>
           {HOSTS.map((h) => (
@@ -178,6 +211,13 @@ function Hosts() {
           ))}
         </Table>
       </Card>
+      <ActionDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Add host establishment"
+        fields={[{ name: "name", label: "Establishment name", placeholder: "e.g. Davao Tech Hub" }, { name: "city", label: "City", placeholder: "Tagum City" }]}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values.name} in ${values.city} added to the partner registry.`); }}
+      />
     </>
   );
 }
@@ -233,9 +273,10 @@ function MoaRecords() {
 }
 
 function Audit() {
+  const exportLog = () => downloadText("internmatch-audit.csv", ["Timestamp,Actor,Action,Target,IP address", ...AUDIT.map((a) => [a.time, a.actor, a.action, a.target, a.ip].map((v) => `"${v}"`).join(","))].join("\n"), "text/csv");
   return (
     <>
-      <PageHeader title="Audit trail" subtitle="Immutable log of all system activity." action={<Button variant="outline">Export log</Button>} />
+      <PageHeader title="Audit trail" subtitle="Immutable log of all system activity." action={<Button variant="outline" onClick={exportLog}>Export log</Button>} />
       <Card>
         <Table head={["Timestamp", "Actor", "Action", "Target", "IP address"]}>
           {AUDIT.map((a) => (
@@ -254,9 +295,11 @@ function Audit() {
 }
 
 function Backup() {
+  const [backupStarted, setBackupStarted] = useState(false);
   return (
     <>
-      <PageHeader title="Backup & recovery" subtitle="Scheduled backups and restore points." action={<Button>Run backup now</Button>} />
+      <PageHeader title="Backup & recovery" subtitle="Scheduled backups and restore points." action={<Button onClick={() => setBackupStarted(true)}>Run backup now</Button>} />
+      {backupStarted && <div className="mb-5 rounded-md border border-border bg-success-soft px-4 py-3 text-sm font-medium text-success">Manual backup completed successfully just now.</div>}
       <div className="grid gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardTitle>Restore points</CardTitle>
