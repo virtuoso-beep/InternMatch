@@ -292,7 +292,7 @@ function Opportunities() {
         onOpenChange={setDialogOpen}
         title="Post internship opportunity"
         fields={[{ name: "title", label: "Opportunity title", placeholder: "e.g. Frontend Developer Intern" }, { name: "slots", label: "Available slots", type: "number", placeholder: "2" }]}
-        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values.title} posted with ${values.slots} slot(s).`); }}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values['title']} posted with ${values['slots']} slot(s).`); }}
       />
     </>
   );

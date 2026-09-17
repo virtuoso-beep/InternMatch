@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\EnsureAccountIsEnabled;
+use App\Http\Middleware\EnsureActiveAccount;
+use App\Http\Middleware\EnsureRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -17,7 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         $middleware->alias([
             'account.enabled' => EnsureAccountIsEnabled::class,
+            'active' => EnsureActiveAccount::class,
+            'role' => EnsureRole::class,
         ]);
+    $middleware->redirectGuestsTo('/auth');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

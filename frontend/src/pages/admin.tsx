@@ -133,7 +133,7 @@ function Users() {
         onOpenChange={setDialogOpen}
         title="Add user"
         fields={[{ name: "name", label: "Full name", placeholder: "e.g. Juan Dela Cruz" }, { name: "email", label: "Email", type: "email", placeholder: "name@example.com" }]}
-        onSubmit={(values) => { setDialogOpen(false); toast.success(`Invitation sent to ${values.name} (${values.email}).`); }}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`Invitation sent to ${values['name']} (${values['email']}).`); }}
       />
       <ActionDialog
         key={editUser?.name ?? "edit-user"}
@@ -145,13 +145,13 @@ function Users() {
           { name: "role", label: "Role", type: "select", options: ["Student", "Practicum Coordinator", "Host Supervisor", "Dean", "System Administrator"] },
           { name: "status", label: "Account status", type: "select", options: ["Active", "Pending", "Disabled"] },
         ]}
-        initialValues={editUser ? { name: editUser.name, role: editUser.role, status: editUser.status } : undefined}
+        initialValues={editUser ? { name: editUser.name, role: editUser.role, status: editUser.status } : {}}
         submitLabel="Save changes"
         onSubmit={(values) => {
           if (!editUser) return;
-          setUsers((current) => current.map((user) => user.name === editUser.name ? { ...user, name: values.name, role: values.role, status: values.status } : user));
+          setUsers((current) => current.map((user) => user.name === editUser.name ? { ...user, name: values['name'] ?? user.name, role: values['role'] ?? user.role, status: values['status'] ?? user.status } : user));
           setEditUser(null);
-          toast.success(`${values.name}'s account was updated.`);
+          toast.success(`${values['name']}'s account was updated.`);
         }}
       />
     </>
@@ -216,7 +216,7 @@ function Hosts() {
         onOpenChange={setDialogOpen}
         title="Add host establishment"
         fields={[{ name: "name", label: "Establishment name", placeholder: "e.g. Davao Tech Hub" }, { name: "city", label: "City", placeholder: "Tagum City" }]}
-        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values.name} in ${values.city} added to the partner registry.`); }}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values['name']} in ${values['city']} added to the partner registry.`); }}
       />
     </>
   );

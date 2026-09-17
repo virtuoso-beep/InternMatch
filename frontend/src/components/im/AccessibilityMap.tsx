@@ -12,7 +12,7 @@ export function AccessibilityMap({ note }: { note?: string }) {
         <div className="border-b border-border px-5 py-4">
           <h2 className="text-base font-semibold">Geographic distribution of host establishments</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {note ?? "Marker size reflects available slots; colour reflects travel accessibility from campus."}
+            {note ?? "Illustration using demonstration records. Live student-to-host mapping is not connected yet."}
           </p>
         </div>
         <div className="relative h-[420px] overflow-hidden rounded-b-lg bg-[oklch(0.94_0.02_200)]">
@@ -64,7 +64,6 @@ export function AccessibilityMap({ note }: { note?: string }) {
           <div className="mt-4 space-y-2 text-sm">
             <Line label="Location" value={active.city} />
             <Line label="Distance from campus" value={`${active.km} km`} />
-            <Line label="Est. travel time" value={active.travel} />
             <Line label="Available slots" value={`${active.slotsOpen} of ${active.slotsTotal}`} />
             <Line label="MOA" value={active.moa} />
           </div>

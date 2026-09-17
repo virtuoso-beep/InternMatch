@@ -272,8 +272,8 @@ class InternMatchSchemaTest extends TestCase
 
     public function test_domain_migrations_can_be_reversed_without_removing_starter_tables(): void
     {
-        $this->assertSame('sqlite', DB::getDriverName());
-        $this->assertSame(':memory:', config('database.connections.sqlite.database'));
+        $this->assertSame('mysql', DB::getDriverName());
+        $this->assertStringEndsWith('_testing', config('database.connections.mysql.database'));
         User::factory()->create();
 
         $this->artisan('migrate:rollback', ['--step' => 10, '--force' => true])->assertExitCode(0);

@@ -134,7 +134,7 @@ function Competencies() {
         title="Add competency"
         description="Add a skill to your competency profile."
         fields={[{ name: "name", label: "Competency", placeholder: "e.g. API Development" }, { name: "level", label: "Proficiency (%)", type: "number", placeholder: "75" }]}
-        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values.name} added at ${values.level}% proficiency.`); }}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values['name']} added at ${values['level']}% proficiency.`); }}
       />
     </>
   );

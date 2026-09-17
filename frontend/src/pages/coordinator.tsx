@@ -150,7 +150,7 @@ function Recommendations() {
         title={`Override ${overrideTarget ?? "recommendation"}`}
         fields={[{ name: "host", label: "Selected host", placeholder: "Enter host establishment" }, { name: "reason", label: "Reason", placeholder: "Explain the override" }]}
         submitLabel="Apply override"
-        onSubmit={(values) => { setOverrideTarget(null); toast.success(`${overrideTarget} assigned to ${values.host}.`); }}
+        onSubmit={(values) => { setOverrideTarget(null); toast.success(`${overrideTarget} assigned to ${values['host']}.`); }}
       />
     </>
   );
@@ -204,7 +204,7 @@ function Approvals() {
         title={`Reassign ${reassigning ?? "placement"}`}
         fields={[{ name: "host", label: "New host establishment", type: "select", options: HOSTS.map((host) => host.name) }, { name: "reason", label: "Reason", placeholder: "Explain the reassignment" }]}
         submitLabel="Reassign"
-        onSubmit={(values) => { setReassigning(null); toast.success(`${reassigning} reassigned to ${values.host}.`); }}
+        onSubmit={(values) => { setReassigning(null); toast.success(`${reassigning} reassigned to ${values['host']}.`); }}
       />
     </>
   );
@@ -273,7 +273,7 @@ function Hosts() {
         onOpenChange={setDialogOpen}
         title="Add host establishment"
         fields={[{ name: "name", label: "Establishment name", placeholder: "e.g. Davao Tech Hub" }, { name: "contact", label: "Contact email", type: "email", placeholder: "contact@example.com" }]}
-        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values.name} was added for review.`); }}
+        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values['name']} was added for review.`); }}
       />
     </>
   );

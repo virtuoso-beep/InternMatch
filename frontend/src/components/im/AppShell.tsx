@@ -1,46 +1,153 @@
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ROLES, type RoleKey } from "@/lib/internmatch";
 import { cx } from "./ui";
 import sealAsset from "@/assets/umtc-seal.png.asset.json";
+import { logout } from "@/lib/api";
+import { SessionGuard, useSessionUser } from "./SessionGuard";
 
 type Note = { title: string; body: string; time: string; unread: boolean };
 
 const INBOX_MESSAGES = [
-  { sender: "Practicum Office", subject: "Placement update for your internship", preview: "Your placement recommendation has been reviewed by the coordinator.", time: "9:42 AM", unread: true },
-  { sender: "InternMatch support", subject: "Welcome to InternMatch", preview: "Complete your profile to receive better internship matches.", time: "Yesterday", unread: true },
-  { sender: "DataCore Solutions Inc.", subject: "Weekly check-in reminder", preview: "Please submit your weekly journal before Friday.", time: "Aug 28", unread: false },
-  { sender: "University of Mindanao", subject: "Academic term announcement", preview: "Important practicum dates for AY 2026-2027.", time: "Aug 25", unread: false },
+  {
+    sender: "Practicum Office",
+    subject: "Placement update for your internship",
+    preview: "Your placement recommendation has been reviewed by the coordinator.",
+    time: "9:42 AM",
+    unread: true,
+  },
+  {
+    sender: "InternMatch support",
+    subject: "Welcome to InternMatch",
+    preview: "Complete your profile to receive better internship matches.",
+    time: "Yesterday",
+    unread: true,
+  },
+  {
+    sender: "DataCore Solutions Inc.",
+    subject: "Weekly check-in reminder",
+    preview: "Please submit your weekly journal before Friday.",
+    time: "Aug 28",
+    unread: false,
+  },
+  {
+    sender: "University of Mindanao",
+    subject: "Academic term announcement",
+    preview: "Important practicum dates for AY 2026-2027.",
+    time: "Aug 25",
+    unread: false,
+  },
 ];
 
 const NOTIFICATIONS: Record<RoleKey, Note[]> = {
   student: [
-    { title: "Placement approved", body: "DataCore Solutions Inc. approved by the coordinator.", time: "2h ago", unread: true },
-    { title: "Week 6 journal due", body: "Submit your weekly journal before Aug 30, 2026.", time: "Yesterday", unread: true },
-    { title: "New recommendation", body: "Davao Region IT Hub now matches your profile at 90%.", time: "3d ago", unread: false },
+    {
+      title: "Placement approved",
+      body: "DataCore Solutions Inc. approved by the coordinator.",
+      time: "2h ago",
+      unread: true,
+    },
+    {
+      title: "Week 6 journal due",
+      body: "Submit your weekly journal before Aug 30, 2026.",
+      time: "Yesterday",
+      unread: true,
+    },
+    {
+      title: "New recommendation",
+      body: "Davao Region IT Hub now matches your profile at 90%.",
+      time: "3d ago",
+      unread: false,
+    },
   ],
   coordinator: [
-    { title: "12 placements awaiting review", body: "Batch B recommendations are ready for approval.", time: "1h ago", unread: true },
-    { title: "MOA expiring", body: "Tagum Digital Services MOA expires in 21 days.", time: "Yesterday", unread: true },
-    { title: "Requirement backlog", body: "8 students have missing insurance certificates.", time: "2d ago", unread: false },
+    {
+      title: "12 placements awaiting review",
+      body: "Batch B recommendations are ready for approval.",
+      time: "1h ago",
+      unread: true,
+    },
+    {
+      title: "MOA expiring",
+      body: "Tagum Digital Services MOA expires in 21 days.",
+      time: "Yesterday",
+      unread: true,
+    },
+    {
+      title: "Requirement backlog",
+      body: "8 students have missing insurance certificates.",
+      time: "2d ago",
+      unread: false,
+    },
   ],
   supervisor: [
-    { title: "Attendance to verify", body: "3 intern time logs need your certification.", time: "30m ago", unread: true },
-    { title: "Evaluation window open", body: "Midterm evaluations close Sep 12, 2026.", time: "2d ago", unread: false },
+    {
+      title: "Attendance to verify",
+      body: "3 intern time logs need your certification.",
+      time: "30m ago",
+      unread: true,
+    },
+    {
+      title: "Evaluation window open",
+      body: "Midterm evaluations close Sep 12, 2026.",
+      time: "2d ago",
+      unread: false,
+    },
   ],
   dean: [
-    { title: "Equity report ready", body: "AY 2026–2027 placement equity summary published.", time: "4h ago", unread: true },
-    { title: "Accreditation packet", body: "Program compliance documents updated.", time: "1w ago", unread: false },
+    {
+      title: "Equity report ready",
+      body: "AY 2026–2027 placement equity summary published.",
+      time: "4h ago",
+      unread: true,
+    },
+    {
+      title: "Accreditation packet",
+      body: "Program compliance documents updated.",
+      time: "1w ago",
+      unread: false,
+    },
   ],
   admin: [
-    { title: "Backup completed", body: "Nightly database backup finished successfully.", time: "6h ago", unread: true },
-    { title: "New account request", body: "2 host supervisor accounts pending provisioning.", time: "Yesterday", unread: true },
+    {
+      title: "Backup completed",
+      body: "Nightly database backup finished successfully.",
+      time: "6h ago",
+      unread: true,
+    },
+    {
+      title: "New account request",
+      body: "2 host supervisor accounts pending provisioning.",
+      time: "Yesterday",
+      unread: true,
+    },
   ],
 };
 
 export function AppShell({ role }: { role: RoleKey }) {
-  const cfg = ROLES[role];
+  return (
+    <SessionGuard role={role}>
+      <AuthenticatedShell role={role} />
+    </SessionGuard>
+  );
+}
+
+function AuthenticatedShell({ role }: { role: RoleKey }) {
+  const user = useSessionUser();
+  const navigate = useNavigate();
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const cfg = {
+    ...ROLES[role],
+    userName: user.name,
+    userLabel: user.name,
+    initials: user.name
+      .split(" ")
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join(""),
+  };
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -90,7 +197,14 @@ export function AppShell({ role }: { role: RoleKey }) {
             }}
             className="flex size-9 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-brand-foreground/15"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-5" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="size-5"
+              aria-hidden="true"
+            >
               <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
             </svg>
           </button>
@@ -109,8 +223,18 @@ export function AppShell({ role }: { role: RoleKey }) {
             onClick={() => setMenu((m) => (m === "bell" ? "none" : "bell"))}
             className="relative flex size-9 items-center justify-center rounded-full transition-colors hover:bg-brand-foreground/15"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5">
-              <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="size-5"
+            >
+              <path
+                d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
               <path d="M13.7 21a2 2 0 0 1-3.4 0" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             {unread > 0 && (
@@ -130,7 +254,10 @@ export function AppShell({ role }: { role: RoleKey }) {
                 {notes.map((n) => (
                   <li
                     key={n.title}
-                    className={cx("border-b border-border px-4 py-3 last:border-0", n.unread && "bg-brand-soft/60")}
+                    className={cx(
+                      "border-b border-border px-4 py-3 last:border-0",
+                      n.unread && "bg-brand-soft/60",
+                    )}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-sm font-semibold">{n.title}</p>
@@ -164,8 +291,16 @@ export function AppShell({ role }: { role: RoleKey }) {
             <span className="flex size-9 items-center justify-center rounded-full bg-brand-foreground/15 text-sm font-semibold">
               {cfg.initials}
             </span>
-            <span className="hidden max-w-56 truncate text-sm opacity-95 sm:inline">{cfg.userLabel}</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4 opacity-80">
+            <span className="hidden max-w-56 truncate text-sm opacity-95 sm:inline">
+              {cfg.userLabel}
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="size-4 opacity-80"
+            >
               <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
@@ -182,19 +317,42 @@ export function AppShell({ role }: { role: RoleKey }) {
                 onClick={() => setMenu("none")}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium hover:bg-muted"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="size-4"
+                >
                   <circle cx="12" cy="8" r="3.5" />
                   <path d="M4.5 20a7.5 7.5 0 0 1 15 0" strokeLinecap="round" />
                 </svg>
                 My profile
               </Link>
-              <Link
-                to="/"
-                onClick={() => setMenu("none")}
+              <button
+                type="button"
+                disabled={signingOut}
+                onClick={async () => {
+                  setSigningOut(true);
+                  setLogoutError(null);
+                  try {
+                    await logout();
+                    await navigate({ to: "/auth", replace: true });
+                  } catch {
+                    setLogoutError("Sign-out failed. Please try again.");
+                  } finally {
+                    setSigningOut(false);
+                  }
+                }}
                 className="block border-t border-border px-4 py-3 text-sm font-semibold text-brand hover:bg-muted"
               >
-                Sign out
-              </Link>
+                {signingOut ? "Signing out…" : "Sign out"}
+              </button>
+              {logoutError && (
+                <p role="alert" className="px-4 pb-3 text-sm">
+                  {logoutError}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -209,7 +367,11 @@ export function AppShell({ role }: { role: RoleKey }) {
             open ? "translate-x-0" : "-translate-x-full",
           )}
         >
-          <nav aria-label="Applications" onMouseLeave={() => !chatOpen && setChatHover(false)} className="relative flex w-21 shrink-0 flex-col items-center gap-5 bg-[#e8eef7] px-2 pt-6 text-[#132238]">
+          <nav
+            aria-label="Applications"
+            onMouseLeave={() => !chatOpen && setChatHover(false)}
+            className="relative flex w-21 shrink-0 flex-col items-center gap-5 bg-[#e8eef7] px-2 pt-6 text-[#132238]"
+          >
             <Link
               to={cfg.base}
               onMouseEnter={() => sidebarCollapsed && setMailHover(true)}
@@ -225,13 +387,24 @@ export function AppShell({ role }: { role: RoleKey }) {
               )}
             >
               <span className="relative flex size-9 items-center justify-center rounded-full bg-[#17365f] text-white shadow-sm">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="size-5"
+                  aria-hidden="true"
+                >
                   <rect x="4" y="4" width="6" height="6" rx="1" />
                   <rect x="14" y="4" width="6" height="6" rx="1" />
                   <rect x="4" y="14" width="6" height="6" rx="1" />
                   <rect x="14" y="14" width="6" height="6" rx="1" />
                 </svg>
-                {unread > 0 && <span className="absolute -top-1 -right-2 flex min-w-5 items-center justify-center rounded-full bg-[#c5221f] px-1 text-[10px] font-bold text-white">{unread}</span>}
+                {unread > 0 && (
+                  <span className="absolute -top-1 -right-2 flex min-w-5 items-center justify-center rounded-full bg-[#c5221f] px-1 text-[10px] font-bold text-white">
+                    {unread}
+                  </span>
+                )}
               </span>
               Dashboard
             </Link>
@@ -243,27 +416,55 @@ export function AppShell({ role }: { role: RoleKey }) {
               className="flex w-full flex-col items-center gap-1 rounded-2xl px-2 py-2 text-xs transition-colors hover:bg-white/60"
             >
               <span className="flex size-9 items-center justify-center rounded-full text-[#132238]">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5" aria-hidden="true">
-                  <path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6a2.5 2.5 0 0 1-2.5 2.5H12l-4.5 4v-4H7.5A2.5 2.5 0 0 1 5 12.5v-6Z" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="size-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6a2.5 2.5 0 0 1-2.5 2.5H12l-4.5 4v-4H7.5A2.5 2.5 0 0 1 5 12.5v-6Z"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </span>
               Chat
             </button>
             {(chatOpen || chatHover) && (
-              <section className="absolute top-24 left-full z-50 w-64 overflow-hidden rounded-xl border border-[#d8e1ee] bg-white text-[#132238] shadow-[0_14px_35px_rgba(32,55,85,0.18)]" aria-label="Chat box">
+              <section
+                className="absolute top-24 left-full z-50 w-64 overflow-hidden rounded-xl border border-[#d8e1ee] bg-white text-[#132238] shadow-[0_14px_35px_rgba(32,55,85,0.18)]"
+                aria-label="Chat box"
+              >
                 <div className="flex items-center justify-between border-b border-[#e4eaf2] px-3 py-2.5">
                   <div>
                     <p className="text-sm font-semibold">Chat</p>
                     <p className="text-[11px] text-[#6d7b8f]">InternMatch messages</p>
                   </div>
-                  <button type="button" aria-label="Close chat" onClick={() => { setChatOpen(false); setChatHover(false); }} className="flex size-7 items-center justify-center rounded-full text-lg text-[#6d7b8f] hover:bg-[#eef3f9]">×</button>
+                  <button
+                    type="button"
+                    aria-label="Close chat"
+                    onClick={() => {
+                      setChatOpen(false);
+                      setChatHover(false);
+                    }}
+                    className="flex size-7 items-center justify-center rounded-full text-lg text-[#6d7b8f] hover:bg-[#eef3f9]"
+                  >
+                    ×
+                  </button>
                 </div>
                 <div className="px-3 py-3">
                   <div className="flex items-start gap-2 rounded-lg bg-[#f1f6fc] px-2.5 py-2">
-                    <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-[#17365f] text-[10px] font-semibold text-white">IM</span>
+                    <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-[#17365f] text-[10px] font-semibold text-white">
+                      IM
+                    </span>
                     <div>
                       <p className="text-xs font-semibold">InternMatch support</p>
-                      <p className="mt-0.5 text-[11px] leading-4 text-[#6d7b8f]">How can we help with your internship?</p>
+                      <p className="mt-0.5 text-[11px] leading-4 text-[#6d7b8f]">
+                        How can we help with your internship?
+                      </p>
                     </div>
                   </div>
                   <form
@@ -273,9 +474,33 @@ export function AppShell({ role }: { role: RoleKey }) {
                       setChatDraft("");
                     }}
                   >
-                    <input value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder="Write a message" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-[#94a1b2]" />
-                    <button type="submit" aria-label="Send message" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#17365f] text-white disabled:opacity-40" disabled={!chatDraft.trim()}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-3.5" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Z" strokeLinecap="round" strokeLinejoin="round" /><path d="M7 12h13" strokeLinecap="round" /></svg>
+                    <input
+                      value={chatDraft}
+                      onChange={(event) => setChatDraft(event.target.value)}
+                      placeholder="Write a message"
+                      className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-[#94a1b2]"
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Send message"
+                      className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#17365f] text-white disabled:opacity-40"
+                      disabled={!chatDraft.trim()}
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        className="size-3.5"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="m4 4 16 8-16 8 3-8-3-8Z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path d="M7 12h13" strokeLinecap="round" />
+                      </svg>
                     </button>
                   </form>
                 </div>
@@ -287,18 +512,38 @@ export function AppShell({ role }: { role: RoleKey }) {
             className={cx(
               "min-w-0 overflow-y-auto px-4 py-6",
               sidebarCollapsed
-                ? mailHover && "absolute top-0 left-full z-30 h-full w-80 overflow-y-auto rounded-xl border border-[#d8e1ee] bg-white px-4 py-6 text-[#132238] shadow-[0_14px_35px_rgba(32,55,85,0.18)]"
+                ? mailHover &&
+                    "absolute top-0 left-full z-30 h-full w-80 overflow-y-auto rounded-xl border border-[#d8e1ee] bg-white px-4 py-6 text-[#132238] shadow-[0_14px_35px_rgba(32,55,85,0.18)]"
                 : "flex-1",
               sidebarCollapsed && !mailHover && "hidden",
             )}
           >
-            <button type="button" className="mb-5 flex w-full items-center gap-3 rounded-2xl bg-[#b9e0fa] px-5 py-4 text-left text-base font-semibold text-[#132238] shadow-sm transition-transform hover:-translate-y-0.5" onClick={() => setComposeOpen(true)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="size-5" aria-hidden="true"><path d="m4 16 12.5-12.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <button
+              type="button"
+              className="mb-5 flex w-full items-center gap-3 rounded-2xl bg-[#b9e0fa] px-5 py-4 text-left text-base font-semibold text-[#132238] shadow-sm transition-transform hover:-translate-y-0.5"
+              onClick={() => setComposeOpen(true)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                className="size-5"
+                aria-hidden="true"
+              >
+                <path
+                  d="m4 16 12.5-12.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
               Compose
             </button>
             {cfg.nav.map((group) => (
               <div key={group.group} className="mb-5">
-                <p className="mb-2 px-3 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">{group.group}</p>
+                <p className="mb-2 px-3 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+                  {group.group}
+                </p>
                 <nav className="space-y-0.5">
                   {group.items.map((item) => (
                     <Link
@@ -311,11 +556,34 @@ export function AppShell({ role }: { role: RoleKey }) {
                       }}
                       className={cx(
                         "flex items-center gap-3 rounded-full px-4 py-2 text-sm transition-colors",
-                        isActive(item.section) ? "bg-[#d2e3fc] font-semibold text-[#132238]" : "text-foreground hover:bg-muted",
+                        isActive(item.section)
+                          ? "bg-[#d2e3fc] font-semibold text-[#132238]"
+                          : "text-foreground hover:bg-muted",
                       )}
                     >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4 shrink-0" aria-hidden="true">
-                        {item.section === "" ? <><path d="M4 6.5h16v11H4z" strokeLinecap="round" strokeLinejoin="round" /><path d="m4 7 8 6 8-6" strokeLinecap="round" strokeLinejoin="round" /></> : <><path d="M5 5h14v14H5z" strokeLinecap="round" strokeLinejoin="round" /><path d="M8 9h8M8 13h5" strokeLinecap="round" /></>}
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        className="size-4 shrink-0"
+                        aria-hidden="true"
+                      >
+                        {item.section === "" ? (
+                          <>
+                            <path
+                              d="M4 6.5h16v11H4z"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <path d="m4 7 8 6 8-6" strokeLinecap="round" strokeLinejoin="round" />
+                          </>
+                        ) : (
+                          <>
+                            <path d="M5 5h14v14H5z" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M8 9h8M8 13h5" strokeLinecap="round" />
+                          </>
+                        )}
                       </svg>
                       {item.section === "" ? "Inbox" : item.label}
                     </Link>
@@ -327,6 +595,11 @@ export function AppShell({ role }: { role: RoleKey }) {
         </aside>
 
         <main className="min-w-0 flex-1 px-5 py-7 lg:px-8">
+          <p className="mb-5 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            Development preview: sign-in uses your real account. Dashboard records, notifications,
+            scores, and workflow actions below are still demonstrations and do not save
+            institutional records.
+          </p>
           {inboxOpen ? <InboxView /> : <Outlet />}
         </main>
       </div>
@@ -354,26 +627,100 @@ function ComposeDialog({ open, onClose }: { open: boolean; onClose: () => void }
         <div className="flex items-center justify-between bg-[#eef3fb] px-4 py-3 text-foreground">
           <h2 className="font-semibold">New message</h2>
           <div className="flex items-center gap-1 text-muted-foreground">
-            <button type="button" aria-label="Minimize compose window" className="flex size-7 items-center justify-center rounded hover:bg-black/5">-</button>
-            <button type="button" aria-label="Expand compose window" className="flex size-7 items-center justify-center rounded text-lg hover:bg-black/5">↗</button>
-            <button type="button" aria-label="Close compose window" onClick={onClose} className="flex size-7 items-center justify-center rounded text-lg hover:bg-black/5">x</button>
+            <button
+              type="button"
+              aria-label="Minimize compose window"
+              className="flex size-7 items-center justify-center rounded hover:bg-black/5"
+            >
+              -
+            </button>
+            <button
+              type="button"
+              aria-label="Expand compose window"
+              className="flex size-7 items-center justify-center rounded text-lg hover:bg-black/5"
+            >
+              ↗
+            </button>
+            <button
+              type="button"
+              aria-label="Close compose window"
+              onClick={onClose}
+              className="flex size-7 items-center justify-center rounded text-lg hover:bg-black/5"
+            >
+              x
+            </button>
           </div>
         </div>
         <div className="flex items-center border-b border-border px-4 text-sm">
           <span className="mr-2 text-muted-foreground">To</span>
-          <input required type="email" aria-label="Recipients" className="min-w-0 flex-1 bg-transparent py-3 outline-none" />
-          <button type="button" className="px-1 text-muted-foreground hover:text-foreground">Cc</button>
-          <button type="button" className="px-1 text-muted-foreground hover:text-foreground">Bcc</button>
+          <input
+            required
+            type="email"
+            aria-label="Recipients"
+            className="min-w-0 flex-1 bg-transparent py-3 outline-none"
+          />
+          <button type="button" className="px-1 text-muted-foreground hover:text-foreground">
+            Cc
+          </button>
+          <button type="button" className="px-1 text-muted-foreground hover:text-foreground">
+            Bcc
+          </button>
         </div>
-        <input required placeholder="Subject" aria-label="Subject" className="border-b border-border bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground" />
-        <textarea required aria-label="Message" placeholder="Write your message..." className="min-h-0 flex-1 resize-none bg-transparent px-4 py-4 text-sm outline-none placeholder:text-muted-foreground" />
+        <input
+          required
+          placeholder="Subject"
+          aria-label="Subject"
+          className="border-b border-border bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground"
+        />
+        <textarea
+          required
+          aria-label="Message"
+          placeholder="Write your message..."
+          className="min-h-0 flex-1 resize-none bg-transparent px-4 py-4 text-sm outline-none placeholder:text-muted-foreground"
+        />
         <div className="flex items-center gap-1 border-t border-border px-4 py-3">
-          <button type="submit" className="rounded-full bg-[#0b57d0] px-6 py-2 text-sm font-semibold text-white hover:bg-[#0849b2]">Send</button>
-          <button type="button" aria-label="Text formatting" className="flex size-9 items-center justify-center rounded-full text-sm font-bold text-muted-foreground hover:bg-muted">Aa</button>
-          <button type="button" aria-label="Attach file" className="flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted">&#128206;</button>
-          <button type="button" aria-label="Insert link" className="flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted">&#128279;</button>
-          <button type="button" aria-label="Insert emoji" className="flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted">&#9786;</button>
-          <button type="button" aria-label="Delete draft" onClick={onClose} className="ml-auto flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted">&#128465;</button>
+          <button
+            type="submit"
+            className="rounded-full bg-[#0b57d0] px-6 py-2 text-sm font-semibold text-white hover:bg-[#0849b2]"
+          >
+            Send
+          </button>
+          <button
+            type="button"
+            aria-label="Text formatting"
+            className="flex size-9 items-center justify-center rounded-full text-sm font-bold text-muted-foreground hover:bg-muted"
+          >
+            Aa
+          </button>
+          <button
+            type="button"
+            aria-label="Attach file"
+            className="flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted"
+          >
+            &#128206;
+          </button>
+          <button
+            type="button"
+            aria-label="Insert link"
+            className="flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted"
+          >
+            &#128279;
+          </button>
+          <button
+            type="button"
+            aria-label="Insert emoji"
+            className="flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted"
+          >
+            &#9786;
+          </button>
+          <button
+            type="button"
+            aria-label="Delete draft"
+            onClick={onClose}
+            className="ml-auto flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted"
+          >
+            &#128465;
+          </button>
         </div>
       </form>
     </div>
@@ -387,22 +734,46 @@ function InboxView() {
         <div>
           <p className="text-sm font-semibold text-brand">Dashboard / Inbox</p>
           <h1 className="mt-1 text-2xl font-bold text-foreground">Inbox</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Your latest InternMatch messages and updates.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Your latest InternMatch messages and updates.
+          </p>
         </div>
       </div>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
         <div className="flex items-center justify-between border-b border-border bg-muted/40 px-5 py-4">
           <p className="font-semibold">All messages</p>
-          <span className="text-sm text-muted-foreground">{INBOX_MESSAGES.filter((message) => message.unread).length} unread</span>
+          <span className="text-sm text-muted-foreground">
+            {INBOX_MESSAGES.filter((message) => message.unread).length} unread
+          </span>
         </div>
         <div>
           {INBOX_MESSAGES.map((message) => (
-            <button key={message.subject} type="button" className="flex w-full items-start gap-4 border-b border-border px-5 py-4 text-left last:border-0 hover:bg-muted/60">
-              <span className={cx("mt-1 size-2 shrink-0 rounded-full", message.unread ? "bg-brand" : "bg-transparent")} />
+            <button
+              key={message.subject}
+              type="button"
+              className="flex w-full items-start gap-4 border-b border-border px-5 py-4 text-left last:border-0 hover:bg-muted/60"
+            >
+              <span
+                className={cx(
+                  "mt-1 size-2 shrink-0 rounded-full",
+                  message.unread ? "bg-brand" : "bg-transparent",
+                )}
+              />
               <span className="min-w-0 flex-1">
-                <span className={cx("block text-sm", message.unread ? "font-bold text-foreground" : "font-medium text-foreground")}>{message.sender}</span>
-                <span className="mt-1 block truncate text-sm font-semibold text-foreground">{message.subject}</span>
-                <span className="mt-1 block truncate text-sm text-muted-foreground">{message.preview}</span>
+                <span
+                  className={cx(
+                    "block text-sm",
+                    message.unread ? "font-bold text-foreground" : "font-medium text-foreground",
+                  )}
+                >
+                  {message.sender}
+                </span>
+                <span className="mt-1 block truncate text-sm font-semibold text-foreground">
+                  {message.subject}
+                </span>
+                <span className="mt-1 block truncate text-sm text-muted-foreground">
+                  {message.preview}
+                </span>
               </span>
               <span className="shrink-0 text-xs text-muted-foreground">{message.time}</span>
             </button>

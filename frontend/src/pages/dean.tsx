@@ -269,7 +269,7 @@ function Export() {
                 <p className="font-semibold">{title}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{meta}</p>
               </div>
-              <Button variant="outline" onClick={() => exportDataset(title)}>Export</Button>
+              <Button variant="outline" onClick={() => exportDataset(title ?? "Report")}>Export</Button>
             </div>
           </Card>
         ))}

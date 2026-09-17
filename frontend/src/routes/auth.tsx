@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { ROLES, ROLE_ORDER, type RoleKey } from "@/lib/internmatch";
-import { cx } from "@/components/im/ui";
+import { useState } from "react";
+import { ROLES } from "@/lib/internmatch";
+
 import sealAsset from "@/assets/umtc-seal.png.asset.json";
+import { login } from "@/lib/api";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -30,33 +31,13 @@ const HIGHLIGHTS = [
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [role, setRole] = useState<RoleKey>("student");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(false);
-  const [email, setEmail] = useState("j.delacruz.000000.tc@umindanao.edu.ph");
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menuOpen]);
-
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !email.includes("@")) {
       setError("Enter your institutional email address.");
@@ -68,7 +49,15 @@ function AuthPage() {
     }
     setError(null);
     setSubmitting(true);
-    window.setTimeout(() => navigate({ to: ROLES[role].base }), 450);
+    try {
+      const user = await login(email.trim(), password, keepSignedIn);
+      setPassword("");
+      await navigate({ to: ROLES[user.role].base });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Sign-in failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -115,70 +104,6 @@ function AuthPage() {
           </p>
 
           <form className="mt-8 space-y-5" onSubmit={submit} noValidate>
-            {/* Role dropdown */}
-            <div ref={menuRef} className="relative">
-              <span className="mb-1.5 block text-sm font-semibold text-foreground">Sign in as</span>
-              <button
-                type="button"
-                aria-haspopup="listbox"
-                aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((v) => !v)}
-                className={cx(
-                  "flex w-full items-center justify-between rounded-lg border bg-background px-4 py-3 text-sm transition-colors",
-                  menuOpen ? "border-brand ring-2 ring-brand/20" : "border-input hover:border-brand/60",
-                )}
-              >
-                <span className="font-medium text-foreground">{ROLES[role].title}</span>
-                <svg
-                  className={cx("size-4 text-muted-foreground transition-transform", menuOpen && "rotate-180")}
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
-              {menuOpen && (
-                <ul
-                  role="listbox"
-                  className="absolute z-20 mt-2 w-full overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
-                >
-                  {ROLE_ORDER.map((r) => (
-                    <li key={r}>
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={r === role}
-                        onClick={() => {
-                          setRole(r);
-                          setMenuOpen(false);
-                        }}
-                        className={cx(
-                          "flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors",
-                          r === role ? "bg-brand-soft font-semibold text-brand" : "text-foreground hover:bg-muted",
-                        )}
-                      >
-                        {ROLES[r].title}
-                        {r === role && (
-                          <svg className="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path
-                              fillRule="evenodd"
-                              d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.58l7.3-7.3a1 1 0 0 1 1.4 0Z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
             {/* Email */}
             <label className="block">
               <span className="mb-1.5 block text-sm font-semibold text-foreground">Institutional email</span>
