@@ -1,5 +1,6 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { ROLES, type RoleKey } from "@/lib/internmatch";
 import { cx } from "./ui";
 import sealAsset from "@/assets/umtc-seal.png.asset.json";
@@ -45,8 +46,10 @@ export function AppShell({ role }: { role: RoleKey }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mailHover, setMailHover] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatHover, setChatHover] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
   const [menu, setMenu] = useState<"none" | "bell" | "user">("none");
   const barRef = useRef<HTMLDivElement>(null);
   const notes = NOTIFICATIONS[role];
@@ -206,12 +209,12 @@ export function AppShell({ role }: { role: RoleKey }) {
             open ? "translate-x-0" : "-translate-x-full",
           )}
         >
-          <nav aria-label="Applications" className="relative flex w-21 shrink-0 flex-col items-center gap-5 bg-[#e8eef7] px-2 pt-6 text-[#132238]">
+          <nav aria-label="Applications" onMouseLeave={() => !chatOpen && setChatHover(false)} className="relative flex w-21 shrink-0 flex-col items-center gap-5 bg-[#e8eef7] px-2 pt-6 text-[#132238]">
             <Link
               to={cfg.base}
               onMouseEnter={() => sidebarCollapsed && setMailHover(true)}
               onClick={() => {
-                setSidebarCollapsed(false);
+                setSidebarCollapsed(true);
                 setMailHover(false);
                 setOpen(false);
                 setInboxOpen(false);
@@ -234,7 +237,8 @@ export function AppShell({ role }: { role: RoleKey }) {
             </Link>
             <button
               type="button"
-              aria-expanded={chatOpen}
+              aria-expanded={chatOpen || chatHover}
+              onMouseEnter={() => setChatHover(true)}
               onClick={() => setChatOpen((value) => !value)}
               className="flex w-full flex-col items-center gap-1 rounded-2xl px-2 py-2 text-xs transition-colors hover:bg-white/60"
             >
@@ -245,14 +249,14 @@ export function AppShell({ role }: { role: RoleKey }) {
               </span>
               Chat
             </button>
-            {chatOpen && (
+            {(chatOpen || chatHover) && (
               <section className="absolute top-24 left-full z-50 w-64 overflow-hidden rounded-xl border border-[#d8e1ee] bg-white text-[#132238] shadow-[0_14px_35px_rgba(32,55,85,0.18)]" aria-label="Chat box">
                 <div className="flex items-center justify-between border-b border-[#e4eaf2] px-3 py-2.5">
                   <div>
                     <p className="text-sm font-semibold">Chat</p>
                     <p className="text-[11px] text-[#6d7b8f]">InternMatch messages</p>
                   </div>
-                  <button type="button" aria-label="Close chat" onClick={() => setChatOpen(false)} className="flex size-7 items-center justify-center rounded-full text-lg text-[#6d7b8f] hover:bg-[#eef3f9]">×</button>
+                  <button type="button" aria-label="Close chat" onClick={() => { setChatOpen(false); setChatHover(false); }} className="flex size-7 items-center justify-center rounded-full text-lg text-[#6d7b8f] hover:bg-[#eef3f9]">×</button>
                 </div>
                 <div className="px-3 py-3">
                   <div className="flex items-start gap-2 rounded-lg bg-[#f1f6fc] px-2.5 py-2">
@@ -288,7 +292,7 @@ export function AppShell({ role }: { role: RoleKey }) {
               sidebarCollapsed && !mailHover && "hidden",
             )}
           >
-            <button type="button" className="mb-5 flex w-full items-center gap-3 rounded-2xl bg-[#b9e0fa] px-5 py-4 text-left text-base font-semibold text-[#132238] shadow-sm transition-transform hover:-translate-y-0.5" onClick={() => window.dispatchEvent(new CustomEvent("internmatch:compose"))}>
+            <button type="button" className="mb-5 flex w-full items-center gap-3 rounded-2xl bg-[#b9e0fa] px-5 py-4 text-left text-base font-semibold text-[#132238] shadow-sm transition-transform hover:-translate-y-0.5" onClick={() => setComposeOpen(true)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="size-5" aria-hidden="true"><path d="m4 16 12.5-12.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" strokeLinecap="round" strokeLinejoin="round" /></svg>
               Compose
             </button>
@@ -326,6 +330,52 @@ export function AppShell({ role }: { role: RoleKey }) {
           {inboxOpen ? <InboxView /> : <Outlet />}
         </main>
       </div>
+      <ComposeDialog open={composeOpen} onClose={() => setComposeOpen(false)} />
+    </div>
+  );
+}
+
+function ComposeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-50" role="presentation">
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-label="Compose message"
+        className="pointer-events-auto absolute right-4 bottom-4 flex h-[min(32rem,calc(100vh-2rem))] w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[0_8px_28px_rgba(16,24,40,0.24)]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onClose();
+          toast.success("Message sent.");
+        }}
+      >
+        <div className="flex items-center justify-between bg-[#eef3fb] px-4 py-3 text-foreground">
+          <h2 className="font-semibold">New message</h2>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <button type="button" aria-label="Minimize compose window" className="flex size-7 items-center justify-center rounded hover:bg-black/5">-</button>
+            <button type="button" aria-label="Expand compose window" className="flex size-7 items-center justify-center rounded text-lg hover:bg-black/5">↗</button>
+            <button type="button" aria-label="Close compose window" onClick={onClose} className="flex size-7 items-center justify-center rounded text-lg hover:bg-black/5">x</button>
+          </div>
+        </div>
+        <div className="flex items-center border-b border-border px-4 text-sm">
+          <span className="mr-2 text-muted-foreground">To</span>
+          <input required type="email" aria-label="Recipients" className="min-w-0 flex-1 bg-transparent py-3 outline-none" />
+          <button type="button" className="px-1 text-muted-foreground hover:text-foreground">Cc</button>
+          <button type="button" className="px-1 text-muted-foreground hover:text-foreground">Bcc</button>
+        </div>
+        <input required placeholder="Subject" aria-label="Subject" className="border-b border-border bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground" />
+        <textarea required aria-label="Message" placeholder="Write your message..." className="min-h-0 flex-1 resize-none bg-transparent px-4 py-4 text-sm outline-none placeholder:text-muted-foreground" />
+        <div className="flex items-center gap-1 border-t border-border px-4 py-3">
+          <button type="submit" className="rounded-full bg-[#0b57d0] px-6 py-2 text-sm font-semibold text-white hover:bg-[#0849b2]">Send</button>
+          <button type="button" aria-label="Text formatting" className="flex size-9 items-center justify-center rounded-full text-sm font-bold text-muted-foreground hover:bg-muted">Aa</button>
+          <button type="button" aria-label="Attach file" className="flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted">&#128206;</button>
+          <button type="button" aria-label="Insert link" className="flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted">&#128279;</button>
+          <button type="button" aria-label="Insert emoji" className="flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted">&#9786;</button>
+          <button type="button" aria-label="Delete draft" onClick={onClose} className="ml-auto flex size-9 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-muted">&#128465;</button>
+        </div>
+      </form>
     </div>
   );
 }
