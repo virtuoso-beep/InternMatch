@@ -8,6 +8,7 @@ use App\Http\Resources\AuthenticatedUserResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class SessionController extends Controller
 {
@@ -26,9 +27,11 @@ class SessionController extends Controller
 
     public function destroy(Request $request): Response
     {
+        $userId = $request->user()?->id;
         Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+        Log::info('auth.logout', ['user_id' => $userId]);
 
         return response()->noContent();
     }

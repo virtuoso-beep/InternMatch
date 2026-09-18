@@ -4,12 +4,18 @@ namespace App\Http\Resources;
 
 use App\Enums\Permission;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /** @mixin User */
 class AuthenticatedUserResource extends JsonResource
 {
+    public function withResponse(Request $request, JsonResponse $response): void
+    {
+        $response->header('Cache-Control', 'no-store');
+    }
+
     /**
      * Transform the resource into an array.
      *

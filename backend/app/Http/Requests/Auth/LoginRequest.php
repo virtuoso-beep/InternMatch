@@ -8,6 +8,7 @@ use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -32,10 +33,11 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email', 'max:255'],
             'password' => ['required', 'string', 'max:4096'],
+            'remember' => ['sometimes', 'boolean'],
         ];
     }
 
-    public function authenticate(): void
+    public function authenticate(bool $requireActiveRole = false): void
     {
         $key = hash('sha256', Str::lower($this->string('email')->trim()->toString()).'|'.$this->ip());
 
@@ -49,9 +51,13 @@ class LoginRequest extends FormRequest
 
         if (! Auth::guard('web')->attemptWhen(
             $this->safe()->only(['email', 'password']),
-            fn (User $user): bool => $user->status !== AccountStatus::Disabled,
+            fn (User $user): bool => $requireActiveRole
+                ? $user->status === AccountStatus::Active && $user->role !== null
+                : $user->status !== AccountStatus::Disabled,
+            $this->boolean('remember'),
         )) {
             RateLimiter::hit($key, 60);
+            Log::notice('auth.login_failed', ['ip' => $this->ip()]);
 
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials could not be authenticated.'],
@@ -59,5 +65,6 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($key);
+        Log::info('auth.login', ['user_id' => Auth::guard('web')->id()]);
     }
 }

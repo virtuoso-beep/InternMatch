@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
-use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -36,7 +35,6 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('login', fn (Request $request): array => [
             Limit::perMinute(30)->by('ip:'.$request->ip()),
-            Limit::perMinute(5)->by('login:'.hash('sha256', Str::lower((string) $request->input('email')).'|'.$request->ip())),
         ]);
     }
 }

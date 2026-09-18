@@ -3,12 +3,18 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ApiError, currentUser, type SessionUser } from "@/lib/api";
 import { ROLES, type RoleKey } from "@/lib/internmatch";
 
-const SessionContext = createContext<SessionUser | null>(null);
+const SessionContext = createContext<{ user: SessionUser; updateUser: (user: SessionUser) => void } | null>(null);
 
 export function useSessionUser(): SessionUser {
   const user = useContext(SessionContext);
   if (!user) throw new Error("Session user requested outside authenticated portal.");
-  return user;
+  return user.user;
+}
+
+export function useUpdateSessionUser() {
+  const session = useContext(SessionContext);
+  if (!session) throw new Error("Session update requested outside authenticated portal.");
+  return session.updateUser;
 }
 
 export function SessionGuard({ role, children }: { role: RoleKey; children: ReactNode }) {
@@ -46,5 +52,5 @@ export function SessionGuard({ role, children }: { role: RoleKey; children: Reac
       <Link to="/auth" className="mt-4 inline-block underline">Sign in</Link>
     </main>;
   }
-  return <SessionContext.Provider value={user}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider value={{ user, updateUser: setUser }}>{children}</SessionContext.Provider>;
 }

@@ -157,6 +157,19 @@ class AuthenticationTest extends TestCase
         }
     }
 
+    public function test_both_login_routes_share_one_failure_limit(): void
+    {
+        $user = User::factory()->withRole(Role::Student)->create();
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $path = $attempt % 2 === 0 ? '/api/login' : '/api/v1/login';
+            $this->postJson($path, ['email' => $user->email, 'password' => 'wrong'])->assertUnprocessable();
+        }
+
+        $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'password'])
+            ->assertTooManyRequests();
+        $this->assertGuest('web');
+    }
+
     public function test_login_requires_a_recognized_spa_origin(): void
     {
         $user = User::factory()->withRole(Role::Student)->create();

@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\AccountStatus;
+use App\Enums\AccountStatus;
+use App\Enums\Role;
 use App\Models\User;
-use App\Role;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -69,6 +69,25 @@ class AuthControllerTest extends TestCase
     public function test_missing_credentials_return_field_errors(): void
     {
         $this->postJson('/api/v1/login', [])->assertUnprocessable()->assertJsonValidationErrors(['email', 'password']);
+    }
+
+    public function test_array_email_is_rejected_without_a_server_error(): void
+    {
+        $this->postJson('/api/v1/login', ['email' => ['invalid'], 'password' => 'wrong'])
+            ->assertUnprocessable()->assertJsonValidationErrors('email');
+    }
+
+    public function test_remember_login_issues_cookie_and_rotates_session_id(): void
+    {
+        $user = User::factory()->withRole(Role::Student)->create();
+        $this->withSession(['marker' => true]);
+        $oldId = session()->getId();
+
+        $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'password', 'remember' => true])
+            ->assertOk()->assertCookie(auth()->guard('web')->getRecallerName());
+
+        $this->assertNotSame($oldId, session()->getId());
+        $this->assertNotEmpty($user->fresh()->remember_token);
     }
 
     public function test_guest_cannot_read_session(): void

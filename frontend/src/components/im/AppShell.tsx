@@ -596,9 +596,8 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
 
         <main className="min-w-0 flex-1 px-5 py-7 lg:px-8">
           <p className="mb-5 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-            Development preview: sign-in uses your real account. Dashboard records, notifications,
-            scores, and workflow actions below are still demonstrations and do not save
-            institutional records.
+            Development preview: sign-in and personal profile edits use saved account records.
+            Dashboards, notifications, chat, scores, and other workflow actions are still demonstrations.
           </p>
           {inboxOpen ? <InboxView /> : <Outlet />}
         </main>

@@ -41,7 +41,7 @@ export function StudentSection({ section }: { section: string }) {
         <>
           <PageHeader
             title="Accessibility map"
-            subtitle="Compare host establishments by distance, travel time, and available slots."
+            subtitle="Preview host locations and available slots. Live student-to-host distances are not connected yet."
           />
           <AccessibilityMap />
         </>
