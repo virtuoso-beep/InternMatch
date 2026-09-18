@@ -15,6 +15,12 @@ export default defineConfig({
       proxy: {
         "/api": { target: process.env['LARAVEL_URL'] ?? environment['LARAVEL_URL'] ?? "http://127.0.0.1:8000", changeOrigin: true },
       },
+      watch: {
+        // Polling is required for Vite HMR to detect file changes inside Docker on Windows.
+        // Without this, inotify events from the Windows filesystem never reach the Linux container.
+        usePolling: true,
+        interval: 1000,
+      },
     },
   },
   tanstackStart: {

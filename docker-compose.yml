@@ -3,14 +3,12 @@ services:
     image: mysql:8.4
     environment:
       MYSQL_DATABASE: internmatchlaravel
-      MYSQL_USER: internmatch
-      MYSQL_PASSWORD: internmatch
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: Admin123!
     volumes:
       - internmatch_mysql:/var/lib/mysql
     healthcheck:
       test:
-        ["CMD-SHELL", "mysqladmin ping -h localhost -u root -proot --silent"]
+        ["CMD-SHELL", "mysqladmin ping -h localhost -u root -pAdmin123! --silent"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -30,8 +28,8 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_DATABASE: internmatchlaravel
-      DB_USERNAME: internmatch
-      DB_PASSWORD: internmatch
+      DB_USERNAME: root
+      DB_PASSWORD: Admin123!
       SESSION_DRIVER: file
       CACHE_STORE: database
       QUEUE_CONNECTION: database
@@ -51,6 +49,10 @@ services:
     working_dir: /app
     environment:
       LARAVEL_URL: http://backend:8000
+      # Required for Vite HMR file watching to work inside Docker on Windows.
+      # Windows NTFS change events don't propagate to the Linux VM, so we poll instead.
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
     ports:
       - "8080:8080"
     volumes:

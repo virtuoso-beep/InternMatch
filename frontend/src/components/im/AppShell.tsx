@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ROLES, type RoleKey } from "@/lib/internmatch";
 import { cx } from "./ui";
-import sealAsset from "@/assets/umtc-seal.png.asset.json";
+import sealUrl from "@/assets/umtc-seal.png";
 import { logout } from "@/lib/api";
 import { SessionGuard, useSessionUser } from "./SessionGuard";
 
@@ -209,7 +209,7 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
             </svg>
           </button>
           <Link to="/" className="flex min-w-0 items-center gap-2 text-xl font-bold tracking-tight">
-            <img src={sealAsset.url} alt="UM Tagum College seal" className="size-8 shrink-0" />
+            <img src={sealUrl} alt="UM Tagum College seal" className="size-8 shrink-0" />
             <span className="truncate">InternMatch</span>
           </Link>
         </div>

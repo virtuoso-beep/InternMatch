@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ROLES } from "@/lib/internmatch";
 
-import sealAsset from "@/assets/umtc-seal.png.asset.json";
+import sealUrl from "@/assets/umtc-seal.png";
 import { login } from "@/lib/api";
 
 export const Route = createFileRoute("/auth")({
@@ -15,7 +15,10 @@ export const Route = createFileRoute("/auth")({
           "Sign in to InternMatch with your institutional credentials to manage competency profiles, deployments, hours, evaluations, and placement analytics.",
       },
       { property: "og:title", content: "Sign in — InternMatch UMTC" },
-      { property: "og:description", content: "Evidence-based internship placement for UM Tagum College." },
+      {
+        property: "og:description",
+        content: "Evidence-based internship placement for UM Tagum College.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -65,12 +68,14 @@ function AuthPage() {
       {/* Left brand panel */}
       <aside className="brand-gradient relative flex flex-col justify-between px-8 py-8 text-brand-foreground lg:px-14 lg:py-10">
         <div className="flex items-center gap-3">
-          <img src={sealAsset.url} alt="UM Tagum College seal" className="size-14 drop-shadow-md" />
+          <img src={sealUrl} alt="UM Tagum College seal" className="size-14 drop-shadow-md" />
           <div>
             <p className="text-xl font-extrabold tracking-tight">
               Intern<span className="text-warn">Match</span>
             </p>
-            <p className="text-[10px] font-semibold tracking-[0.22em] uppercase opacity-85">UM Tagum College</p>
+            <p className="text-[10px] font-semibold tracking-[0.22em] uppercase opacity-85">
+              UM Tagum College
+            </p>
           </div>
         </div>
 
@@ -79,8 +84,8 @@ function AuthPage() {
             Evidence-based internship placement for UMTC.
           </h1>
           <p className="mt-5 max-w-md text-sm leading-relaxed opacity-90">
-            Sign in to manage competency profiles, host establishments, deployment assignments, certified hours,
-            supervisor evaluations, and placement analytics.
+            Sign in to manage competency profiles, host establishments, deployment assignments,
+            certified hours, supervisor evaluations, and placement analytics.
           </p>
           <ul className="mt-8 space-y-3.5">
             {HIGHLIGHTS.map((h) => (
@@ -92,13 +97,17 @@ function AuthPage() {
           </ul>
         </div>
 
-        <p className="text-xs opacity-75">University of Mindanao Tagum College · Department of Computing Education</p>
+        <p className="text-xs opacity-75">
+          University of Mindanao Tagum College · Department of Computing Education
+        </p>
       </aside>
 
       {/* Right form panel */}
       <main className="flex items-center justify-center bg-card px-6 py-12">
         <div className="w-full max-w-md">
-          <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Sign in to your account</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight text-foreground">
+            Sign in to your account
+          </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Use the institutional credentials issued by the system administrator.
           </p>
@@ -106,7 +115,9 @@ function AuthPage() {
           <form className="mt-8 space-y-5" onSubmit={submit} noValidate>
             {/* Email */}
             <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-foreground">Institutional email</span>
+              <span className="mb-1.5 block text-sm font-semibold text-foreground">
+                Institutional email
+              </span>
               <div className="relative">
                 <svg
                   className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -137,7 +148,9 @@ function AuthPage() {
                 <button
                   type="button"
                   className="text-xs font-semibold text-brand hover:underline"
-                  onClick={() => setError("Password resets are handled by the system administrator.")}
+                  onClick={() =>
+                    setError("Password resets are handled by the system administrator.")
+                  }
                 >
                   Forgot password?
                 </button>
@@ -169,13 +182,27 @@ function AuthPage() {
                   className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {showPassword ? (
-                    <svg className="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <svg
+                      className="size-4.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden="true"
+                    >
                       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
                       <circle cx="12" cy="12" r="3" />
                       <path d="m4 4 16 16" />
                     </svg>
                   ) : (
-                    <svg className="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <svg
+                      className="size-4.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden="true"
+                    >
                       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
@@ -196,7 +223,10 @@ function AuthPage() {
             </label>
 
             {error && (
-              <p role="alert" className="rounded-md bg-brand-soft px-3.5 py-2.5 text-sm font-medium text-brand">
+              <p
+                role="alert"
+                className="rounded-md bg-brand-soft px-3.5 py-2.5 text-sm font-medium text-brand"
+              >
                 {error}
               </p>
             )}

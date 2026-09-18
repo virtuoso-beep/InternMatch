@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ROLES, ROLE_ORDER } from "@/lib/internmatch";
 import heroInterns from "@/assets/hero-interns.jpg";
-import sealAsset from "@/assets/umtc-seal.png.asset.json";
+import sealUrl from "@/assets/umtc-seal.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -73,7 +73,7 @@ function Landing() {
       <header className="sticky top-0 z-30 border-b-4 border-warn bg-card/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <div className="flex items-center gap-2.5">
-            <img src={sealAsset.url} alt="UM Tagum College seal" className="size-10" />
+            <img src={sealUrl} alt="UM Tagum College seal" className="size-10" />
             <div>
               <p className="text-lg font-bold tracking-tight text-foreground">
                 Intern<span className="text-brand">Match</span>
@@ -200,7 +200,7 @@ function Landing() {
       <footer className="bg-brand text-brand-foreground">
         <div className="mx-auto max-w-6xl px-5 py-10">
           <div className="flex items-center gap-2.5">
-            <img src={sealAsset.url} alt="UM Tagum College seal" className="size-10" />
+            <img src={sealUrl} alt="UM Tagum College seal" className="size-10" />
             <div>
               <p className="text-lg font-bold">
                 Intern<span className="text-warn">Match</span>
