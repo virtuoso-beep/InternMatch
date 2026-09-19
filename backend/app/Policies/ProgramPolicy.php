@@ -12,7 +12,7 @@ class ProgramPolicy
     {
         return $user->hasPermission(Permission::ManageAcademicRecords)
             || ($user->hasPermission(Permission::ViewProgramRecords)
-                && $user->programTerms()->where('program_id', $program->id)->exists());
+                && $user->programs()->whereKey($program->id)->exists());
     }
 
     public function create(User $user): bool

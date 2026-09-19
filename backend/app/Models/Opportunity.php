@@ -48,7 +48,7 @@ class Opportunity extends Model
     /** @return BelongsToMany<Program, $this> */
     public function programs(): BelongsToMany
     {
-        return $this->belongsToMany(Program::class, 'opportunity_program')->withTimestamps();
+        return $this->belongsToMany(Program::class, 'opportunity_program')->withPivot('capacity')->withTimestamps();
     }
 
     /** @return BelongsToMany<Competency, $this> */

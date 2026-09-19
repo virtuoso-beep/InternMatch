@@ -11,6 +11,9 @@ class StudentEnrollmentPolicy
 {
     public function view(User $user, StudentEnrollment $enrollment): bool
     {
+        if ($user->hasPermission(Permission::ManageSystem)) {
+            return true;
+        }
         if ($user->hasPermission(Permission::ViewOwnPlacement)) {
             return $enrollment->student->user_id === $user->id;
         }

@@ -276,7 +276,7 @@ class InternMatchSchemaTest extends TestCase
         $this->assertStringEndsWith('_testing', config('database.connections.mysql.database'));
         User::factory()->create();
 
-        $this->artisan('migrate:rollback', ['--step' => 10, '--force' => true])->assertExitCode(0);
+        $this->artisan('migrate:rollback', ['--step' => DB::table('migrations')->where('migration', 'not like', '0001_%')->count(), '--force' => true])->assertExitCode(0);
 
         $this->assertTrue(Schema::hasTable('users'));
         $this->assertFalse(Schema::hasColumn('users', 'role'));

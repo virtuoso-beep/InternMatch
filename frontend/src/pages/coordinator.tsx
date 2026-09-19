@@ -1,4 +1,10 @@
+import { NotificationList } from "@/components/im/NotificationList";
+import { MonitoringWorkspace } from "@/components/im/MonitoringWorkspace";
+import { ProgramMonitoringSettings } from "@/components/im/ProgramMonitoringSettings";
 import { useState } from "react";
+import { OpportunityWorkspace } from "@/components/im/OpportunityWorkspace";
+import { RequirementWorkspace } from "@/components/im/RequirementWorkspace";
+import { HostWorkspace } from "@/components/im/HostWorkspace";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AccessibilityMap } from "@/components/im/AccessibilityMap";
@@ -25,6 +31,7 @@ import { ProfileEditor } from "@/components/im/ProfileEditor";
 
 export function CoordinatorSection({ section }: { section: string }) {
   switch (section) {
+    case "notifications": return <NotificationList />;
     case "profile":
       return <ProfileEditor role="coordinator" />;
     case "":
@@ -35,14 +42,17 @@ export function CoordinatorSection({ section }: { section: string }) {
       return <Approvals />;
     case "students":
       return <Students />;
+    case "opportunities":
+      return <OpportunityWorkspace />;
     case "hosts":
-      return <Hosts />;
+      return <HostWorkspace />;
     case "progress":
-      return <Progress />;
+      return <MonitoringWorkspace />;
     case "requirements":
-      return <Requirements />;
+      return <RequirementWorkspace />;
     case "evaluations":
-      return <Evaluations />;
+      return <MonitoringWorkspace />;
+    case "monitoring-settings": return <ProgramMonitoringSettings />;
     case "analytics":
       return <Analytics />;
     case "map":
@@ -239,45 +249,6 @@ function Students() {
   );
 }
 
-function Hosts() {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  return (
-    <>
-      <PageHeader
-        title="Host establishments"
-        subtitle="Partner organisations, slot capacity, and agreement status."
-        action={<Button onClick={() => setDialogOpen(true)}>Add establishment</Button>}
-      />
-      <div className="grid gap-4 xl:grid-cols-2">
-        {HOSTS.map((h) => (
-          <Card key={h.name}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold">{h.name}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {h.field} · {h.city}
-                </p>
-              </div>
-              <Pill tone={statusTone(h.moa)}>{h.moa}</Pill>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <Field label="Slots" value={`${h.slotsOpen}/${h.slotsTotal}`} />
-              <Field label="Distance" value={`${h.km} km`} />
-              <Field label="Rating" value={`${h.rating} / 5.0`} />
-            </div>
-          </Card>
-        ))}
-      </div>
-      <ActionDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        title="Add host establishment"
-        fields={[{ name: "name", label: "Establishment name", placeholder: "e.g. Davao Tech Hub" }, { name: "contact", label: "Contact email", type: "email", placeholder: "contact@example.com" }]}
-        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values['name']} was added for review.`); }}
-      />
-    </>
-  );
-}
 
 function Progress() {
   return (
@@ -315,32 +286,6 @@ function Progress() {
   );
 }
 
-function Requirements() {
-  return (
-    <>
-      <PageHeader title="Requirements tracking" subtitle="Document compliance across all deployed students." />
-      <StatGrid>
-        <StatCard label="Complete" value="118" tone="success" />
-        <StatCard label="Under review" value="26" tone="warn" />
-        <StatCard label="Missing" value="16" tone="brand" />
-        <StatCard label="Compliance rate" value="74%" />
-      </StatGrid>
-      <Card>
-        <CardTitle>Compliance by document type</CardTitle>
-        <Bars
-          data={[
-            { label: "Medical Clearance", value: 96 },
-            { label: "Parental Consent", value: 93 },
-            { label: "Endorsement Letter", value: 88 },
-            { label: "Memorandum of Agreement", value: 71 },
-            { label: "Insurance Certificate", value: 64 },
-            { label: "Weekly Journals", value: 58 },
-          ]}
-        />
-      </Card>
-    </>
-  );
-}
 
 function Evaluations() {
   return (

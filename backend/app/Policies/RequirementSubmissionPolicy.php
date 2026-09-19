@@ -11,7 +11,8 @@ class RequirementSubmissionPolicy
 {
     public function view(User $user, RequirementSubmission $submission): bool
     {
-        return ($user->hasPermission(Permission::SubmitOwnRequirements)
+        return $user->hasPermission(Permission::ManageSystem)
+            || ($user->hasPermission(Permission::SubmitOwnRequirements)
             && $submission->studentEnrollment->student->user_id === $user->id)
             || ($user->hasPermission(Permission::ReviewRequirements)
                 && $user->isAssignedToProgramTerm($submission->program_term_id));
@@ -21,6 +22,6 @@ class RequirementSubmissionPolicy
     {
         return $user->hasPermission(Permission::ReviewRequirements)
             && $user->isAssignedToProgramTerm($submission->program_term_id)
-            && $submission->status === SubmissionStatus::Submitted;
+            && in_array($submission->status, [SubmissionStatus::Submitted, SubmissionStatus::UnderReview], true);
     }
 }

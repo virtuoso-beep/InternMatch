@@ -1,7 +1,22 @@
 <?php
 
+use App\Http\Controllers\AcademicController;
+use App\Http\Controllers\AccountAccessController;
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CompetencyController;
+use App\Http\Controllers\EvaluationController;
+use App\Http\Controllers\HostController;
+use App\Http\Controllers\MonitoringController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OpportunityController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProgramAccessController;
+use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\ProgramMonitoringController;
+use App\Http\Controllers\RequirementController;
+use App\Http\Controllers\StudentPortalController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -14,6 +29,50 @@ Route::prefix('api/v1')->group(function (): void {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('session', [AuthController::class, 'show'])->middleware(['auth', 'active']);
     Route::middleware(['auth', 'active'])->group(function (): void {
+        Route::get('placements', [MonitoringController::class, 'index']);
+        Route::get('placements/{placement}/evaluations', [EvaluationController::class, 'index']);
+        Route::post('placements/{placement}/evaluations', [EvaluationController::class, 'save']);
+        Route::get('program-monitoring', [ProgramMonitoringController::class, 'index']);
+        Route::put('program-terms/{programTerm}/monitoring-rules', [ProgramMonitoringController::class, 'rules']);
+        Route::post('programs/{program}/evaluation-rubrics', [ProgramMonitoringController::class, 'rubric']);
+        Route::get('placements/{placement}/monitoring', [MonitoringController::class, 'show']);
+        Route::post('placements/{placement}/time-logs', [MonitoringController::class, 'time']);
+        Route::post('time-logs/{timeLog}/verify', [MonitoringController::class, 'verify']);
+        Route::post('placements/{placement}/journals', [MonitoringController::class, 'journal']);
+        Route::post('journals/{journal}/review', [MonitoringController::class, 'reviewJournal']);
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::patch('notifications/{notification}/read', [NotificationController::class, 'read']);
+        Route::get('enrollments/{enrollment}/requirements', [RequirementController::class, 'index']);
+        Route::post('enrollments/{enrollment}/requirements', [RequirementController::class, 'submit']);
+        Route::post('program-terms/{programTerm}/requirements', [RequirementController::class, 'configure']);
+        Route::get('requirement-configuration', [RequirementController::class, 'configuration']);
+        Route::get('submissions/{submission}/document', [RequirementController::class, 'download']);
+        Route::post('submissions/{submission}/review', [RequirementController::class, 'review']);
+        Route::get('users', [AccountController::class, 'index']);
+        Route::post('users', [AccountController::class, 'store']);
+        Route::put('users/{user}/hosts', [AccountController::class, 'assignHosts']);
+        Route::patch('users/{user}/access', AccountAccessController::class);
+        Route::get('placement-reference', [AcademicController::class, 'reference']);
+        Route::post('academic-terms', [AcademicController::class, 'storeTerm']);
+        Route::post('enrollments', [AcademicController::class, 'enroll']);
+        Route::get('hosts', [HostController::class, 'index']);
+        Route::post('hosts', [HostController::class, 'store']);
+        Route::patch('hosts/{host}', [HostController::class, 'update']);
+        Route::get('hosts/{host}/capacities', [HostController::class, 'capacities']);
+        Route::put('hosts/{host}/capacities', [HostController::class, 'updateCapacity']);
+        Route::get('opportunities', [OpportunityController::class, 'index']);
+        Route::post('opportunities', [OpportunityController::class, 'store']);
+        Route::put('opportunities/{opportunity}', [OpportunityController::class, 'update']);
+        Route::get('audit-logs', AuditController::class);
+        Route::get('enrollments', [StudentPortalController::class, 'enrollments']);
+        Route::get('enrollments/{enrollment}/opportunities', [StudentPortalController::class, 'opportunities']);
+        Route::get('enrollments/{enrollment}/recommendations', [StudentPortalController::class, 'recommendations']);
+        Route::get('competencies', [CompetencyController::class, 'index']);
+        Route::post('competencies', [CompetencyController::class, 'store']);
+        Route::delete('competencies/{competency}', [CompetencyController::class, 'destroy']);
+        Route::get('programs', [ProgramController::class, 'index']);
+        Route::patch('programs/{program}', [ProgramController::class, 'update']);
+        Route::put('users/{user}/programs', ProgramAccessController::class);
         Route::get('profile', [ProfileController::class, 'show']);
         Route::patch('profile', [ProfileController::class, 'update']);
     });

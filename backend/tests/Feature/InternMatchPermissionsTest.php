@@ -40,7 +40,7 @@ class InternMatchPermissionsTest extends TestCase
     {
         $placement = Placement::factory()->create();
         $user = User::factory()->withRole($role)->create();
-        $user->programTerms()->attach($placement->studentEnrollment->program_term_id);
+        $user->programs()->attach($placement->studentEnrollment->programTerm->program_id);
 
         $this->assertSame($allowed, Gate::forUser($user)->allows('decide', $placement));
     }
@@ -49,7 +49,7 @@ class InternMatchPermissionsTest extends TestCase
     {
         $placement = Placement::factory()->create();
         $user = User::factory()->withRole(Role::Coordinator)->create();
-        $user->programTerms()->attach(ProgramTerm::factory()->create());
+        $user->programs()->attach(ProgramTerm::factory()->create()->program_id);
 
         $this->assertFalse(Gate::forUser($user)->allows('decide', $placement));
         $this->assertFalse(Gate::forUser($user)->allows('view', $placement));
@@ -65,7 +65,7 @@ class InternMatchPermissionsTest extends TestCase
     {
         $placement = Placement::factory()->create();
         $user = User::factory()->withRole(Role::Coordinator)->create(['status' => $status]);
-        $user->programTerms()->attach($placement->studentEnrollment->program_term_id);
+        $user->programs()->attach($placement->studentEnrollment->programTerm->program_id);
 
         $this->assertFalse(Gate::forUser($user)->allows('decide', $placement));
     }
@@ -101,7 +101,7 @@ class InternMatchPermissionsTest extends TestCase
         $this->assertTrue($admin->hasPermission(Permission::ManageSystem));
         $this->assertTrue(Gate::forUser($admin)->allows('update', $placement->hostEstablishment));
         $this->assertTrue(Gate::forUser($admin)->allows('update', $placement->studentEnrollment->programTerm->program));
-        $this->assertFalse(Gate::forUser($admin)->allows('view', $placement));
+        $this->assertTrue(Gate::forUser($admin)->allows('view', $placement));
         $this->assertFalse($admin->hasPermission(Permission::SubmitEvaluations));
         $this->assertFalse($admin->hasPermission(Permission::ReviewRequirements));
     }
@@ -158,7 +158,7 @@ class InternMatchPermissionsTest extends TestCase
         $dean = User::factory()->withRole(Role::Dean)->create();
         $placement = Placement::factory()->create();
         $other = Placement::factory()->create();
-        $dean->programTerms()->attach($placement->studentEnrollment->program_term_id);
+        $dean->programs()->attach($placement->studentEnrollment->programTerm->program_id);
 
         $this->assertTrue(Gate::forUser($dean)->allows('view', $placement));
         $this->assertFalse(Gate::forUser($dean)->allows('view', $other));
@@ -173,7 +173,7 @@ class InternMatchPermissionsTest extends TestCase
 
         $this->assertFalse(Gate::forUser($coordinator)->allows('review', $submission));
 
-        $coordinator->programTerms()->attach($submission->program_term_id);
+        $coordinator->programs()->attach($submission->programTerm->program_id);
         $this->assertTrue(Gate::forUser($coordinator)->allows('review', $submission));
 
         $submission->update(['status' => SubmissionStatus::Approved]);
@@ -184,7 +184,7 @@ class InternMatchPermissionsTest extends TestCase
     {
         $submission = RequirementSubmission::factory()->create();
         $dean = User::factory()->withRole(Role::Dean)->create();
-        $dean->programTerms()->attach($submission->program_term_id);
+        $dean->programs()->attach($submission->programTerm->program_id);
 
         $this->assertTrue($dean->hasPermission(Permission::ViewReports));
         $this->assertFalse(Gate::forUser($dean)->allows('view', $submission));

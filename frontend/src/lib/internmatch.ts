@@ -28,6 +28,7 @@ export const ROLES: Record<RoleKey, RoleConfig> = {
           { label: "Dashboard", section: "" },
           
           { label: "Competencies", section: "competencies" },
+          { label: "Opportunities", section: "opportunities" },
           { label: "Recommendations", section: "recommendations" },
         ],
       },
@@ -57,12 +58,14 @@ export const ROLES: Record<RoleKey, RoleConfig> = {
           { label: "Pending Approvals", section: "approvals" },
           { label: "Student Profiles", section: "students" },
           { label: "Host Establishments", section: "hosts" },
+          { label: "Opportunities", section: "opportunities" },
         ],
       },
       {
         group: "Monitoring",
         items: [
           { label: "Internship Progress", section: "progress" },
+          { label: "Monitoring Settings", section: "monitoring-settings" },
           { label: "Requirements", section: "requirements" },
           { label: "Evaluations", section: "evaluations" },
         ],
@@ -151,7 +154,9 @@ export const ROLES: Record<RoleKey, RoleConfig> = {
         group: "Records",
         items: [
           { label: "Host Establishments", section: "hosts" },
+          { label: "Opportunities", section: "opportunities" },
           { label: "Programs & Curriculum", section: "programs" },
+          { label: "Monitoring Settings", section: "monitoring-settings" },
           { label: "MOA Records", section: "moa" },
         ],
       },
@@ -177,7 +182,6 @@ export type Host = {
   slotsOpen: number;
   slotsTotal: number;
   tags: string[];
-  travel: string;
   rating: number;
   accessibility: "High" | "Moderate" | "Low";
   moa: string;
@@ -195,7 +199,6 @@ export const HOSTS: Host[] = [
     slotsOpen: 2,
     slotsTotal: 4,
     tags: ["Web Development", "Database Design", "REST APIs"],
-    travel: "12 min",
     rating: 4.6,
     accessibility: "High",
     moa: "Active until Jun 2027",
@@ -211,7 +214,6 @@ export const HOSTS: Host[] = [
     slotsOpen: 1,
     slotsTotal: 2,
     tags: ["Networking", "Technical Support"],
-    travel: "9 min",
     rating: 4.3,
     accessibility: "High",
     moa: "Active until Mar 2027",
@@ -227,7 +229,6 @@ export const HOSTS: Host[] = [
     slotsOpen: 3,
     slotsTotal: 3,
     tags: ["Networking"],
-    travel: "26 min",
     rating: 4.1,
     accessibility: "Moderate",
     moa: "Expiring in 30 days",
@@ -243,7 +244,6 @@ export const HOSTS: Host[] = [
     slotsOpen: 2,
     slotsTotal: 5,
     tags: ["Web Development", "UI Design"],
-    travel: "38 min",
     rating: 3.9,
     accessibility: "Low",
     moa: "Active until Nov 2026",
@@ -259,7 +259,6 @@ export const HOSTS: Host[] = [
     slotsOpen: 4,
     slotsTotal: 6,
     tags: ["Data Analysis", "Python", "Reporting"],
-    travel: "45 min",
     rating: 4.5,
     accessibility: "Low",
     moa: "Active until Aug 2027",

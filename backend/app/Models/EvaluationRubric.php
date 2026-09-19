@@ -25,7 +25,7 @@ class EvaluationRubric extends Model
     /** @return HasMany<EvaluationCriterion, $this> */
     public function criteria(): HasMany
     {
-        return $this->hasMany(EvaluationCriterion::class);
+        return $this->hasMany(EvaluationCriterion::class)->orderBy('sort_order')->orderBy('id');
     }
 
     /** @return HasMany<Evaluation, $this> */

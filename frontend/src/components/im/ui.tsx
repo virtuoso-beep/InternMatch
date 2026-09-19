@@ -97,12 +97,14 @@ export function Button({
   variant = "primary",
   onClick,
   type = "button",
+  disabled = false,
   className,
 }: {
   children: ReactNode;
   variant?: "primary" | "outline" | "ghost";
   onClick?: () => void;
   type?: "button" | "submit";
+  disabled?: boolean;
   className?: string;
 }) {
   const styles = {
@@ -113,7 +115,8 @@ export function Button({
   return (
     <button
       type={type}
-      onClick={onClick ?? (() => toast(`${typeof children === "string" ? children : "Action"} selected`))}
+      onClick={onClick}
+      disabled={disabled}
       className={cx(
         "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         styles,

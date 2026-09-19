@@ -1,3 +1,5 @@
+import { NotificationList } from "@/components/im/NotificationList";
+import { ProgramMonitoringSettings } from "@/components/im/ProgramMonitoringSettings";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -17,27 +19,36 @@ import {
   Table,
   statusTone,
 } from "@/components/im/ui";
-import { AUDIT, HOSTS, PROGRAMS, USERS } from "@/lib/internmatch";
+import { AUDIT, HOSTS, USERS } from "@/lib/internmatch";
+import { ProgramRegistry } from "@/components/im/ProgramRegistry";
+import { AuditLog } from "@/components/im/AuditLog";
+import { OpportunityWorkspace } from "@/components/im/OpportunityWorkspace";
+import { HostWorkspace } from "@/components/im/HostWorkspace";
+import { AccountRegistry } from "@/components/im/AccountRegistry";
 import { ProfileEditor } from "@/components/im/ProfileEditor";
 
 export function AdminSection({ section }: { section: string }) {
   switch (section) {
+    case "notifications": return <NotificationList />;
+    case "monitoring-settings": return <ProgramMonitoringSettings />;
     case "profile":
       return <ProfileEditor role="admin" />;
     case "":
       return <Dashboard />;
     case "users":
-      return <Users />;
+      return <AccountRegistry />;
     case "roles":
       return <Roles />;
+    case "opportunities":
+      return <OpportunityWorkspace />;
     case "hosts":
-      return <Hosts />;
+      return <HostWorkspace />;
     case "programs":
       return <Programs />;
     case "moa":
       return <MoaRecords />;
     case "audit":
-      return <Audit />;
+      return <AuditLog />;
     case "backup":
       return <Backup />;
     default:
@@ -90,73 +101,6 @@ function Dashboard() {
   );
 }
 
-function Users() {
-  const [filter, setFilter] = useState("All");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editUser, setEditUser] = useState<(typeof USERS)[number] | null>(null);
-  const [users, setUsers] = useState(USERS);
-  const rows = users.filter((u) => filter === "All" || u.role.includes(filter));
-  return (
-    <>
-      <PageHeader
-        title="User accounts"
-        subtitle="612 active accounts across all roles"
-        action={<Button onClick={() => setDialogOpen(true)}>+ Add user</Button>}
-      />
-      <FilterChips
-        options={["All", "Student", "Coordinator", "Supervisor", "Dean"]}
-        value={filter}
-        onChange={setFilter}
-      />
-      <Card>
-        <Table head={["Name", "Role", "Last login", "Status", "Action"]}>
-          {rows.map((u) => (
-            <Row key={u.name}>
-              <td className="font-medium">{u.name}</td>
-              <td className="text-muted-foreground">{u.role}</td>
-              <td className="text-muted-foreground">{u.login}</td>
-              <td>
-                <Pill tone={statusTone(u.status)}>{u.status}</Pill>
-              </td>
-              <td>
-                <button type="button" onClick={() => u.status === "Pending" ? toast.success(`Invite resent to ${u.name}.`) : setEditUser(u)} className="text-sm font-semibold text-brand hover:underline">
-                  {u.status === "Pending" ? "Resend invite" : "Edit"}
-                </button>
-              </td>
-            </Row>
-          ))}
-        </Table>
-        <p className="mt-4 text-sm text-muted-foreground">Showing {rows.length} of 612 accounts</p>
-      </Card>
-      <ActionDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        title="Add user"
-        fields={[{ name: "name", label: "Full name", placeholder: "e.g. Juan Dela Cruz" }, { name: "email", label: "Email", type: "email", placeholder: "name@example.com" }]}
-        onSubmit={(values) => { setDialogOpen(false); toast.success(`Invitation sent to ${values['name']} (${values['email']}).`); }}
-      />
-      <ActionDialog
-        key={editUser?.name ?? "edit-user"}
-        open={editUser !== null}
-        onOpenChange={(open) => { if (!open) setEditUser(null); }}
-        title={`Edit ${editUser?.name ?? "user"}`}
-        fields={[
-          { name: "name", label: "Full name", placeholder: "Full name" },
-          { name: "role", label: "Role", type: "select", options: ["Student", "Practicum Coordinator", "Host Supervisor", "Dean", "System Administrator"] },
-          { name: "status", label: "Account status", type: "select", options: ["Active", "Pending", "Disabled"] },
-        ]}
-        initialValues={editUser ? { name: editUser.name, role: editUser.role, status: editUser.status } : {}}
-        submitLabel="Save changes"
-        onSubmit={(values) => {
-          if (!editUser) return;
-          setUsers((current) => current.map((user) => user.name === editUser.name ? { ...user, name: values['name'] ?? user.name, role: values['role'] ?? user.role, status: values['status'] ?? user.status } : user));
-          setEditUser(null);
-          toast.success(`${values['name']}'s account was updated.`);
-        }}
-      />
-    </>
-  );
-}
 
 function Roles() {
   const perms = ["View students", "Approve placements", "Submit evaluations", "Manage users", "Export reports"];
@@ -189,59 +133,9 @@ function Roles() {
   );
 }
 
-function Hosts() {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  return (
-    <>
-      <PageHeader title="Host establishments" subtitle="Master record of partner organisations." action={<Button onClick={() => setDialogOpen(true)}>+ Add establishment</Button>} />
-      <Card>
-        <Table head={["Establishment", "Industry", "City", "Slots", "MOA"]}>
-          {HOSTS.map((h) => (
-            <Row key={h.name}>
-              <td className="font-medium">{h.name}</td>
-              <td className="text-muted-foreground">{h.field}</td>
-              <td className="text-muted-foreground">{h.city}</td>
-              <td>
-                {h.slotsOpen}/{h.slotsTotal}
-              </td>
-              <td>
-                <Pill tone={statusTone(h.moa)}>{h.moa}</Pill>
-              </td>
-            </Row>
-          ))}
-        </Table>
-      </Card>
-      <ActionDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        title="Add host establishment"
-        fields={[{ name: "name", label: "Establishment name", placeholder: "e.g. Davao Tech Hub" }, { name: "city", label: "City", placeholder: "Tagum City" }]}
-        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values['name']} in ${values['city']} added to the partner registry.`); }}
-      />
-    </>
-  );
-}
 
 function Programs() {
-  return (
-    <>
-      <PageHeader title="Programs & curriculum" subtitle="Programs and their mapped practicum competencies." />
-      <div className="grid gap-4 lg:grid-cols-3">
-        {PROGRAMS.map((p) => (
-          <Card key={p.code}>
-            <CardTitle>{p.code}</CardTitle>
-            <p className="text-sm text-muted-foreground">{p.name}</p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <Field label="Students" value={String(p.students)} />
-              <Field label="Partners" value={String(p.partners)} />
-              <Field label="Required hours" value="486" />
-              <Field label="Competencies" value="12 mapped" />
-            </div>
-          </Card>
-        ))}
-      </div>
-    </>
-  );
+  return <ProgramRegistry />;
 }
 
 function MoaRecords() {
@@ -264,28 +158,6 @@ function MoaRecords() {
               <td>
                 <Pill tone={statusTone(h.moa)}>{h.moa}</Pill>
               </td>
-            </Row>
-          ))}
-        </Table>
-      </Card>
-    </>
-  );
-}
-
-function Audit() {
-  const exportLog = () => downloadText("internmatch-audit.csv", ["Timestamp,Actor,Action,Target,IP address", ...AUDIT.map((a) => [a.time, a.actor, a.action, a.target, a.ip].map((v) => `"${v}"`).join(","))].join("\n"), "text/csv");
-  return (
-    <>
-      <PageHeader title="Audit trail" subtitle="Immutable log of all system activity." action={<Button variant="outline" onClick={exportLog}>Export log</Button>} />
-      <Card>
-        <Table head={["Timestamp", "Actor", "Action", "Target", "IP address"]}>
-          {AUDIT.map((a) => (
-            <Row key={a.time}>
-              <td className="text-muted-foreground">{a.time}</td>
-              <td className="font-medium">{a.actor}</td>
-              <td>{a.action}</td>
-              <td className="text-muted-foreground">{a.target}</td>
-              <td className="text-muted-foreground">{a.ip}</td>
             </Row>
           ))}
         </Table>

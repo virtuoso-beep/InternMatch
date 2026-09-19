@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['host_establishment_id', 'reference_number', 'status', 'effective_on', 'expires_on', 'max_interns_per_term', 'signatories', 'notes', 'document_id'])]
+#[Fillable(['host_establishment_id', 'reference_number', 'status', 'effective_on', 'expires_on', 'max_interns_per_term', 'signatories', 'notes', 'document_id', 'is_institution_wide'])]
 class Moa extends Model
 {
     /** @use HasFactory<MoaFactory> */
@@ -25,7 +25,13 @@ class Moa extends Model
             'expires_on' => 'immutable_date',
             'max_interns_per_term' => 'integer',
             'signatories' => 'array',
+            'is_institution_wide' => 'boolean',
         ];
+    }
+
+    public function coversProgram(int $programId): bool
+    {
+        return $this->is_institution_wide || $this->programs()->whereKey($programId)->exists();
     }
 
     /** @return BelongsTo<HostEstablishment, $this> */

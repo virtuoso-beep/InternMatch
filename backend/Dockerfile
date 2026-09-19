@@ -3,8 +3,8 @@ FROM php:8.4-cli
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends libzip-dev unzip \
-	&& docker-php-ext-install pdo_mysql zip \
+	&& apt-get install -y --no-install-recommends libzip-dev libicu-dev unzip \
+	&& docker-php-ext-install pdo_mysql zip intl \
 	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html

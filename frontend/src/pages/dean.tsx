@@ -1,3 +1,4 @@
+import { NotificationList } from "@/components/im/NotificationList";
 import { AccessibilityMap } from "@/components/im/AccessibilityMap";
 import { toast } from "sonner";
 import {
@@ -20,6 +21,7 @@ import { ProfileEditor } from "@/components/im/ProfileEditor";
 
 export function DeanSection({ section }: { section: string }) {
   switch (section) {
+    case "notifications": return <NotificationList />;
     case "profile":
       return <ProfileEditor role="dean" />;
     case "":

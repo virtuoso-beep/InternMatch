@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\ProfileResource;
 use App\Models\User;
+use App\Services\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +29,7 @@ class ProfileController extends Controller
             if ($profile !== []) {
                 $user->profile()->updateOrCreate([], $profile);
             }
+            Audit::record($user, 'profile.updated', $user, ['fields' => array_keys($data)]);
 
             return $user;
         });

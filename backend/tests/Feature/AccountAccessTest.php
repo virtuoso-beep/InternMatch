@@ -143,12 +143,12 @@ class AccountAccessTest extends TestCase
         $url = '/api/test/placements/'.$placement->id.'/decide';
 
         $this->actingAs($coordinator, 'web')->postJson($url)->assertForbidden();
-        $coordinator->programTerms()->attach($placement->studentEnrollment->program_term_id);
+        $coordinator->programs()->attach($placement->studentEnrollment->programTerm->program_id);
         $this->postJson($url)->assertNoContent();
 
         $this->app['auth']->forgetGuards();
         $admin = User::factory()->withRole(Role::Admin)->create();
-        $admin->programTerms()->attach($placement->studentEnrollment->program_term_id);
+        $admin->programs()->attach($placement->studentEnrollment->programTerm->program_id);
         $this->actingAs($admin, 'web')->postJson($url)->assertForbidden();
     }
 }

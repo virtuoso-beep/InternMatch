@@ -1,4 +1,8 @@
+import { NotificationList } from "@/components/im/NotificationList";
+import { MonitoringWorkspace } from "@/components/im/MonitoringWorkspace";
 import { useState } from "react";
+import { OpportunityWorkspace } from "@/components/im/OpportunityWorkspace";
+import { HostWorkspace } from "@/components/im/HostWorkspace";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -23,20 +27,21 @@ import { ProfileEditor } from "@/components/im/ProfileEditor";
 
 export function SupervisorSection({ section }: { section: string }) {
   switch (section) {
+    case "notifications": return <NotificationList />;
     case "profile":
       return <ProfileEditor role="supervisor" />;
     case "":
       return <Dashboard />;
     case "interns":
-      return <Interns />;
+      return <MonitoringWorkspace />;
     case "attendance":
-      return <Attendance />;
+      return <MonitoringWorkspace />;
     case "evaluations":
-      return <Evaluations />;
+      return <MonitoringWorkspace />;
     case "company":
-      return <Company />;
+      return <HostWorkspace />;
     case "opportunities":
-      return <Opportunities />;
+      return <OpportunityWorkspace />;
     case "moa":
       return <Moa />;
     default:
@@ -233,70 +238,7 @@ function Evaluations() {
   );
 }
 
-function Company() {
-  const navigate = useNavigate();
-  return (
-    <>
-      <PageHeader title="Company profile" subtitle="Details shown to students in recommendations." action={<Button onClick={() => navigate({ to: "/supervisor/$section", params: { section: "profile" } })}>Edit profile</Button>} />
-      <div className="grid gap-5 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardTitle>Establishment details</CardTitle>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Name" value="DataCore Solutions Inc." />
-            <Field label="Industry" value="Software Development" />
-            <Field label="Address" value="Pioneer Ave., Tagum City, Davao del Norte" />
-            <Field label="Distance from campus" value="3.2 km" />
-            <Field label="Contact person" value="Rico Fernandez" />
-            <Field label="Email" value="rfernandez@datacore.ph" />
-          </div>
-        </Card>
-        <Card>
-          <CardTitle>Capacity</CardTitle>
-          <div className="space-y-4">
-            <Field label="Total slots" value="4" />
-            <Field label="Open slots" value="2" />
-            <Field label="Accessibility rating" value={<Pill tone="success">High</Pill>} />
-            <Field label="Student rating" value="4.6 / 5.0" />
-          </div>
-        </Card>
-      </div>
-    </>
-  );
-}
 
-function Opportunities() {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  return (
-    <>
-      <PageHeader title="Internship opportunities" subtitle="Postings matched against student competency profiles." action={<Button onClick={() => setDialogOpen(true)}>Post opportunity</Button>} />
-      <div className="grid gap-4 xl:grid-cols-2">
-        {OPPORTUNITIES.map((o) => (
-          <Card key={o.title}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold">{o.title}</h3>
-                <p className="text-sm text-muted-foreground">{o.slots}</p>
-              </div>
-              <Pill tone={statusTone(o.status)}>{o.status}</Pill>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {o.competencies.map((c) => (
-                <Pill key={c}>{c}</Pill>
-              ))}
-            </div>
-          </Card>
-        ))}
-      </div>
-      <ActionDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        title="Post internship opportunity"
-        fields={[{ name: "title", label: "Opportunity title", placeholder: "e.g. Frontend Developer Intern" }, { name: "slots", label: "Available slots", type: "number", placeholder: "2" }]}
-        onSubmit={(values) => { setDialogOpen(false); toast.success(`${values['title']} posted with ${values['slots']} slot(s).`); }}
-      />
-    </>
-  );
-}
 
 function Moa() {
   const [renewalRequested, setRenewalRequested] = useState(false);

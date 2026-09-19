@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name', 'is_active'])]
+#[Fillable(['code', 'name', 'cluster', 'required_ojt_hours', 'internship_term', 'evaluation_rubric_id', 'is_active'])]
 class Program extends Model
 {
     /** @use HasFactory<ProgramFactory> */
@@ -19,7 +19,18 @@ class Program extends Model
     {
         return [
             'is_active' => 'boolean',
+            'required_ojt_hours' => 'integer',
         ];
+    }
+
+    public function competencies(): BelongsToMany
+    {
+        return $this->belongsToMany(Competency::class, 'program_competencies')->withTimestamps();
+    }
+
+    public function coordinators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'coordinator_program')->withTimestamps();
     }
 
     /** @return HasMany<ProgramTerm, $this> */

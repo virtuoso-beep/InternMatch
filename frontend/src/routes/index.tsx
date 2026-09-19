@@ -32,7 +32,7 @@ const CAPABILITIES = [
   },
   {
     title: "Supervised reranking",
-    body: "A Logistic Regression reranker scores retrieved candidates using coordinator-annotated placement judgments.",
+    body: "Planned optional reranking requires approved placement judgments and held-out evaluation. No trained ranker is currently available.",
   },
   {
     title: "Constrained cohort allocation",
@@ -40,7 +40,7 @@ const CAPABILITIES = [
   },
   {
     title: "Geospatial accessibility",
-    body: "Estimated student-to-establishment travel distance and placement distribution across localities.",
+    body: "Planned Haversine analysis measures straight-line distance in kilometers, not travel time or road distance.",
   },
   {
     title: "Monitoring & risk flags",
@@ -63,7 +63,7 @@ const ROLE_SUMMARY: Record<string, string> = {
 const PROCESS = [
   { n: "01", title: "Preprocess", body: "Competency and task descriptions are cleaned for embedding." },
   { n: "02", title: "Retrieve", body: "Cosine similarity over multilingual sentence embeddings." },
-  { n: "03", title: "Rerank", body: "Logistic Regression scores candidates on placement factors." },
+  { n: "03", title: "Rerank", body: "Use similarity and defined criteria unless a trained ranker has been validated." },
   { n: "04", title: "Decide", body: "Coordinator reviews, modifies, approves, or rejects." },
 ];
 
@@ -108,7 +108,7 @@ function Landing() {
             </h1>
             <p className="mt-5 max-w-xl text-base opacity-90">
               InternMatch centralizes student profiles, host establishments, deployments, requirements, and evaluations
-              for UM Tagum College — then ranks suitable placements using semantic matching, supervised learning, and
+              for UM Tagum College — plans to support placement decisions through semantic matching and
               geospatial accessibility analysis.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -127,7 +127,7 @@ function Landing() {
             </div>
             <dl className="mt-10 grid max-w-lg grid-cols-3 gap-6 border-t border-brand-foreground/20 pt-6">
               {[
-                ["2-stage", "Retrieval + reranking"],
+                ["16", "Academic programs"],
                 ["5", "User roles"],
                 ["19", "Functional requirements"],
               ].map(([v, l]) => (
@@ -153,7 +153,7 @@ function Landing() {
           One platform for placement, allocation, and monitoring
         </h2>
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          Every module maps to the functional requirements of the InternMatch capstone specification.
+          The modules below describe the intended system. This development version does not yet implement the full placement and monitoring workflow.
         </p>
         <div className="mt-10 grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-2 lg:grid-cols-3">
           {CAPABILITIES.map((c) => (

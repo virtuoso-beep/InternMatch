@@ -19,7 +19,7 @@ const base = "/api/v1";
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
-  if (init.body) headers.set("Content-Type", "application/json");
+  if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const response = await fetch(`${base}${path}`, { ...init, headers, credentials: "same-origin", cache: "no-store" });
   if (response.status === 204) return undefined as T;
   const json = await response.json().catch(() => null);
@@ -44,6 +44,11 @@ export async function mutate<T>(path: string, body?: unknown, method = "POST"): 
     headers: { "X-CSRF-TOKEN": token },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+}
+
+export async function upload<T>(path: string, body: FormData): Promise<T> {
+  const { token } = await api<{ token: string }>("/csrf");
+  return api<T>(path, { method: "POST", headers: { "X-CSRF-TOKEN": token }, body });
 }
 
 export async function currentUser(): Promise<SessionUser> {

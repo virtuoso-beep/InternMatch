@@ -4,8 +4,14 @@ set -eu
 
 cd /var/www/html
 
-if [ -z "${APP_KEY:-}" ]; then
-    export APP_KEY="$(php artisan key:generate --show)"
+if [ ! -f .env ]; then
+    cp .env.example .env
+fi
+
+# Preserve the application key across restarts; rotating it invalidates sessions
+# and makes previously encrypted application data unreadable.
+if [ -z "${APP_KEY:-}" ] && ! grep -Eq '^APP_KEY=.+$' .env; then
+    php artisan key:generate --force
 fi
 
 php artisan config:clear

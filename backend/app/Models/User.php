@@ -45,7 +45,12 @@ class User extends Authenticatable
 
     public function isAssignedToProgramTerm(int $programTermId): bool
     {
-        return $this->programTerms()->whereKey($programTermId)->exists();
+        return $this->programs()->whereHas('programTerms', fn ($query) => $query->whereKey($programTermId))->exists();
+    }
+
+    public function programs(): BelongsToMany
+    {
+        return $this->belongsToMany(Program::class, 'coordinator_program')->withTimestamps();
     }
 
     public function isAssignedToHost(int $hostEstablishmentId): bool
