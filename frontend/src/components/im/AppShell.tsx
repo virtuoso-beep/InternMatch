@@ -25,6 +25,7 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
   const [menu, setMenu] = useState<"none" | "bell" | "user">("none");
   const [notifications, setNotifications] = useState<NotificationPage | null>(null);
   const [notificationError, setNotificationError] = useState("");
+  const [notificationRevision, setNotificationRevision] = useState(0);
   const [logoutError, setLogoutError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
@@ -50,7 +51,13 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
     return () => {
       active = false;
     };
-  }, [pathname, menu]);
+  }, [pathname, menu, notificationRevision]);
+
+  useEffect(() => {
+    const refresh = () => setNotificationRevision((value) => value + 1);
+    window.addEventListener("internmatch:notifications-changed", refresh);
+    return () => window.removeEventListener("internmatch:notifications-changed", refresh);
+  }, []);
 
   useEffect(() => {
     const onClick = (event: MouseEvent) => {

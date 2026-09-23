@@ -1,4 +1,5 @@
 import { NotificationList } from "@/components/im/NotificationList";
+import { LiveDashboard } from "@/components/im/LiveDashboard";
 import { AccessibilityMap } from "@/components/im/AccessibilityMap";
 import { toast } from "sonner";
 import {
@@ -25,7 +26,7 @@ export function DeanSection({ section }: { section: string }) {
     case "profile":
       return <ProfileEditor role="dean" />;
     case "":
-      return <Dashboard />;
+      return <LiveDashboard />;
     case "performance":
       return <Performance />;
     case "hosts":

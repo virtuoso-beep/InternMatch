@@ -58,6 +58,7 @@ export const ROLES: Record<RoleKey, RoleConfig> = {
           { label: "Pending Approvals", section: "approvals" },
           { label: "Student Profiles", section: "students" },
           { label: "Host Establishments", section: "hosts" },
+          { label: "Agreements", section: "moa" },
           { label: "Opportunities", section: "opportunities" },
         ],
       },

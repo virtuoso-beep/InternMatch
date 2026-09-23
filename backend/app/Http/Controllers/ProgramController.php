@@ -5,10 +5,8 @@ namespace App\Http\Controllers;
 use App\Enums\Permission;
 use App\Enums\Role;
 use App\Models\Program;
-use App\Services\Audit;
+use App\Services\ProgramSettings;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 
 class ProgramController extends Controller
 {
@@ -28,17 +26,7 @@ class ProgramController extends Controller
 
     public function update(Request $request, Program $program)
     {
-        Gate::authorize('update', $program);
-        $data = $request->validate([
-            'required_ojt_hours' => ['present', 'nullable', 'integer', 'min:1', 'max:10000'],
-            'internship_term' => ['present', 'nullable', 'string', 'max:255'],
-            'is_active' => ['sometimes', 'boolean'],
-        ]);
-        DB::transaction(function () use ($program, $data, $request) {
-            $before = $program->only(array_keys($data));
-            $program->update($data);
-            Audit::record($request->user(), 'program.updated', $program, ['before' => $before, 'after' => $data], $program->id);
-        });
+        $program = ProgramSettings::update($request->user(), $program, $request->all());
 
         return response()->json(['data' => $program->fresh()->loadCount('competencies')], headers: ['Cache-Control' => 'no-store']);
     }

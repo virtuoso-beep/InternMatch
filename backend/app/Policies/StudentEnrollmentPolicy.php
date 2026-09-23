@@ -4,11 +4,20 @@ namespace App\Policies;
 
 use App\Enums\EnrollmentStatus;
 use App\Enums\Permission;
+use App\Enums\Role;
 use App\Models\StudentEnrollment;
 use App\Models\User;
 
 class StudentEnrollmentPolicy
 {
+    public function update(User $user, StudentEnrollment $enrollment): bool
+    {
+        return $user->hasPermission(Permission::ManageAcademicRecords)
+            || ($user->role === Role::Coordinator
+                && $user->hasPermission(Permission::ViewProgramRecords)
+                && $user->isAssignedToProgramTerm($enrollment->program_term_id));
+    }
+
     public function view(User $user, StudentEnrollment $enrollment): bool
     {
         if ($user->hasPermission(Permission::ManageSystem)) {

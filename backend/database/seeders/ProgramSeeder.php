@@ -31,7 +31,10 @@ class ProgramSeeder extends Seeder
             ['BEED', 'Bachelor of Elementary Education', 'Education', 'Lesson Planning|Classroom Management|Early Literacy|Numeracy Instruction|Child Development|Learning Materials Development|Inclusive Education|Student Assessment|Educational Technology|Teaching Demonstration|Classroom Observation|Parent Communication|Reflective Practice|Instructional Design|Professional Ethics'],
         ];
         foreach ($catalog as [$code, $name, $cluster, $vocabulary]) {
-            $program = Program::firstOrCreate(['code' => $code], ['name' => $name, 'cluster' => $cluster]);
+            // BSIT: 486 hours confirmed by the user against the department-approved data guide on 2026-09-24.
+            // Existing program settings are preserved; other programs still need confirmation.
+            $program = Program::firstOrCreate(['code' => $code], ['name' => $name, 'cluster' => $cluster,
+                'required_ojt_hours' => $code === 'BSIT' ? 486 : null]);
             if ($program->cluster === null) {
                 $program->update(['cluster' => $cluster]);
             }

@@ -1,4 +1,6 @@
 import { NotificationList } from "@/components/im/NotificationList";
+import { MoaWorkspace } from "@/components/im/MoaWorkspace";
+import { LiveDashboard } from "@/components/im/LiveDashboard";
 import { MonitoringWorkspace } from "@/components/im/MonitoringWorkspace";
 import { useState } from "react";
 import { OpportunityWorkspace } from "@/components/im/OpportunityWorkspace";
@@ -31,7 +33,7 @@ export function SupervisorSection({ section }: { section: string }) {
     case "profile":
       return <ProfileEditor role="supervisor" />;
     case "":
-      return <Dashboard />;
+      return <LiveDashboard />;
     case "interns":
       return <MonitoringWorkspace />;
     case "attendance":
@@ -43,7 +45,7 @@ export function SupervisorSection({ section }: { section: string }) {
     case "opportunities":
       return <OpportunityWorkspace />;
     case "moa":
-      return <Moa />;
+      return <MoaWorkspace />;
     default:
       return <PageHeader title="Not found" subtitle="This supervisor page does not exist." />;
   }

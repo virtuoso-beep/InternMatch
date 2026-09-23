@@ -41,7 +41,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    command: ["/usr/local/bin/docker-entrypoint.sh"]
+    command: ["sh", "/var/www/html/docker-entrypoint.sh"]
 
   frontend:
     build:

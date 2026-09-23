@@ -1,4 +1,6 @@
 import { NotificationList } from "@/components/im/NotificationList";
+import { MoaWorkspace } from "@/components/im/MoaWorkspace";
+import { LiveDashboard } from "@/components/im/LiveDashboard";
 import { MonitoringWorkspace } from "@/components/im/MonitoringWorkspace";
 import { ProgramMonitoringSettings } from "@/components/im/ProgramMonitoringSettings";
 import { useState } from "react";
@@ -32,10 +34,11 @@ import { ProfileEditor } from "@/components/im/ProfileEditor";
 export function CoordinatorSection({ section }: { section: string }) {
   switch (section) {
     case "notifications": return <NotificationList />;
+    case "moa": return <MoaWorkspace />;
     case "profile":
       return <ProfileEditor role="coordinator" />;
     case "":
-      return <Dashboard />;
+      return <LiveDashboard />;
     case "recommendations":
       return <Recommendations />;
     case "approvals":

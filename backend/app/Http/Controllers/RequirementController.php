@@ -9,14 +9,13 @@ use App\Models\ProgramTerm;
 use App\Models\RequirementSubmission;
 use App\Models\RequirementType;
 use App\Models\StudentEnrollment;
-use App\Notifications\PortalNotification;
 use App\Services\Audit;
+use App\Services\RequirementReviewService;
 use App\Services\StudentAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Throwable;
 
 class RequirementController extends Controller
@@ -105,23 +104,6 @@ class RequirementController extends Controller
 
     public function review(Request $request, RequirementSubmission $submission)
     {
-        Gate::authorize('review', $submission);
-        $data = $request->validate(['status' => ['required', Rule::in(['under_review', 'approved', 'rejected'])], 'comments' => ['required_if:status,rejected', 'nullable', 'string', 'max:5000']]);
-        DB::transaction(function () use ($request, $submission, $data) {
-            StudentEnrollment::whereKey($submission->student_enrollment_id)->lockForUpdate()->firstOrFail();
-            $record = RequirementSubmission::whereKey($submission->id)->lockForUpdate()->firstOrFail();
-            Gate::authorize('review', $record);
-            $latest = RequirementSubmission::where('student_enrollment_id', $record->student_enrollment_id)
-                ->where('program_term_requirement_id', $record->program_term_requirement_id)->max('revision');
-            abort_unless($record->revision === (int) $latest, 409, 'Review the latest submission revision.');
-            $record->update(['status' => $data['status']]);
-            if ($data['status'] !== 'under_review') {
-                $record->reviews()->create(['reviewed_by' => $request->user()->id, 'decision' => $data['status'], 'comments' => $data['comments'] ?? null, 'reviewed_at' => now()]);
-            }
-            Audit::record($request->user(), 'requirement.reviewed', $record, ['status' => $data['status']], $record->programTerm->program_id);
-            $record->studentEnrollment->student->user->notify(new PortalNotification('Requirement status updated', $record->programTermRequirement->requirementType->name.': '.str_replace('_', ' ', $data['status']).'.'));
-        });
-
-        return response()->json(['data' => $submission->fresh()->load('reviews')]);
+        return response()->json(['data' => RequirementReviewService::review($request->user(), $submission, $request->all())]);
     }
 }

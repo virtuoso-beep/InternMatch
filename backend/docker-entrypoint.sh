@@ -8,6 +8,10 @@ if [ ! -f .env ]; then
     cp .env.example .env
 fi
 
+# The named vendor volume survives image rebuilds and can lag behind the
+# bind-mounted lockfile. Synchronize it before booting any Laravel command.
+composer install --no-interaction --prefer-dist --no-progress
+
 # Preserve the application key across restarts; rotating it invalidates sessions
 # and makes previously encrypted application data unreadable.
 if [ -z "${APP_KEY:-}" ] && ! grep -Eq '^APP_KEY=.+$' .env; then

@@ -26,7 +26,8 @@ class ProgramArchitectureTest extends TestCase
         $this->seed(DatabaseSeeder::class);
         $this->assertSame(16, Program::count());
         $this->assertSame(0, User::count());
-        $this->assertSame(0, Program::whereNotNull('required_ojt_hours')->count());
+        $this->assertSame(486, Program::where('code', 'BSIT')->firstOrFail()->required_ojt_hours);
+        $this->assertSame(0, Program::where('code', '!=', 'BSIT')->whereNotNull('required_ojt_hours')->count());
         foreach (Program::withCount('competencies')->get() as $program) {
             $this->assertSame(strtoupper($program->code), $program->code);
             $this->assertSame(15, $program->competencies_count);

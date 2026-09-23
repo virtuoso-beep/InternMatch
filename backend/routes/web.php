@@ -6,8 +6,10 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CompetencyController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\HostController;
+use App\Http\Controllers\MoaController;
 use App\Http\Controllers\MonitoringController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OpportunityController;
@@ -16,6 +18,7 @@ use App\Http\Controllers\ProgramAccessController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgramMonitoringController;
 use App\Http\Controllers\RequirementController;
+use App\Http\Controllers\StudentManagementController;
 use App\Http\Controllers\StudentPortalController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +32,12 @@ Route::prefix('api/v1')->group(function (): void {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('session', [AuthController::class, 'show'])->middleware(['auth', 'active']);
     Route::middleware(['auth', 'active'])->group(function (): void {
+        Route::get('dashboard', DashboardController::class);
+        Route::get('moas', [MoaController::class, 'index']);
+        Route::post('moas', [MoaController::class, 'save']);
+        Route::put('moas/{moa}', [MoaController::class, 'save']);
+        Route::post('moas/{moa}/document', [MoaController::class, 'upload']);
+        Route::get('moas/{moa}/document', [MoaController::class, 'download']);
         Route::get('placements', [MonitoringController::class, 'index']);
         Route::get('placements/{placement}/evaluations', [EvaluationController::class, 'index']);
         Route::post('placements/{placement}/evaluations', [EvaluationController::class, 'save']);
@@ -55,6 +64,8 @@ Route::prefix('api/v1')->group(function (): void {
         Route::get('placement-reference', [AcademicController::class, 'reference']);
         Route::post('academic-terms', [AcademicController::class, 'storeTerm']);
         Route::post('enrollments', [AcademicController::class, 'enroll']);
+        Route::patch('enrollments/{enrollment}', [StudentManagementController::class, 'update']);
+        Route::post('enrollments/{enrollment}/withdraw', [StudentManagementController::class, 'withdraw']);
         Route::get('hosts', [HostController::class, 'index']);
         Route::post('hosts', [HostController::class, 'store']);
         Route::patch('hosts/{host}', [HostController::class, 'update']);

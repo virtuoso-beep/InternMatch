@@ -1,4 +1,6 @@
 import { NotificationList } from "@/components/im/NotificationList";
+import { MoaWorkspace } from "@/components/im/MoaWorkspace";
+import { LiveDashboard } from "@/components/im/LiveDashboard";
 import { ProgramMonitoringSettings } from "@/components/im/ProgramMonitoringSettings";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -34,7 +36,7 @@ export function AdminSection({ section }: { section: string }) {
     case "profile":
       return <ProfileEditor role="admin" />;
     case "":
-      return <Dashboard />;
+      return <LiveDashboard />;
     case "users":
       return <AccountRegistry />;
     case "roles":
@@ -46,7 +48,7 @@ export function AdminSection({ section }: { section: string }) {
     case "programs":
       return <Programs />;
     case "moa":
-      return <MoaRecords />;
+      return <MoaWorkspace />;
     case "audit":
       return <AuditLog />;
     case "backup":

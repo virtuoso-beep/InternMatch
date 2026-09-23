@@ -51,6 +51,7 @@ export function NotificationList() {
                 onClick={async () => {
                   try {
                     await mutate(`/notifications/${item.id}/read`, undefined, "PATCH");
+                    window.dispatchEvent(new Event("internmatch:notifications-changed"));
                     setRevision((value) => value + 1);
                   } catch (cause) {
                     setError(
