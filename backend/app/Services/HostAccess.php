@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AccountStatus;
 use App\Enums\Role;
 use App\Models\HostEstablishment;
 use App\Models\User;
@@ -13,6 +14,9 @@ class HostAccess
     public static function query(User $user): Builder
     {
         $query = HostEstablishment::query();
+        if ($user->status !== AccountStatus::Active) {
+            return $query->whereRaw('1 = 0');
+        }
         if ($user->role === Role::Admin) {
             return $query;
         }

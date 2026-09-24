@@ -76,7 +76,7 @@ class StudentResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
+        return $table->recordUrl(fn (StudentEnrollment $record) => $record->status === EnrollmentStatus::Enrolled ? static::getUrl('edit', ['record' => $record]) : null)->columns([
             TextColumn::make('student.student_number')->label('Student number')->searchable(),
             TextColumn::make('student.user.name')->label('Student')->searchable(),
             TextColumn::make('programTerm.program.code')->label('Program')->searchable(),

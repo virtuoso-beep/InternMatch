@@ -1,13 +1,11 @@
 # InternMatch implementation audit
 
-Audit checkpoint: 2026-09-23. This is an evidence ledger, not a release certification.
+Audit checkpoint: 2026-09-24. This is an evidence ledger, not a release certification.
 
 ## Authorities and confirmed input
 
-- Architecture and acceptance: `system manu.docx`; the user confirmed that it contains both the revised system specification and the renamed FR/NFR requirements. The separately supplied `InternMatch_System_Spec_Revised.docx` is a supporting architecture reference.
-- Build sequence: `InternMatch_Team_Development_Guide.docx`.
-- Reference shapes: `InternMatch_Data_Needed_Revised.md`.
-- The user supplied 420 hours **unconfirmed**. Live program requirements remain null. Test-only hour values do not constitute department approval.
+- Task order and status authority: `InternMatch_Team_Development_Guide.docx`, as explicitly directed on 2026-09-24. Architecture authority: the current `InternMatch_System_Spec_Revised.docx`. Data authority: the current `InternMatch_Data_Needed_Revised.docx`. Earlier `system manu.docx` remains historical acceptance context.
+- On 2026-09-24 the user explicitly confirmed **486 hours are department-approved for BSIT**, superseding the earlier unconfirmed 420. The live Docker BSIT record now stores 486 with an approval-source audit entry. New reference seeds use 486 for BSIT only; reseeding preserves existing settings and enrollment snapshots. Other program hours remain unconfirmed. Test-only hour values do not constitute department approval.
 - The user confirmed no approved evaluation rubrics or monitoring thresholds are available. No defaults are seeded. Configuration requires an approval reference; the application cannot independently authenticate a department's approval.
 - Main development database: Docker MySQL, `internmatchlaravel`. Automated tests use a separate local MySQL database ending in `_testing`, guarded in `Tests/TestCase.php`.
 
@@ -99,3 +97,19 @@ Transient command output is retained under ignored `.local/`. Never interpret a 
 - Docker backend /up, isolated QA backend /up, and the main frontend API proxy returned HTTP 200 after recovery. No database reset was performed.
 - Student browser showed the persisted coordinator review notification: QA Signed Form approved. Found and repaired a stale header unread count after marking the notification read. Browser verified the badge clears without navigation.
 - TypeScript and frontend production build passed after the badge fix.
+
+## Native student management and approved BSIT hours — 2026-09-24
+
+- Folder/code: native Filament `Students` resource with list, administrator enrollment creation and scoped coordinator enrollment edits. Existing `StudentEnrollment`, program/term relationships and MySQL constraints are reused; no duplicate student storage or schema reset.
+- Backend/API: enrollment creation moved into shared `EnrollmentProvisioning`; PATCH enrollment and POST withdrawal use `StudentEnrollmentManagement`. Authorization is rechecked in the service. Updates accept year level and enrollment/target dates only. Program, identity, hours and placement status cannot be mass-assigned through the editor. Closed enrollments cannot be changed. Withdrawal requires a reason, rejects placement history and retains the record and audit trail.
+- Integration/tests: 8 student/provisioning tests passed with 82 assertions. Full backend regression then passed **167 tests / 1,158 assertions**. After the user confirmed BSIT hours, 10 program-architecture tests passed with 101 assertions. After the coordinator creation-link visibility fix, all 18 student/provisioning/program tests passed with 185 assertions.
+- Browser: coordinator list excluded the outside program; direct outside enrollment URL returned 404. Editing year and target date persisted after refresh and matched MySQL plus an audit entry. Administrator created a synthetic enrollment through the native form. The first browser withdrawal attempt timed out in PHP class loading, then template rendering, and left the enrollment unchanged. After local QA opcode caching, optimized autoloading and template compilation, coordinator withdrawal succeeded and remained withdrawn after refresh. MySQL retained the record, original hour snapshot and audited reason; the UI removed edit/withdraw controls and links. This is not performance/NFR acceptance.
+- BSIT reference seed now uses department-approved 486 hours for new program records and preserves existing settings on rerun. Live Docker BSIT value updated to 486 with `program.hours_confirmed` audit evidence. Other program values and existing enrollment snapshots were not modified.
+- Native student enrollment management status: **✅** for scoped listing, administrator creation, coordinator edits and history-preserving withdrawal, with the browser and test evidence above. AI, allocation, reporting and production tasks have not been marked complete by this work.
+
+## Native host management — 2026-09-24
+
+- **✅** Native Filament host creation, listing, editing and deactivation use shared `HostManagement` API services and program-scoped queries. Profile and capacity saves are atomic; other programs' capacities are retained. Existing capacity row identities are fixed in the editor; new rows can be added. History is retained when a host is deactivated.
+- Eight native-host/existing-host-opportunity tests passed with 59 assertions: scoped creation, outside-host denial, duplicate validation, shared-program preservation, occupied-capacity protection, rollback and panel-role denial.
+- Browser coordinator created `NATIVE-HOST-BROWSER-0924`, updated its name and capacity from 3 to 2, and deactivated it. Values survived refresh and matched QA MySQL: coordinates 7.44/125.8, capacity 2, inactive state, and created/updated/capacity audit entries. All records were synthetic.
+- Native opportunity management is **🔵**: shared API/native services and scoped forms implemented. Eight targeted tests passed with 54 assertions. Full regression and browser acceptance remain pending.
