@@ -9,15 +9,25 @@ use App\Services\Haversine;
 use App\Services\OpportunityEligibility;
 use App\Services\StudentAccess;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use App\Services\GenerateRecommendations;
 
 class StudentPortalController extends Controller
 {
+    public function generate(Request $request, int $enrollment, GenerateRecommendations $matching)
+    {
+        abort_unless(in_array($request->user()->role, [Role::Student, Role::Coordinator], true), 403);
+        $student = StudentAccess::enrollments($request->user())->findOrFail($enrollment);
+        return response()->json(['data' => $matching->generate($request->user(), $student)]);
+    }
+
     public function recommendations(Request $request, int $enrollment)
     {
         abort_unless(in_array($request->user()->role, [Role::Student, Role::Coordinator, Role::Admin], true), 403);
         $student = StudentAccess::enrollments($request->user())->findOrFail($enrollment);
         $query = Recommendation::query()->where('student_enrollment_id', $student->id);
-        $generation = (clone $query)->orderByDesc('generated_at')->orderByDesc('id')->value('generation_id');
+        $generation = DB::table('recommendation_generations')->where('student_enrollment_id', $student->id)->orderByDesc('generated_at')->orderByDesc('id')->value('id')
+            ?? (clone $query)->orderByDesc('generated_at')->orderByDesc('id')->value('generation_id');
 
         // Read only stored generation facts, never join today's capacity/MOA into an old explanation.
         return response()->json(['data' => $generation ? $query->where('generation_id', $generation)->orderBy('rank')->get() : []], headers: ['Cache-Control' => 'no-store']);

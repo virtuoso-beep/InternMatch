@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\RefreshSemanticEmbedding;
+
 use App\Enums\Role;
 use App\Models\Competency;
 use App\Models\Program;
@@ -43,6 +45,7 @@ class CompetencyController extends Controller
             return $record;
         });
 
+        if (config('matching.enabled')) { RefreshSemanticEmbedding::dispatch('student', $student->id)->afterCommit(); }
         return response()->json(['data' => $record->load('competency')]);
     }
 
@@ -56,6 +59,7 @@ class CompetencyController extends Controller
             $record->delete();
         });
 
+        if (config('matching.enabled')) { RefreshSemanticEmbedding::dispatch('student', $student->id)->afterCommit(); }
         return response()->noContent();
     }
 }

@@ -7,8 +7,11 @@ type Requirement = {
   id: number;
   is_required: boolean;
   due_at: string | null;
-  requirement_type: { name: string };
+  scheduled_on: string | null;
+  requirement_type: { name: string; kind: "document" | "event" };
 };
+type Attendance = { id: number; program_term_requirement_id: number; attended_on: string; confirmed_at: string | null };
+type RequirementData = { requirements: Requirement[]; submissions: Submission[]; attendances: Attendance[] };
 type Submission = {
   id: number;
   program_term_requirement_id: number;
@@ -42,7 +45,7 @@ export function RequirementWorkspace() {
   }, []);
   return (
     <>
-      <PageHeader title="Requirements" subtitle="Submit documents and track coordinator review." />
+      <PageHeader title="Requirements" subtitle="Submit documents, record event attendance, and track coordinator confirmation." />
       {["admin", "coordinator"].includes(user.role) && <RequirementConfiguration />}
       {error && <p role="alert">{error}</p>}
       {!enrollments && !error && <p role="status">Loading enrollments…</p>}
@@ -67,7 +70,7 @@ export function RequirementConfiguration() {
         required_before_deployment: boolean;
       })[];
     }[];
-    types: { id: number; name: string }[];
+    types: { id: number; name: string; kind: string }[];
   };
   const [config, setConfig] = useState<Config | null>(null);
   const [term, setTerm] = useState("");
@@ -75,6 +78,7 @@ export function RequirementConfiguration() {
   const [required, setRequired] = useState(true);
   const [deployment, setDeployment] = useState(true);
   const [due, setDue] = useState("");
+  const [scheduled, setScheduled] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -95,6 +99,7 @@ export function RequirementConfiguration() {
     const current = selected?.requirements.find(
       (item) => item.requirement_type_id === Number(type),
     );
+    setScheduled(current?.scheduled_on ?? "");
     setRequired(current?.is_required ?? true);
     setDeployment(current?.required_before_deployment ?? true);
     const date = current?.due_at ? new Date(current.due_at) : null;
@@ -122,6 +127,7 @@ export function RequirementConfiguration() {
               is_required: required,
               required_before_deployment: deployment,
               due_at: due ? new Date(due).toISOString() : null,
+              scheduled_on: config?.types.find((item) => item.id === Number(type))?.kind === "event" ? scheduled || null : null,
             });
             setConfig(await api<Config>("/requirement-configuration"));
             setMessage("Requirement configuration saved.");
@@ -173,6 +179,11 @@ export function RequirementConfiguration() {
             className="mt-1 block w-full rounded border p-2"
           />
         </label>
+        {config?.types.find((item) => item.id === Number(type))?.kind === "event" && (
+          <label className="text-sm">Event date (leave empty until announced)
+            <input type="date" value={scheduled} onChange={(event) => setScheduled(event.target.value)} className="mt-1 block w-full rounded border p-2" />
+          </label>
+        )}
         <div className="space-y-2 text-sm">
           <label className="block">
             <input
@@ -220,17 +231,14 @@ export function RequirementConfiguration() {
 
 function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
   const user = useSessionUser();
-  const [data, setData] = useState<{
-    requirements: Requirement[];
-    submissions: Submission[];
-  } | null>(null);
+  const [data, setData] = useState<RequirementData | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
   const [comments, setComments] = useState<Record<number, string>>({});
   useEffect(() => {
     let active = true;
-    api<{ requirements: Requirement[]; submissions: Submission[] }>(
+    api<RequirementData>(
       `/enrollments/${enrollment.id}/requirements`,
     )
       .then((value) => {
@@ -255,10 +263,15 @@ function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
         </p>
       )}
       {data?.requirements.length === 0 && (
-        <p>No document requirements have been configured for this program and term.</p>
+        <p>No requirements have been configured for this program and term.</p>
       )}
       <div className="divide-y">
         {data?.requirements.map((requirement) => {
+          if (requirement.requirement_type.kind === "event") {
+            return <EventRequirement key={requirement.id} requirement={requirement} enrollmentId={enrollment.id}
+              attendance={data.attendances.find((item) => item.program_term_requirement_id === requirement.id)}
+              onSaved={() => setRevision((value) => value + 1)} />;
+          }
           const submissions = data.submissions.filter(
             (item) => item.program_term_requirement_id === requirement.id,
           );
@@ -386,3 +399,41 @@ function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
     </Card>
   );
 }
+
+function EventRequirement({ requirement, enrollmentId, attendance, onSaved }: {
+  requirement: Requirement; enrollmentId: number; attendance: Attendance | undefined; onSaved: () => void;
+}) {
+  const user = useSessionUser();
+  const [date, setDate] = useState(attendance?.attended_on ?? "");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  useEffect(() => setDate(attendance?.attended_on ?? ""), [attendance?.attended_on]);
+  async function save(confirm: boolean) {
+    setBusy(true);
+    setMessage("");
+    try {
+      const base = `/enrollments/${enrollmentId}/event-attendances`;
+      await mutate(confirm ? `${base}/${attendance?.id}/confirm` : base,
+        confirm ? {} : { requirement_id: requirement.id, attended_on: date });
+      onSaved();
+      setMessage(confirm ? "Attendance confirmed." : "Attendance recorded; awaiting coordinator confirmation.");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Unable to save attendance.");
+    } finally { setBusy(false); }
+  }
+  return <section className="py-4">
+    <h3 className="font-semibold">{requirement.requirement_type.name}{requirement.is_required ? " (required)" : " (optional)"}</h3>
+    <p className="text-sm">{requirement.scheduled_on ? `Scheduled: ${requirement.scheduled_on}` : "Date not yet announced"}</p>
+    <p className="text-sm">Status: {attendance?.confirmed_at ? "Confirmed" : attendance ? "Attended � awaiting confirmation" : "Not attended"}
+      {attendance ? ` � Attended ${attendance.attended_on}` : ""}</p>
+    {user.role === "student" && !attendance?.confirmed_at && <form className="my-3 flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); void save(false); }}>
+      <label className="text-sm">Attendance date
+        <input aria-label={`${requirement.requirement_type.name} attendance date`} className="mt-1 block rounded border p-2" type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
+      </label>
+      <Button type="submit" disabled={busy}>Record attendance</Button>
+    </form>}
+    {user.role === "coordinator" && attendance && !attendance.confirmed_at && <Button variant="outline" className="mt-3" disabled={busy} onClick={() => void save(true)}>Confirm attendance</Button>}
+    {message && <p role="status" className="mt-2 text-sm">{message}</p>}
+  </section>;
+}
+

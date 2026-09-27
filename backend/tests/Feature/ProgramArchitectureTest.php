@@ -30,7 +30,7 @@ class ProgramArchitectureTest extends TestCase
         $this->assertSame(0, Program::where('code', '!=', 'BSIT')->whereNotNull('required_ojt_hours')->count());
         foreach (Program::withCount('competencies')->get() as $program) {
             $this->assertSame(strtoupper($program->code), $program->code);
-            $this->assertSame(15, $program->competencies_count);
+            $this->assertSame($program->code === 'BSIT' ? 4 : 15, $program->competencies_count);
             $this->assertNotEmpty($program->cluster);
         }
         $bsit = Program::where('code', 'BSIT')->firstOrFail();

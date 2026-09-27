@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['program_term_id', 'requirement_type_id', 'is_required', 'required_before_deployment', 'due_at'])]
+#[Fillable(['program_term_id', 'requirement_type_id', 'is_required', 'required_before_deployment', 'due_at', 'scheduled_on'])]
 class ProgramTermRequirement extends Model
 {
     /** @use HasFactory<ProgramTermRequirementFactory> */
@@ -21,6 +21,7 @@ class ProgramTermRequirement extends Model
             'is_required' => 'boolean',
             'required_before_deployment' => 'boolean',
             'due_at' => 'immutable_datetime',
+            'scheduled_on' => 'immutable_date:Y-m-d',
         ];
     }
 

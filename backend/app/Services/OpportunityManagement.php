@@ -77,6 +77,7 @@ class OpportunityManagement
             return $record;
         });
 
+        if (config('matching.enabled')) { \App\Jobs\RefreshSemanticEmbedding::dispatch('opportunity', $saved->id)->afterCommit(); }
         return $saved->load(['programs', 'competencies']);
     }
 }

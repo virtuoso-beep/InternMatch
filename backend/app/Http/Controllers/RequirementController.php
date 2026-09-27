@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\Permission;
 use App\Enums\Role;
 use App\Models\Document;
+use App\Models\EventAttendance;
 use App\Models\ProgramTerm;
 use App\Models\RequirementSubmission;
 use App\Models\RequirementType;
@@ -29,7 +30,7 @@ class RequirementController extends Controller
             $terms->whereIn('program_id', $user->programs()->select('programs.id'));
         }
 
-        return response()->json(['program_terms' => $terms->get(), 'types' => RequirementType::where('is_active', true)->orderBy('name')->get(['id', 'name'])]);
+        return response()->json(['program_terms' => $terms->get(), 'types' => RequirementType::where('is_active', true)->orderBy('name')->get(['id', 'name', 'kind'])]);
     }
 
     public function index(Request $request, int $enrollment)
@@ -39,7 +40,9 @@ class RequirementController extends Controller
         $requirements = $student->programTerm->requirements()->with('requirementType')->get();
         $submissions = $student->requirementSubmissions()->with(['document', 'reviews'])->orderByDesc('revision')->get();
 
-        return response()->json(['requirements' => $requirements, 'submissions' => $submissions], headers: ['Cache-Control' => 'no-store']);
+        return response()->json(['requirements' => $requirements, 'submissions' => $submissions,
+            'attendances' => EventAttendance::where('student_enrollment_id', $student->id)->get(),
+        ], headers: ['Cache-Control' => 'no-store']);
     }
 
     public function configure(Request $request, int $programTerm)
@@ -51,7 +54,9 @@ class RequirementController extends Controller
         $data = $request->validate([
             'requirement_type_id' => ['required', 'integer', 'exists:requirement_types,id'],
             'is_required' => ['required', 'boolean'], 'required_before_deployment' => ['required', 'boolean'], 'due_at' => ['nullable', 'date'],
+            'scheduled_on' => ['nullable', 'date_format:Y-m-d'],
         ]);
+        abort_if(! empty($data['scheduled_on']) && RequirementType::findOrFail($data['requirement_type_id'])->kind !== 'event', 422, 'Only events have a scheduled date.');
         $record = DB::transaction(function () use ($request, $term, $data) {
             $record = $term->requirements()->updateOrCreate(['requirement_type_id' => $data['requirement_type_id']], $data);
             Audit::record($request->user(), 'requirement.configured', $record, $data, $term->program_id);
@@ -68,6 +73,7 @@ class RequirementController extends Controller
         Gate::authorize('submitRequirements', $student);
         $data = $request->validate(['requirement_id' => ['required', 'integer'], 'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,docx', 'max:10240']]);
         $requirement = $student->programTerm->requirements()->findOrFail($data['requirement_id']);
+        abort_unless($requirement->requirementType->kind === 'document', 422, 'Record attendance for event requirements instead of uploading a file.');
         $file = $request->file('file');
         $path = $file->store('requirements', 'local');
         abort_unless(is_string($path), 503, 'The document could not be stored. Please try again.');

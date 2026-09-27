@@ -46,6 +46,7 @@ class EnrollmentProvisioning
             }
             $student ??= $user->student()->create(['student_number' => $data['student_number']]);
             $term = ProgramTerm::firstOrCreate(['program_id' => $program->id, 'academic_term_id' => $data['academic_term_id']], ['required_minutes' => $program->required_ojt_hours * 60]);
+            ProgramRequirementTemplates::apply($term);
             if ($student->enrollments()->where('program_term_id', $term->id)->exists()) {
                 throw ValidationException::withMessages(['program_id' => 'The student is already enrolled in this program and term.']);
             }

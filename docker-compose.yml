@@ -1,4 +1,16 @@
 services:
+  ai:
+    build: ./ai-service
+    volumes:
+      - ai_models:/models
+    environment:
+      MODEL_REVISION: d128750597153bb5987e10b1c3493a34e5a4502a
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
   mysql:
     image: mysql:8.4
     environment:
@@ -63,6 +75,7 @@ services:
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "8080"]
 
 volumes:
+  ai_models:
   internmatch_mysql:
   backend_vendor:
   frontend_node_modules:

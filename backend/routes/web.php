@@ -18,6 +18,7 @@ use App\Http\Controllers\ProgramAccessController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\ProgramMonitoringController;
 use App\Http\Controllers\RequirementController;
+use App\Http\Controllers\EventAttendanceController;
 use App\Http\Controllers\StudentManagementController;
 use App\Http\Controllers\StudentPortalController;
 use Illuminate\Support\Facades\Route;
@@ -53,6 +54,8 @@ Route::prefix('api/v1')->group(function (): void {
         Route::patch('notifications/{notification}/read', [NotificationController::class, 'read']);
         Route::get('enrollments/{enrollment}/requirements', [RequirementController::class, 'index']);
         Route::post('enrollments/{enrollment}/requirements', [RequirementController::class, 'submit']);
+        Route::post('enrollments/{enrollment}/event-attendances', [EventAttendanceController::class, 'attend']);
+        Route::post('enrollments/{enrollment}/event-attendances/{attendance}/confirm', [EventAttendanceController::class, 'confirm']);
         Route::post('program-terms/{programTerm}/requirements', [RequirementController::class, 'configure']);
         Route::get('requirement-configuration', [RequirementController::class, 'configuration']);
         Route::get('submissions/{submission}/document', [RequirementController::class, 'download']);
@@ -78,6 +81,7 @@ Route::prefix('api/v1')->group(function (): void {
         Route::get('enrollments', [StudentPortalController::class, 'enrollments']);
         Route::get('enrollments/{enrollment}/opportunities', [StudentPortalController::class, 'opportunities']);
         Route::get('enrollments/{enrollment}/recommendations', [StudentPortalController::class, 'recommendations']);
+        Route::post('enrollments/{enrollment}/recommendations', [StudentPortalController::class, 'generate'])->middleware('throttle:10,1');
         Route::get('competencies', [CompetencyController::class, 'index']);
         Route::post('competencies', [CompetencyController::class, 'store']);
         Route::delete('competencies/{competency}', [CompetencyController::class, 'destroy']);

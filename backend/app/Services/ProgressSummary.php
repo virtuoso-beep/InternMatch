@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\SubmissionStatus;
 use App\Models\Placement;
+use App\Models\EventAttendance;
 use App\Models\TimeLog;
 use Carbon\CarbonImmutable;
 
@@ -28,6 +29,12 @@ class ProgressSummary
             $flags[] = ['code' => 'insufficient_hours', 'description' => 'Remaining certified internship hours meet the program attention threshold within the remaining period.'];
         }
         foreach ($term->requirements()->where('is_required', true)->whereNotNull('due_at')->where('due_at', '<', now())->with('requirementType')->get() as $requirement) {
+            if ($requirement->requirementType->kind === 'event') {
+                if (! EventAttendance::where('student_enrollment_id', $enrollment->id)->where('program_term_requirement_id', $requirement->id)->whereNotNull('confirmed_at')->exists()) {
+                    $flags[] = ['code' => 'requirement_'.$requirement->id, 'description' => $requirement->requirementType->name.' is overdue and attendance has not been confirmed.'];
+                }
+                continue;
+            }
             $latest = $enrollment->requirementSubmissions()->where('program_term_requirement_id', $requirement->id)->orderByDesc('revision')->first();
             if (! $latest || $latest->status !== SubmissionStatus::Approved) {
                 $flags[] = ['code' => 'requirement_'.$requirement->id, 'description' => $requirement->requirementType->name.' is overdue and has no approved latest submission.'];
