@@ -424,8 +424,8 @@ function EventRequirement({ requirement, enrollmentId, attendance, onSaved }: {
   return <section className="py-4">
     <h3 className="font-semibold">{requirement.requirement_type.name}{requirement.is_required ? " (required)" : " (optional)"}</h3>
     <p className="text-sm">{requirement.scheduled_on ? `Scheduled: ${requirement.scheduled_on}` : "Date not yet announced"}</p>
-    <p className="text-sm">Status: {attendance?.confirmed_at ? "Confirmed" : attendance ? "Attended � awaiting confirmation" : "Not attended"}
-      {attendance ? ` � Attended ${attendance.attended_on}` : ""}</p>
+    <p className="text-sm">Status: {attendance?.confirmed_at ? "Confirmed" : attendance ? "Attended — awaiting confirmation" : "Not attended"}
+      {attendance ? ` — Attended ${attendance.attended_on}` : ""}</p>
     {user.role === "student" && !attendance?.confirmed_at && <form className="my-3 flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); void save(false); }}>
       <label className="text-sm">Attendance date
         <input aria-label={`${requirement.requirement_type.name} attendance date`} className="mt-1 block rounded border p-2" type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
@@ -436,4 +436,5 @@ function EventRequirement({ requirement, enrollmentId, attendance, onSaved }: {
     {message && <p role="status" className="mt-2 text-sm">{message}</p>}
   </section>;
 }
+
 

@@ -1,4 +1,6 @@
 import { NotificationList } from "@/components/im/NotificationList";
+import { AllocationWorkspace } from "@/components/im/AllocationWorkspace";
+import { ReportWorkspace } from "@/components/im/ReportWorkspace";
 import { MoaWorkspace } from "@/components/im/MoaWorkspace";
 import { LiveDashboard } from "@/components/im/LiveDashboard";
 import { MonitoringWorkspace } from "@/components/im/MonitoringWorkspace";
@@ -42,7 +44,7 @@ export function CoordinatorSection({ section }: { section: string }) {
     case "recommendations":
       return <Recommendations />;
     case "approvals":
-      return <Approvals />;
+      return <AllocationWorkspace />;
     case "students":
       return <Students />;
     case "opportunities":
@@ -57,7 +59,7 @@ export function CoordinatorSection({ section }: { section: string }) {
       return <MonitoringWorkspace />;
     case "monitoring-settings": return <ProgramMonitoringSettings />;
     case "analytics":
-      return <Analytics />;
+      return <ReportWorkspace title="Analytics and reports" />;
     case "map":
       return (
         <>

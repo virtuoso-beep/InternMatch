@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ROLES } from "@/lib/internmatch";
 
 import sealUrl from "@/assets/umtc-seal.png";
@@ -40,6 +40,8 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !email.includes("@")) {
@@ -169,6 +171,7 @@ function AuthPage() {
                 </svg>
                 <input
                   type={showPassword ? "text" : "password"}
+                  aria-label="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -233,7 +236,7 @@ function AuthPage() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !ready}
               className="w-full rounded-lg bg-brand py-3 text-sm font-bold text-brand-foreground shadow-sm transition-all hover:opacity-90 active:scale-[0.99] disabled:opacity-70"
             >
               {submitting ? "Signing in…" : "Sign in"}

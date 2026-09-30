@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/im/ui";
+import { AccessibilityMap } from "@/components/im/AccessibilityMap";
 import { ProfileEditor } from "@/components/im/ProfileEditor";
 import { StudentOverview } from "@/components/im/StudentOverview";
 import { StudentCompetencies } from "@/components/im/StudentCompetencies";
@@ -16,7 +17,7 @@ export function StudentSection({ section }: { section: string }) {
     case "recommendations": return <StudentOverview recommendations />;
     case "requirements": return <RequirementWorkspace />;
     case "notifications": return <NotificationList />;
-    case "map": return <PageHeader title="Accessibility map" subtitle="Map display is not connected yet. Eligible Opportunities shows straight-line distances when coordinates are recorded." />;
+    case "map": return <><PageHeader title="Accessibility map" subtitle="Saved locations and straight-line student-to-host distances." /><AccessibilityMap /></>;
     default: return <PageHeader title="Not found" subtitle="This student page does not exist." />;
   }
 }

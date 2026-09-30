@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['placement_id', 'code', 'severity', 'description', 'raised_by', 'raised_at', 'resolved_by', 'resolved_at', 'resolution'])]
+#[Fillable(['placement_id', 'code', 'severity', 'description', 'raised_by', 'raised_at', 'resolved_by', 'resolved_at', 'resolution', 'resolved_automatically'])]
 class MonitoringFlag extends Model
 {
     /** @use HasFactory<MonitoringFlagFactory> */
@@ -21,6 +21,7 @@ class MonitoringFlag extends Model
             'severity' => RiskSeverity::class,
             'raised_at' => 'immutable_datetime',
             'resolved_at' => 'immutable_datetime',
+            'resolved_automatically' => 'boolean',
         ];
     }
 

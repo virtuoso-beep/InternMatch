@@ -55,6 +55,6 @@ class OpportunityEligibility
         return ['program_id' => $programId, 'capacity_remaining' => min($opportunityRemaining, $hostRemaining),
             'opportunity_capacity_remaining' => $opportunityRemaining, 'host_capacity_remaining' => $hostRemaining,
             'moa_id' => $moa->id, 'moa_status' => $moa->status->value,
-            'moa_expires_on' => $moa->expires_on->toDateString()];
+            'moa_effective_on' => $moa->effective_on->toDateString(), 'moa_expires_on' => $moa->expires_on->toDateString()];
     }
 }

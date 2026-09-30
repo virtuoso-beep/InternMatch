@@ -13,11 +13,15 @@ class RefreshSemanticEmbedding implements ShouldQueue
     use Queueable;
 
     public int $tries = 3;
+
     public int $timeout = 100;
 
     public function __construct(public string $kind, public int $id) {}
 
-    public function backoff(): array { return [30, 120, 300]; }
+    public function backoff(): array
+    {
+        return [30, 120, 300];
+    }
 
     public function handle(SemanticEmbeddings $embeddings): void
     {
@@ -26,6 +30,8 @@ class RefreshSemanticEmbedding implements ShouldQueue
             'opportunity' => Opportunity::find($this->id),
             default => null,
         };
-        if ($owner) { $embeddings->refresh($owner); }
+        if ($owner) {
+            $embeddings->refresh($owner);
+        }
     }
 }

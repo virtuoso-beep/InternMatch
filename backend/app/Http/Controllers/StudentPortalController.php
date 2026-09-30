@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EnrollmentStatus;
 use App\Enums\Role;
 use App\Models\Opportunity;
 use App\Models\Recommendation;
+use App\Services\GenerateRecommendations;
 use App\Services\Haversine;
 use App\Services\OpportunityEligibility;
 use App\Services\StudentAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Services\GenerateRecommendations;
 
 class StudentPortalController extends Controller
 {
@@ -18,6 +19,8 @@ class StudentPortalController extends Controller
     {
         abort_unless(in_array($request->user()->role, [Role::Student, Role::Coordinator], true), 403);
         $student = StudentAccess::enrollments($request->user())->findOrFail($enrollment);
+        abort_unless($student->status === EnrollmentStatus::Enrolled, 422, 'This enrollment is closed.');
+
         return response()->json(['data' => $matching->generate($request->user(), $student)]);
     }
 
@@ -26,7 +29,7 @@ class StudentPortalController extends Controller
         abort_unless(in_array($request->user()->role, [Role::Student, Role::Coordinator, Role::Admin], true), 403);
         $student = StudentAccess::enrollments($request->user())->findOrFail($enrollment);
         $query = Recommendation::query()->where('student_enrollment_id', $student->id);
-        $generation = DB::table('recommendation_generations')->where('student_enrollment_id', $student->id)->orderByDesc('generated_at')->orderByDesc('id')->value('id')
+        $generation = DB::table('recommendation_generations')->where('student_enrollment_id', $student->id)->orderByDesc('id')->value('generation_id')
             ?? (clone $query)->orderByDesc('generated_at')->orderByDesc('id')->value('generation_id');
 
         // Read only stored generation facts, never join today's capacity/MOA into an old explanation.

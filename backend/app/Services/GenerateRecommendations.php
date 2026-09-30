@@ -10,7 +10,6 @@ use App\Notifications\PortalNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 class GenerateRecommendations
 {
@@ -25,7 +24,9 @@ class GenerateRecommendations
         $vectors = [];
         $sources = [];
         foreach ($candidates as $opportunity) {
-            if (! $this->eligibility->inspect($enrollment, $opportunity)) { continue; }
+            if (! $this->eligibility->inspect($enrollment, $opportunity)) {
+                continue;
+            }
             $cached = $this->embeddings->cached($opportunity);
             abort_unless($cached, 409, 'Eligible opportunity embeddings are still processing. Please retry shortly.');
             $vectors[] = ['id' => $opportunity->id, 'vector' => json_decode($cached->vector, true, flags: JSON_THROW_ON_ERROR)];
@@ -46,6 +47,7 @@ class GenerateRecommendations
             }
             abort_unless(count($scores) === count($vectors), 503, 'Incomplete AI ranking response.');
         }
+
         return DB::transaction(function () use ($actor, $enrollment, $studentVector, $scores, $sources) {
             $enrollment = StudentEnrollment::whereKey($enrollment->id)->lockForUpdate()->firstOrFail();
             abort_unless($this->embeddings->key($enrollment->student)['source_text_hash'] === $studentVector->source_text_hash, 409, 'Competencies changed during matching. Retry after processing.');
@@ -54,7 +56,9 @@ class GenerateRecommendations
             foreach ($scores as $id => $score) {
                 $opportunity = Opportunity::findOrFail($id);
                 $facts = $this->eligibility->inspect($enrollment, $opportunity);
-                if (! $facts) { continue; }
+                if (! $facts) {
+                    continue;
+                }
                 abort_unless($this->embeddings->key($opportunity)['source_text_hash'] === $sources[$id]->source_text_hash, 409, 'Opportunity changed during matching. Please retry.');
                 $host = $opportunity->hostEstablishment;
                 $distance = $profile?->latitude !== null && $profile?->longitude !== null && $host->latitude !== null && $host->longitude !== null
@@ -62,20 +66,24 @@ class GenerateRecommendations
                 $rows[] = ['opportunity_id' => $id, 'similarity_score' => $score, 'distance_km' => $distance,
                     'capacity_at_time' => $facts['capacity_remaining'], 'moa_status_at_time' => $facts['moa_status'],
                     'snapshot' => $facts + ['opportunity_title' => $opportunity->title, 'host_name' => $host->name,
-                        'host_id' => $host->id, 'model_name' => config('matching.model'), 'model_version' => config('matching.revision'),
+                        'host_id' => $host->id, 'city' => $host->city, 'description' => $opportunity->description, 'tasks' => $opportunity->tasks,
+                        'model_name' => config('matching.model'), 'model_version' => config('matching.revision'),
                         'student_source_hash' => $studentVector->source_text_hash, 'opportunity_source_hash' => $sources[$id]->source_text_hash,
                         'distance_kind' => 'straight_line', 'criteria' => 'Cosine descending; ties use known distance ascending, then opportunity ID. No requirement-completion ranking feature.']];
             }
             usort($rows, fn ($a, $b) => ($b['similarity_score'] <=> $a['similarity_score']) ?: (($a['distance_km'] ?? INF) <=> ($b['distance_km'] ?? INF)) ?: ($a['opportunity_id'] <=> $b['opportunity_id']));
             $generation = (string) Str::uuid();
-            DB::table('recommendation_generations')->insert(['id' => $generation, 'student_enrollment_id' => $enrollment->id, 'created_by' => $actor->id, 'generated_at' => now()]);
+            DB::table('recommendation_generations')->insert(['generation_id' => $generation, 'student_enrollment_id' => $enrollment->id, 'created_by' => $actor->id, 'generated_at' => now()]);
             $saved = [];
             foreach ($rows as $index => $row) {
                 $saved[] = Recommendation::create($row + ['generation_id' => $generation, 'student_enrollment_id' => $enrollment->id,
                     'rank' => $index + 1, 'ranking_method' => 'cosine_then_distance', 'generated_at' => now()]);
             }
             Audit::record($actor, 'recommendations.generated', $enrollment, ['generation_id' => $generation, 'count' => count($saved)], $enrollment->programTerm->program_id);
-            if ($saved !== []) { $enrollment->student->user->notify(new PortalNotification('Recommendations available', count($saved).' eligible internship recommendations are ready for review.')); }
+            if ($saved !== []) {
+                $enrollment->student->user->notify(new PortalNotification('Recommendations available', count($saved).' eligible internship recommendations are ready for review.'));
+            }
+
             return $saved;
         });
     }

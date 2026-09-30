@@ -13,4 +13,5 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 COPY . .
-RUN composer install --no-interaction --prefer-dist --no-progress
+RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && composer install --no-interaction --prefer-dist --no-progress

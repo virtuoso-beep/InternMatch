@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\AccountStatus;
 use App\Enums\Role;
+use App\Jobs\RefreshSemanticEmbedding;
 use App\Models\Opportunity;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -77,7 +78,10 @@ class OpportunityManagement
             return $record;
         });
 
-        if (config('matching.enabled')) { \App\Jobs\RefreshSemanticEmbedding::dispatch('opportunity', $saved->id)->afterCommit(); }
+        if (config('matching.enabled')) {
+            RefreshSemanticEmbedding::dispatch('opportunity', $saved->id)->afterCommit();
+        }
+
         return $saved->load(['programs', 'competencies']);
     }
 }

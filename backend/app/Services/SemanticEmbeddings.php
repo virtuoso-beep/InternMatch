@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Opportunity;
 use App\Models\Student;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -14,11 +13,12 @@ class SemanticEmbeddings
     public function source(Student|Opportunity $owner): string
     {
         if ($owner instanceof Student) {
-            return $owner->studentCompetencies()->with('competency')->orderBy('competency_id')->get()
-                ->map(fn ($skill) => $skill->competency->name)->implode('; ');
+            return mb_substr($owner->studentCompetencies()->with('competency')->orderBy('competency_id')->get()
+                ->map(fn ($skill) => $skill->competency->name)->implode('; '), 0, 12000);
         }
-        return trim(implode("\n", [$owner->title, $owner->description, $owner->tasks,
-            $owner->competencies()->orderBy('competencies.id')->pluck('name')->implode('; ')]));
+
+        return trim(mb_substr(implode("\n", [$owner->title, $owner->description, $owner->tasks,
+            $owner->competencies()->orderBy('competencies.id')->pluck('name')->implode('; ')]), 0, 12000));
     }
 
     public function key(Student|Opportunity $owner): array
@@ -33,6 +33,7 @@ class SemanticEmbeddings
         if ($this->source($owner) === '') {
             return null;
         }
+
         return DB::table('embeddings')->where($this->key($owner))->first();
     }
 
@@ -49,7 +50,7 @@ class SemanticEmbeddings
         $vector = $result['vector'] ?? [];
         if (($result['source_text_hash'] ?? null) !== $key['source_text_hash']
             || ($result['model_name'] ?? null) !== $key['model_name'] || ($result['model_version'] ?? null) !== $key['model_version']
-            || count($vector) !== 768 || collect($vector)->contains(fn ($v) => ! is_numeric($v) || ! is_finite((float) $v))
+            || ! is_array($vector) || count($vector) !== 768 || collect($vector)->contains(fn ($v) => ! is_numeric($v) || ! is_finite((float) $v))
             || array_sum(array_map(fn ($v) => $v * $v, $vector)) <= 0) {
             throw new RuntimeException('AI service returned invalid embedding provenance or vector.');
         }

@@ -22,11 +22,14 @@ export function StudentOverview({ opportunities = false, recommendations = false
     return () => { active = false; };
   }, []);
   return <>
-    <PageHeader title={recommendations ? "Recommendations" : opportunities ? "Eligible opportunities" : `Welcome, ${user.name}`} subtitle="Your current academic and placement records." />
+    <PageHeader title={recommendations ? "Recommended internships" : opportunities ? "Eligible opportunities" : `Welcome, ${user.name}`} subtitle={recommendations ? "Ranked by competency similarity, geographic accessibility, and slot availability." : "Your current academic and placement records."} />
     {error && <p role="alert">{error}</p>}
     {!enrollments && !error && <p role="status">Loading your records…</p>}
     {enrollments?.length === 0 && <Card>No enrollment has been linked to your account. Contact your practicum coordinator.</Card>}
-    <div className="space-y-4">{enrollments?.map(enrollment => <Card key={enrollment.id}>
+    <div className="space-y-4">{enrollments?.map(enrollment => recommendations ? <section key={enrollment.id} aria-label={`${enrollment.program_term.program.code} recommendations`}>
+      {(enrollments.length > 1) && <h2 className="font-semibold">{enrollment.program_term.program.code} · {enrollment.program_term.academic_term.name}</h2>}
+      <StoredRecommendations enrollmentId={enrollment.id} />
+    </section> : <Card key={enrollment.id}>
       <CardTitle>{enrollment.program_term.program.code} · {enrollment.program_term.academic_term.name}</CardTitle>
       <p>Enrollment: {enrollment.status} · Year level: {enrollment.year_level ?? "Not recorded"}</p>
       <p>Required hours: {enrollment.program_term.program.required_ojt_hours ?? "Awaiting department confirmation"}</p>
@@ -34,7 +37,6 @@ export function StudentOverview({ opportunities = false, recommendations = false
         ? <p>{enrollment.current_placement.host_establishment.name} · {enrollment.current_placement.opportunity.title} · {enrollment.current_placement.status}</p>
         : <p>No current placement recorded.</p>}
       {opportunities && <EligibleOpportunities enrollmentId={enrollment.id} />}
-      {recommendations && <StoredRecommendations enrollmentId={enrollment.id} />}
     </Card>)}</div>
   </>;
 }

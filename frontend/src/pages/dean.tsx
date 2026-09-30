@@ -19,6 +19,7 @@ import {
 } from "@/components/im/ui";
 import { AUDIT, HOSTS, PROGRAMS } from "@/lib/internmatch";
 import { ProfileEditor } from "@/components/im/ProfileEditor";
+import { ReportWorkspace } from "@/components/im/ReportWorkspace";
 
 export function DeanSection({ section }: { section: string }) {
   switch (section) {
@@ -38,7 +39,7 @@ export function DeanSection({ section }: { section: string }) {
     case "accreditation":
       return <Accreditation />;
     case "export":
-      return <Export />;
+      return <ReportWorkspace title="Export data" />;
     case "audit":
       return <Audit />;
     default:

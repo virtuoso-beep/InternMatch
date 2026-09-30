@@ -29,12 +29,12 @@ services:
     build:
       context: ./backend
     working_dir: /var/www/html
-    environment:
+    environment: &backend_environment
       APP_NAME: InternMatch
       APP_ENV: local
       APP_DEBUG: "true"
       APP_URL: http://localhost:8000
-      FRONTEND_URL: http://localhost:8080
+      FRONTEND_URL: http://localhost:8080,http://127.0.0.1:8080
       SANCTUM_STATEFUL_DOMAINS: localhost:8080,127.0.0.1:8080
       DB_CONNECTION: mysql
       DB_HOST: mysql
@@ -45,6 +45,9 @@ services:
       SESSION_DRIVER: file
       CACHE_STORE: database
       QUEUE_CONNECTION: database
+      DB_QUEUE_RETRY_AFTER: 150
+      AI_ENABLED: "true"
+      AI_SERVICE_URL: http://ai:8000
     ports:
       - "8000:8000"
     volumes:
@@ -54,6 +57,32 @@ services:
       mysql:
         condition: service_healthy
     command: ["sh", "/var/www/html/docker-entrypoint.sh"]
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    working_dir: /var/www/html
+    environment: *backend_environment
+    volumes:
+      - ./backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=100"]
+
+  scheduler:
+    build: ./backend
+    restart: unless-stopped
+    working_dir: /var/www/html
+    environment: *backend_environment
+    volumes:
+      - ./backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["php", "artisan", "schedule:work"]
 
   frontend:
     build:
@@ -79,3 +108,5 @@ volumes:
   internmatch_mysql:
   backend_vendor:
   frontend_node_modules:
+
+
