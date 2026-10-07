@@ -14,13 +14,13 @@ export function AuditLog() {
     return () => { active = false; };
   }, [page]);
   return <>
-    <PageHeader title="Audit trail" subtitle="Recorded account, profile, competency, and program changes." />
+    <PageHeader title="Audit trail" subtitle="Recorded actions within your authorized scope." />
     {error && <p role="alert">{error}</p>}
     {!data && !error && <p role="status">Loading audit records…</p>}
     {data && <Card>
       {data.data.length === 0 ? <p>No audit records in your access scope.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm">
         <thead><tr><th className="p-2">Time</th><th className="p-2">Actor</th><th className="p-2">Action</th><th className="p-2">Record</th></tr></thead>
-        <tbody>{data.data.map(item => <tr key={item.id} className="border-t"><td className="p-2">{item.created_at}</td><td className="p-2">{item.actor_name ?? "Deleted account"}</td><td className="p-2">{item.action}</td><td className="p-2">{item.subject_id}</td></tr>)}</tbody>
+        <tbody>{data.data.map(item => <tr key={item.id} className="border-t"><td className="p-2">{item.created_at}</td><td className="p-2">{item.actor_name ?? "System / unavailable actor"}</td><td className="p-2">{item.action}</td><td className="p-2">{item.subject_id}</td></tr>)}</tbody>
       </table></div>}
       <div className="mt-4 flex gap-3"><Button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</Button><span>Page {page} of {data.last_page}</span><Button disabled={page >= data.last_page} onClick={() => setPage(page + 1)}>Next</Button></div>
     </Card>}

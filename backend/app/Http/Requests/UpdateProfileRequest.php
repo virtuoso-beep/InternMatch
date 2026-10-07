@@ -29,6 +29,8 @@ class UpdateProfileRequest extends FormRequest
             'contact_number' => ['sometimes', 'nullable', 'string', 'max:40'],
             'address' => ['sometimes', 'nullable', 'string', 'max:255'],
             'bio' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'preferred_internship_location' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'knowledge_areas' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
             'notify_email' => ['sometimes', 'required', 'boolean'],

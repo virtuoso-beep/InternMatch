@@ -23,6 +23,8 @@ class ProfileResource extends JsonResource
             'contact_number' => $this->profile?->contact_number,
             'address' => $this->profile?->address,
             'bio' => $this->profile?->bio,
+            'preferred_internship_location' => $this->profile?->preferred_internship_location,
+            'knowledge_areas' => $this->profile?->knowledge_areas,
             'latitude' => $this->profile?->latitude,
             'longitude' => $this->profile?->longitude,
             'notify_email' => $this->profile?->notify_email ?? true,

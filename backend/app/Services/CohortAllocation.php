@@ -13,6 +13,7 @@ use App\Models\StudentEnrollment;
 use App\Models\User;
 use App\Notifications\PortalNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class CohortAllocation
 {
@@ -88,6 +89,14 @@ class CohortAllocation
         abort_unless($item, 404);
         $term = ProgramTerm::findOrFail($item->program_term_id);
         $this->authorize($actor, $term);
+
+        $data = Validator::make($data, [
+            'decision' => ['required', 'in:approve,reject'], 'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'opportunity_id' => ['nullable', 'integer', 'exists:opportunities,id'],
+            'supervisor_id' => ['required_if:decision,approve', 'nullable', 'integer', 'exists:users,id'],
+            'starts_on' => ['required_if:decision,approve', 'nullable', 'date_format:Y-m-d'],
+            'ends_on' => ['required_if:decision,approve', 'nullable', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
+        ])->validate();
 
         return DB::transaction(function () use ($actor, $itemId, $term, $data) {
             ProgramTerm::whereKey($term->id)->lockForUpdate()->firstOrFail();

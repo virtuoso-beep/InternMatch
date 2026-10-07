@@ -42,13 +42,16 @@ class ProfileTest extends TestCase
         $this->actingAs($user)->patchJson('/api/v1/profile', [
             'name' => 'Updated Student', 'contact_number' => '09123456789', 'address' => 'Tagum',
             'bio' => 'Web development', 'latitude' => 0, 'longitude' => 0,
+            'preferred_internship_location' => 'Tagum ICT Office', 'knowledge_areas' => 'Relational database design',
             'notify_email' => false, 'notify_digest' => true,
         ])->assertOk()->assertJsonPath('data.name', 'Updated Student')->assertJsonPath('data.latitude', '0.0000000');
 
         $this->assertDatabaseHas('users', ['id' => $user->id, 'name' => 'Updated Student']);
         $this->assertDatabaseHas('user_profiles', ['user_id' => $user->id, 'address' => 'Tagum', 'notify_email' => false]);
         $this->assertSame('Unchanged', $other->fresh()->bio);
-        $this->getJson('/api/v1/profile')->assertOk()->assertJsonPath('data.bio', 'Web development');
+        $this->getJson('/api/v1/profile')->assertOk()->assertJsonPath('data.bio', 'Web development')
+            ->assertJsonPath('data.preferred_internship_location', 'Tagum ICT Office')
+            ->assertJsonPath('data.knowledge_areas', 'Relational database design');
     }
 
     public function test_repeated_updates_keep_one_profile_record(): void

@@ -247,8 +247,7 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
         </aside>
         <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
           <p className="mb-5 rounded border border-warn/40 bg-warn/10 p-3 text-sm">
-            Development preview: the implementation audit is ongoing. Some dashboard, placement,
-            monitoring, and reporting screens still contain demonstration content.
+            Development preview: records labeled Synthetic are fictional test data. Production deployment and final user acceptance are pending.
           </p>
           <Outlet />
         </main>

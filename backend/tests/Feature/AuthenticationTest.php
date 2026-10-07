@@ -214,6 +214,8 @@ class AuthenticationTest extends TestCase
 
     public function test_cors_allows_credentials_only_for_configured_frontend_origins(): void
     {
+        // Make this independent of the Docker frontend's single-origin setting.
+        config(['cors.allowed_origins' => ['http://localhost:8080', 'http://127.0.0.1:8080']]);
         $this->options('/api/login', [], [
             'Origin' => 'http://localhost:8080',
             'Access-Control-Request-Method' => 'POST',

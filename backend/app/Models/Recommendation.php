@@ -7,6 +7,16 @@ use LogicException;
 
 class Recommendation extends Model
 {
+    public function studentEnrollment(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(StudentEnrollment::class);
+    }
+
+    public function opportunity(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Opportunity::class);
+    }
+
     public $timestamps = false;
 
     protected $guarded = ['id'];

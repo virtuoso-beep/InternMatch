@@ -8,13 +8,15 @@ type Profile = {
   id: number; name: string; email: string; role: RoleKey;
   contact_number: string | null; address: string | null; bio: string | null;
   latitude: string | null; longitude: string | null;
+  preferred_internship_location: string | null; knowledge_areas: string | null;
   notify_email: boolean; notify_digest: boolean; student_number: string | null;
   enrollments: Array<{ id: number; program: string; term: string; year_level: number | null; status: string }>;
 };
-type Form = { name: string; contact_number: string; address: string; bio: string; latitude: string; longitude: string; notify_email: boolean; notify_digest: boolean };
+type Form = { name: string; contact_number: string; address: string; bio: string; preferred_internship_location: string; knowledge_areas: string; latitude: string; longitude: string; notify_email: boolean; notify_digest: boolean };
 const toForm = (profile: Profile): Form => ({
   name: profile.name, contact_number: profile.contact_number ?? "", address: profile.address ?? "",
   bio: profile.bio ?? "", latitude: profile.latitude ?? "", longitude: profile.longitude ?? "",
+  preferred_internship_location: profile.preferred_internship_location ?? "", knowledge_areas: profile.knowledge_areas ?? "",
   notify_email: profile.notify_email, notify_digest: profile.notify_digest,
 });
 const inputClass = "mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/25";
@@ -51,7 +53,7 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
     setForm((previous) => previous ? { ...previous, [key]: value } : previous);
     setMessage(null);
   };
-  const field = (key: "name" | "contact_number" | "address" | "latitude" | "longitude", label: string) => <label className="block text-sm font-medium">
+  const field = (key: "name" | "contact_number" | "address" | "preferred_internship_location" | "latitude" | "longitude", label: string) => <label className="block text-sm font-medium">
     {label}<input className={inputClass} value={form[key]} required={key === "name"}
       type={key === "latitude" || key === "longitude" ? "number" : "text"} step="any"
       min={key === "latitude" ? -90 : key === "longitude" ? -180 : undefined}
@@ -90,10 +92,15 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
           <label className="block text-sm font-medium">Account email<input className={inputClass} value={profile.email} readOnly /></label>
           {field("contact_number", "Contact number")}
           {field("address", "Locality / address")}
+          {role === "student" && <>
+            {field("preferred_internship_location", "Preferred internship location (optional)")}
+            <p className="text-xs text-muted-foreground">A preference helps your coordinator review choices. It does not exclude opportunities in other locations.</p>
+            <label className="block text-sm font-medium sm:col-span-2">Knowledge / areas of expertise<textarea aria-label="Knowledge / areas of expertise" className={inputClass} rows={3} maxLength={2000} value={form.knowledge_areas} onChange={(event) => set("knowledge_areas", event.target.value)} /></label>
+          </>}
           {field("latitude", "Latitude (optional)")}
           {field("longitude", "Longitude (optional)")}
           <p className="text-xs text-muted-foreground sm:col-span-2">Enter your recorded location, or leave both coordinates blank. These support straight-line distance calculations; they are not continuous tracking.</p>
-          <label className="block text-sm font-medium sm:col-span-2">About<textarea className={inputClass} rows={4} maxLength={2000} value={form.bio} onChange={(event) => set("bio", event.target.value)} /></label>
+          <label className="block text-sm font-medium sm:col-span-2">About<textarea aria-label="About" className={inputClass} rows={4} maxLength={2000} value={form.bio} onChange={(event) => set("bio", event.target.value)} /></label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.notify_email} onChange={(event) => set("notify_email", event.target.checked)} />Email updates preference</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.notify_digest} onChange={(event) => set("notify_digest", event.target.checked)} />Weekly digest preference</label>
           <p className="text-xs text-muted-foreground sm:col-span-2">Preferences are saved. Email notification delivery is still under development.</p>

@@ -2,8 +2,6 @@ import { NotificationList } from "@/components/im/NotificationList";
 import { MoaWorkspace } from "@/components/im/MoaWorkspace";
 import { LiveDashboard } from "@/components/im/LiveDashboard";
 import { ProgramMonitoringSettings } from "@/components/im/ProgramMonitoringSettings";
-import { useState } from "react";
-import { toast } from "sonner";
 import {
   Bars,
   ActionDialog,
@@ -21,7 +19,6 @@ import {
   Table,
   statusTone,
 } from "@/components/im/ui";
-import { AUDIT, HOSTS, USERS } from "@/lib/internmatch";
 import { ProgramRegistry } from "@/components/im/ProgramRegistry";
 import { AuditLog } from "@/components/im/AuditLog";
 import { OpportunityWorkspace } from "@/components/im/OpportunityWorkspace";
@@ -58,52 +55,6 @@ export function AdminSection({ section }: { section: string }) {
   }
 }
 
-function Dashboard() {
-  return (
-    <>
-      <PageHeader title="System dashboard" subtitle="InternMatch platform health and usage." />
-      <StatGrid>
-        <StatCard label="Active accounts" value="612" />
-        <StatCard label="Sessions today" value="184" tone="success" />
-        <StatCard label="Failed logins (24h)" value="7" tone="warn" />
-        <StatCard label="Last backup" value="2h ago" tone="success" />
-      </StatGrid>
-      <div className="grid gap-5 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardTitle>Recent activity</CardTitle>
-          <Table head={["Timestamp", "Actor", "Action"]}>
-            {AUDIT.slice(0, 5).map((a) => (
-              <Row key={a.time}>
-                <td className="text-muted-foreground">{a.time}</td>
-                <td className="font-medium">{a.actor}</td>
-                <td>{a.action}</td>
-              </Row>
-            ))}
-          </Table>
-        </Card>
-        <Card>
-          <CardTitle>Service status</CardTitle>
-          <div className="space-y-3 text-sm">
-            {[
-              ["Web application", "Healthy"],
-              ["Database", "Healthy"],
-              ["Recommendation service", "Healthy"],
-              ["File storage", "Healthy"],
-              ["Scheduled backups", "Healthy"],
-            ].map(([svc, st]) => (
-              <div key={svc} className="flex items-center justify-between gap-3">
-                <span>{svc}</span>
-                <Pill tone={statusTone(st!)}>{st}</Pill>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-    </>
-  );
-}
-
-
 function Roles() {
   const perms = ["View students", "Approve placements", "Submit evaluations", "Manage users", "Export reports"];
   const roles = ["Student", "Coordinator", "Supervisor", "Dean", "Admin"];
@@ -112,7 +63,7 @@ function Roles() {
     Coordinator: [true, true, false, false, true],
     Supervisor: [true, false, true, false, false],
     Dean: [true, false, false, false, true],
-    Admin: [true, true, true, true, true],
+    Admin: [true, false, false, true, false],
   };
   return (
     <>
@@ -140,76 +91,14 @@ function Programs() {
   return <ProgramRegistry />;
 }
 
-function MoaRecords() {
-  return (
-    <>
-      <PageHeader title="MOA records" subtitle="Agreements between the university and host establishments." />
-      <StatGrid>
-        <StatCard label="Active MOAs" value="50" tone="success" />
-        <StatCard label="Expiring in 90 days" value="6" tone="warn" />
-        <StatCard label="Expired" value="2" tone="brand" />
-        <StatCard label="Pending signature" value="3" tone="warn" />
-      </StatGrid>
-      <Card>
-        <Table head={["Reference", "Establishment", "Effective", "Status"]}>
-          {HOSTS.map((h, i) => (
-            <Row key={h.name}>
-              <td className="font-medium">MOA-2025-{140 + i}</td>
-              <td>{h.name}</td>
-              <td className="text-muted-foreground">Jun 15, 2025</td>
-              <td>
-                <Pill tone={statusTone(h.moa)}>{h.moa}</Pill>
-              </td>
-            </Row>
-          ))}
-        </Table>
-      </Card>
-    </>
-  );
-}
-
 function Backup() {
-  const [backupStarted, setBackupStarted] = useState(false);
-  return (
-    <>
-      <PageHeader title="Backup & recovery" subtitle="Scheduled backups and restore points." action={<Button onClick={() => setBackupStarted(true)}>Run backup now</Button>} />
-      {backupStarted && <div className="mb-5 rounded-md border border-border bg-success-soft px-4 py-3 text-sm font-medium text-success">Manual backup completed successfully just now.</div>}
-      <div className="grid gap-5 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardTitle>Restore points</CardTitle>
-          <Table head={["Created", "Type", "Size", "Status"]}>
-            {[
-              ["Aug 27, 2026 06:00", "Automated · Daily", "1.8 GB", "Completed"],
-              ["Aug 26, 2026 06:00", "Automated · Daily", "1.8 GB", "Completed"],
-              ["Aug 25, 2026 06:00", "Automated · Daily", "1.7 GB", "Completed"],
-              ["Aug 24, 2026 21:14", "Manual", "1.7 GB", "Completed"],
-            ].map((r) => (
-              <Row key={r[0]}>
-                <td className="font-medium">{r[0]}</td>
-                <td className="text-muted-foreground">{r[1]}</td>
-                <td>{r[2]}</td>
-                <td>
-                  <Pill tone="success">{r[3]}</Pill>
-                </td>
-              </Row>
-            ))}
-          </Table>
-        </Card>
-        <Card>
-          <CardTitle>Storage usage</CardTitle>
-          <Bars
-            data={[
-              { label: "Database", value: 42 },
-              { label: "Documents", value: 61 },
-              { label: "Backups", value: 35 },
-            ]}
-          />
-          <div className="mt-5 space-y-4">
-            <Field label="Backup schedule" value="Daily at 06:00 (Asia/Manila)" />
-            <Field label="Retention" value="30 daily · 12 monthly" />
-          </div>
-        </Card>
-      </div>
-    </>
-  );
+  return <>
+    <PageHeader title="Backup & recovery" subtitle="Database backups are performed by the system operator." />
+    <Card>
+      <CardTitle>Operator backup procedure</CardTitle>
+      <p className="text-sm">Use the documented Docker database backup procedure and retain private uploaded documents alongside the SQL backup. Verify recovery in a separate database before accepting a restore point.</p>
+      <p className="mt-3 text-sm">This page does not execute backups or display unverified restore points. The local development backup and restore evidence is recorded in the implementation audit.</p>
+      <p className="mt-3 text-sm">Production backup scheduling, storage location, retention and recovery targets require the deployment configuration. They have not been configured.</p>
+    </Card>
+  </>;
 }

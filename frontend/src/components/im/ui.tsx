@@ -29,7 +29,7 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cx("rounded-lg border border-border bg-card p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]", className)}>
+    <div className={cx("min-w-0 rounded-lg border border-border bg-card p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]", className)}>
       {children}
     </div>
   );

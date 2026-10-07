@@ -33,7 +33,7 @@ export function StudentCompetencies() {
         finally { setBusy(false); }
       }}>
         <label className="text-sm">Program competency
-          <select required className="mt-1 block rounded border p-2" value={selected} onChange={event => setSelected(event.target.value)}>
+          <select aria-label="Program competency" required className="mt-1 block rounded border p-2" value={selected} onChange={event => setSelected(event.target.value)}>
             <option value="">Select a competency</option>
             {records.vocabulary.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>

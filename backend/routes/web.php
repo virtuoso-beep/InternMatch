@@ -34,6 +34,9 @@ Route::prefix('api/v1')->group(function (): void {
     Route::get('session', [AuthController::class, 'show'])->middleware(['auth', 'active']);
     Route::middleware(['auth', 'active'])->group(function (): void {
         Route::get('dashboard', DashboardController::class);
+        Route::get('program-analytics', \App\Http\Controllers\ProgramAnalyticsController::class);
+        Route::get('recommendation-reviews', [\App\Http\Controllers\RecommendationReviewController::class, 'index']);
+        Route::post('recommendation-reviews/{recommendation}', [\App\Http\Controllers\RecommendationReviewController::class, 'store']);
         Route::get('moas', [MoaController::class, 'index']);
         Route::post('moas', [MoaController::class, 'save']);
         Route::put('moas/{moa}', [MoaController::class, 'save']);

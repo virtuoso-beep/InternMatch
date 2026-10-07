@@ -27,7 +27,7 @@ class ManagementPanelProvider extends PanelProvider
             ->colors(['primary' => Color::Teal])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->pages([Dashboard::class])
-            ->widgets([AccountWidget::class])
+            ->widgets([AccountWidget::class, \App\Filament\Widgets\PlacementStatistics::class])
             ->middleware([
                 EncryptCookies::class, AddQueuedCookiesToResponse::class, StartSession::class,
                 AuthenticateSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class,

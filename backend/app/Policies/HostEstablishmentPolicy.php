@@ -11,6 +11,7 @@ class HostEstablishmentPolicy
 {
     public function update(User $user, HostEstablishment $host): bool
     {
-        return $user->hasPermission(Permission::ManageHosts) && HostAccess::query($user)->whereKey($host->id)->exists();
+        return ($user->hasPermission(Permission::ManageHosts) || $user->hasPermission(Permission::ManageAssignedHost))
+            && HostAccess::query($user)->whereKey($host->id)->exists();
     }
 }

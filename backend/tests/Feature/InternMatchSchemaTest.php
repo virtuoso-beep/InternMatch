@@ -260,13 +260,16 @@ class InternMatchSchemaTest extends TestCase
 
     public function test_reference_seeding_is_repeatable_without_overwriting_custom_names(): void
     {
+        $this->seed(\Database\Seeders\ProgramSeeder::class);
         $this->seed(InternMatchReferenceSeeder::class);
+        $competencyCount = Competency::count();
         Competency::where('code', 'web-development')->update(['name' => 'Custom web curriculum']);
 
         $this->seed(InternMatchReferenceSeeder::class);
 
-        $this->assertDatabaseCount('competencies', 6);
-        $this->assertDatabaseCount('requirement_types', 5);
+        $this->assertDatabaseCount('competencies', $competencyCount);
+        $this->assertDatabaseCount('requirement_types', 15);
+        $this->assertSame(4, \App\Models\Program::where('code', 'BSIT')->firstOrFail()->competencies()->count());
         $this->assertDatabaseHas('competencies', ['code' => 'web-development', 'name' => 'Custom web curriculum']);
     }
 

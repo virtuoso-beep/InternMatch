@@ -1,6 +1,14 @@
 # InternMatch implementation audit
 
-Audit checkpoint: 2026-09-24. This is an evidence ledger, not a release certification.
+Latest checkpoint: **2026-10-07**. See `GUIDE_COMPLETION_EVIDENCE.md` for current guide status and `LOCAL_PERFORMANCE_RESULTS.md` for measured local response times. The phase tables below are historical checkpoints; dated entries later in this ledger record subsequent completion. This is an evidence ledger, not a release certification.
+
+## Verified completion checkpoint — 2026-10-07
+
+- Replaced reachable coordinator student/recommendation prototypes and dean analytics/report/audit prototypes with persisted, authorized Laravel data. Review judgments append history without altering frozen recommendations; dean aggregates remain scoped to assigned programs and exclude student identities. Fixed mobile card/table overflow.
+- Final backend regression passed **202 tests / 1,566 assertions** in the guarded disposable testing database. TypeScript and production build passed. All **55 portal routes** passed desktop and mobile navigation checks; five original logins, 20 cross-role redirects and API authorization also passed through the local Nginx gateway.
+- Defined local hardware, dataset and five-request concurrency. All 25 retrieval requests met the five-second target (maximum 2.498 seconds); eight actual recommendation generations met the eight-second target (maximum 2.274 seconds). Cached-vector local timings do not establish production capacity or cold-model performance.
+- Updated the development guide with evidence for **42 newly completed tasks**, totaling **131 completed / 149 task rows**. Eighteen rows remain blocked: six approved-data ML tasks, one remaining-NFR acceptance task, and eleven production/UAT tasks. Synthetic fixtures and automated checks do not substitute for institutional approvals or human acceptance.
+- Original accounts/passwords, all 31 user records, historical QA data and uploaded files are preserved. Fresh SQL and pre-edit guide backups are retained. Detailed test paths and known intermediate test failures are documented in `GUIDE_COMPLETION_EVIDENCE.md`.
 
 ## Authorities and confirmed input
 
@@ -112,4 +120,33 @@ Transient command output is retained under ignored `.local/`. Never interpret a 
 - **✅** Native Filament host creation, listing, editing and deactivation use shared `HostManagement` API services and program-scoped queries. Profile and capacity saves are atomic; other programs' capacities are retained. Existing capacity row identities are fixed in the editor; new rows can be added. History is retained when a host is deactivated.
 - Eight native-host/existing-host-opportunity tests passed with 59 assertions: scoped creation, outside-host denial, duplicate validation, shared-program preservation, occupied-capacity protection, rollback and panel-role denial.
 - Browser coordinator created `NATIVE-HOST-BROWSER-0924`, updated its name and capacity from 3 to 2, and deactivated it. Values survived refresh and matched QA MySQL: coordinates 7.44/125.8, capacity 2, inactive state, and created/updated/capacity audit entries. All records were synthetic.
-- Native opportunity management is **🔵**: shared API/native services and scoped forms implemented. Eight targeted tests passed with 54 assertions. Full regression and browser acceptance remain pending.
+- Native opportunity management is **🔵**: shared API/native services and scoped forms implemented. Eight targeted tests passed with 54 assertions. Full regression and browser acceptance remain pending at this September 24 checkpoint.
+
+## Continued verification and QA retention — 2026-10-01
+
+- User explicitly requires retaining all existing synthetic and verified QA records. The application and browser QA databases remain intact and have fresh backups in `.local/sep28-audit`. Browser QA is running on port 8082. See `QA_DATA_RETENTION.md`; already discarded disposable test fixtures are not claimed as recovered.
+- Full backend regression: **190 tests / 1,386 assertions passed** after repairing the supervisor host policy and updating outdated CORS and reference-seeder test assumptions. A single-origin CORS header does not authorize an unrelated origin; the test now explicitly sets its two-origin fixture.
+- Student profile: browser save persisted after refresh and matched the authenticated API. The About field now has a stable accessible name when populated. Its synthetic bio is retained. Docker TypeScript check passed; the host's stale node_modules lacked Leaflet, so host-only checking was not acceptance evidence.
+- Native recommendation review: **2 tests / 25 assertions passed**, followed by successful browser review, confirmation, refresh and unchanged frozen-explanation checks. Only assigned active coordinators can label recommendations. Every judgment appends history and audit evidence; it creates no placement. Synthetic judgments remain explicitly identified and are not approved training data.
+- The original development guide was updated directly with profile and native review evidence, a documented judgment format, retention instruction and consistent status colors. Full Integration/E2E/NFR acceptance and outstanding native allocation, analytics, reports and release dependencies remain open. These checks do not claim the whole project is complete.
+
+## Main ports and retained QA consolidation — 2026-10-03
+
+- Frontend **8080** and backend **8000** are the active InternMatch endpoints. Both use the current repository code. The extra 8082/8002 containers remain stopped; their database was not deleted.
+- After a fresh backup, the reviewed transactional importer copied the retained QA records into `internmatchlaravel`. Main account records and credentials were preserved; user and reference IDs were remapped. The first attempt rolled back on a MySQL-generated column; the corrected importer excludes generated columns and its committed result was independently checked. Main now contains 19 users, one student/placement, two recommendations, nine notifications, one report and two coordinator judgments.
+- Browser checks passed for all five role logins on 8080, the retained student profile and notification, the dean's approved report, and native recommendation review with preserved history on 8000. Evidence: `.local/sep28-audit/main-ports-browser-results.json`. This is consolidation verification, not full E2E acceptance.
+- The verified browser-uploaded document is present in shared storage. Nine older synthetic document metadata records lacked files before migration; these remain explicitly unverified uploads. Source history and all backups are retained.
+
+## Original accounts and persistent testing data — 2026-10-06
+
+- The October 3 five-role browser check used retained QA accounts, not the five original `@example.com` accounts. The originals had no student enrollment or assigned program/host scopes, which explained their empty pages. Their existing passwords still worked. October 6 browser checks explicitly used `student@example.com`, `coordinator@example.com`, `supervisor@example.com`, `dean@example.com` and `admin@example.com` at localhost:8080 and all passed without page errors.
+- The revised opt-in `internmatch:seed-demo` requires those original accounts. It never creates accounts or resets credentials. After a fresh SQL backup, a transaction attached the synthetic student enrollment and relevant BSIT/host scopes. Every existing user row remained identical and the user count remained 31. All prior QA accounts and records were retained.
+- The original student now has an active synthetic placement, ten downloadable labeled PDFs, four attendance records, 40 verified hours, a journal, a test-only evaluation and real E5 recommendations. Required hours remain 486. Existing institutional configuration is preserved; the synthetic rubric is not an approved departmental rubric. See `SYNTHETIC_TEST_DATA.md` and `DATA_DOCUMENT_REFERENCE.md`.
+- Seeder preservation, repeatability, missing-account refusal and production guard: **3 tests / 44 assertions passed**. Before/after browser evidence: `.local/oct06-original-logins.txt`, `.local/oct06-original-logins-after.txt`; backup: `.local/oct06-before-original-links.sql`.
+
+## Additional implementation and verification — 2026-10-03 to 2026-10-06
+
+- Added optional preferred internship location and knowledge areas to persisted profiles. Browser saves survived refresh. Added native Filament cohort proposal review, placement decisions, scoped statistics and report generation/approval/export through shared authorization services. Native browser checks verified saved placement decisions and report CSV content.
+- Added a local Nginx gateway configuration on optional port 8081. The main frontend and backend remain 8080 and 8000. Removed the administrator dashboard's simulated successful backup action; it now directs operators to actual backup procedures. A real SQL backup was restored to the separate `internmatch_oct04_restore_check` database with matching user/document/recommendation counts.
+- Full backend checkpoint: **197 tests / 1,605 assertions passed**. Subsequent authentication/native-workflow checks: **20 tests / 125 assertions passed**. AI service checks: **5 passed**. Frontend TypeScript and production build passed. Browser records are retained under `.local/oct03-browser-results.json`; commands and restore evidence are in `.local/oct03-full-suite.txt`, `.local/oct04-final-targeted.txt` and `.local/oct04-restore-verification.txt`.
+- These are local implementation checks. Approved coordinator ML labels, departmental rubric/threshold approval, approved pilot conditions, production infrastructure and human UAT evidence remain absent. No synthetic records are represented as those approvals, and the full development guide is not claimed complete.

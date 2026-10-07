@@ -80,3 +80,6 @@ def recommendations(data: RankingInput):
         raise HTTPException(422, str(error)) from error
     return {'data': sorted(ranked, key=lambda c: (-c['similarity_score'], c['id'])),
             'ranking_method': 'cosine', 'model_name': MODEL, 'model_version': REVISION}
+
+from ml.integrate import router as ml_router
+app.include_router(ml_router)

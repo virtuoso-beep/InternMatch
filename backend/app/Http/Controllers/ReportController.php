@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\{Permission, Role};
 use App\Models\{GeneratedReport, ProgramTerm};
-use App\Services\{Audit, ReportBuilder};
+use App\Services\{Audit, ReportBuilder, ReportManagement};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -13,15 +13,12 @@ class ReportController extends Controller
 {
     private function terms(Request $request)
     {
-        abort_unless($request->user()->hasPermission(Permission::ViewReports), 403);
-
-        return ProgramTerm::whereIn('program_id', $request->user()->programs()->select('programs.id'));
+        return ReportManagement::terms($request->user());
     }
 
     private function reports(Request $request)
     {
-        return GeneratedReport::whereIn('program_term_id', $this->terms($request)->select('id'))
-            ->when($request->user()->role === Role::Dean, fn ($q) => $q->whereNotNull('approved_at'));
+        return ReportManagement::query($request->user());
     }
 
     public function index(Request $request)
@@ -37,14 +34,7 @@ class ReportController extends Controller
     {
         abort_unless($request->user()->role === Role::Coordinator, 403);
         $data = $request->validate(['program_term_id' => ['required', 'integer'], 'kind' => ['required', Rule::in(ReportBuilder::KINDS)]]);
-        $term = $this->terms($request)->findOrFail($data['program_term_id']);
-        $report = DB::transaction(function () use ($request, $builder, $term, $data) {
-            $payload = $builder->build($term, $data['kind']);
-            $report = GeneratedReport::create(['program_term_id' => $term->id, 'kind' => $data['kind'], 'payload' => $payload, 'content_hash' => hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR)), 'generated_by' => $request->user()->id]);
-            Audit::record($request->user(), 'report.generated', $report, ['kind' => $report->kind, 'rows' => count($payload['rows']), 'content_hash' => $report->content_hash], $term->program_id);
-
-            return $report;
-        });
+        $report = ReportManagement::generate($request->user(), (int) $data['program_term_id'], $data['kind']);
 
         return response()->json(['data' => $report], 201);
     }
@@ -56,15 +46,7 @@ class ReportController extends Controller
 
     public function approve(Request $request, int $report)
     {
-        abort_unless($request->user()->role === Role::Coordinator, 403);
-        $record = DB::transaction(function () use ($request, $report) {
-            $record = $this->reports($request)->lockForUpdate()->findOrFail($report);
-            abort_if($record->approved_at, 409, 'Report has already been approved.');
-            $record->update(['approved_by' => $request->user()->id, 'approved_at' => now()]);
-            Audit::record($request->user(), 'report.approved', $record, ['content_hash' => $record->content_hash], $record->programTerm->program_id);
-
-            return $record;
-        });
+        $record = ReportManagement::approve($request->user(), $report);
 
         return response()->json(['data' => $record]);
     }
