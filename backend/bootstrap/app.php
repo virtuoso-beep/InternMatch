@@ -22,7 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureActiveAccount::class,
             'role' => EnsureRole::class,
         ]);
-    $middleware->redirectGuestsTo('/auth');
+    $middleware->redirectGuestsTo(fn (Request $request) => $request->is('manage/*') ? '/manage/login' : '/auth');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

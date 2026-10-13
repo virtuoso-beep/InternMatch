@@ -29,7 +29,7 @@ class User extends Authenticatable implements FilamentUser
     {
         return $panel->getId() === 'manage'
             && $this->status === AccountStatus::Active
-            && in_array($this->role, [Role::Admin, Role::Coordinator], true);
+            && $this->role === Role::Admin;
     }
 
     /**

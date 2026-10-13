@@ -2,8 +2,24 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ApiError, currentUser, type SessionUser } from "@/lib/api";
 import { ROLES, type RoleKey } from "@/lib/internmatch";
+import { managementUrl } from "@/lib/management";
 
-const SessionContext = createContext<{ user: SessionUser; updateUser: (user: SessionUser) => void } | null>(null);
+const SessionContext = createContext<{
+  user: SessionUser;
+  updateUser: (user: SessionUser) => void;
+} | null>(null);
+
+export function SessionUserProvider({
+  user,
+  updateUser,
+  children,
+}: {
+  user: SessionUser;
+  updateUser: (user: SessionUser) => void;
+  children: ReactNode;
+}) {
+  return <SessionContext.Provider value={{ user, updateUser }}>{children}</SessionContext.Provider>;
+}
 
 export function useSessionUser(): SessionUser {
   const user = useContext(SessionContext);
@@ -27,30 +43,50 @@ export function SessionGuard({ role, children }: { role: RoleKey; children: Reac
     let active = true;
     setUser(null);
     setError(null);
-    currentUser().then((session) => {
-      if (!active) return;
-      if (session.role !== role) {
-        void navigate({ to: ROLES[session.role].base, replace: true });
-        return;
-      }
-      setUser(session);
-    }).catch((cause: unknown) => {
-      if (!active) return;
-      if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
-        void navigate({ to: "/auth", replace: true });
-      } else {
-        setError("Unable to check your session. Check the connection and try again.");
-      }
-    });
-    return () => { active = false; };
+    currentUser()
+      .then((session) => {
+        if (!active) return;
+        if (session.role === "admin") {
+          window.location.replace(managementUrl());
+          return;
+        }
+        if (session.role !== role) {
+          void navigate({ to: ROLES[session.role].base, replace: true });
+          return;
+        }
+        setUser(session);
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
+          void navigate({ to: "/auth", replace: true });
+        } else {
+          setError("Unable to check your session. Check the connection and try again.");
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [role, navigate, retry]);
 
   if (!user || user.role !== role) {
-    return <main className="mx-auto max-w-lg p-8" aria-live="polite">
-      <p>{error ?? "Checking your session…"}</p>
-      {error && <button className="mt-4 mr-4 underline" onClick={() => setRetry((value) => value + 1)}>Try again</button>}
-      <Link to="/auth" className="mt-4 inline-block underline">Sign in</Link>
-    </main>;
+    return (
+      <main className="mx-auto max-w-lg p-8" aria-live="polite">
+        <p>{error ?? "Checking your session…"}</p>
+        {error && (
+          <button className="mt-4 mr-4 underline" onClick={() => setRetry((value) => value + 1)}>
+            Try again
+          </button>
+        )}
+        <Link to="/auth" className="mt-4 inline-block underline">
+          Sign in
+        </Link>
+      </main>
+    );
   }
-  return <SessionContext.Provider value={{ user, updateUser: setUser }}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={{ user, updateUser: setUser }}>
+      {children}
+    </SessionContext.Provider>
+  );
 }

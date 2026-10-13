@@ -18,3 +18,5 @@
 .DS_Store
 Thumbs.db
 /.local/
+/backend/public/admin-ui/
+/frontend/dist-admin/

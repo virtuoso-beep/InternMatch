@@ -4,6 +4,7 @@ import { ROLES } from "@/lib/internmatch";
 
 import sealUrl from "@/assets/umtc-seal.png";
 import { login } from "@/lib/api";
+import { managementUrl } from "@/lib/management";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -57,6 +58,10 @@ function AuthPage() {
     try {
       const user = await login(email.trim(), password, keepSignedIn);
       setPassword("");
+      if (user.role === "admin") {
+        window.location.assign(managementUrl());
+        return;
+      }
       await navigate({ to: ROLES[user.role].base });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Sign-in failed. Please try again.");

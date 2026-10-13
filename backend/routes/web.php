@@ -23,6 +23,15 @@ use App\Http\Controllers\StudentManagementController;
 use App\Http\Controllers\StudentPortalController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/manage/admin-workspace/{section?}', \App\Http\Controllers\AdminWorkspaceController::class)
+    ->middleware(['auth', 'active', 'role:admin'])->name('admin.workspace');
+
+Route::get('/admin/{section?}', function (?string $section = null) {
+    abort_unless($section === null || array_key_exists($section, \App\Filament\Pages\Administration::SECTIONS), 404);
+
+    return redirect($section ? '/manage/administration?section='.urlencode($section) : '/manage');
+});
+
 Route::get('/', function () {
     return view('welcome');
 });
