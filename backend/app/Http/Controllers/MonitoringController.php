@@ -25,7 +25,7 @@ class MonitoringController extends Controller
     {
         abort_if($request->user()->role === Role::Dean, 403);
 
-        return response()->json(PlacementAccess::query($request->user())->with(['studentEnrollment.student.user:id,name', 'studentEnrollment.programTerm.program:id,code', 'hostEstablishment:id,name', 'opportunity:id,title', 'supervisor:id,name'])->latest()->paginate(30), headers: ['Cache-Control' => 'no-store']);
+        return response()->json(PlacementAccess::query($request->user())->with(['studentEnrollment.student.user:id,name', 'studentEnrollment.programTerm.program:id,code', 'hostEstablishment:id,name', 'opportunity:id,title', 'supervisor:id,name', 'moa:id,status,effective_on,expires_on'])->latest()->paginate(30), headers: ['Cache-Control' => 'no-store']);
     }
 
     public function show(Request $request, int $placement, ProgressSummary $progress)

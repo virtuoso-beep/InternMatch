@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, mutate, upload } from "@/lib/api";
 import { useSessionUser } from "./SessionGuard";
-import { Button, Card, CardTitle, PageHeader } from "./ui";
+import { Button, Card, CardTitle, cx, PageHeader, Pill } from "./ui";
 
 type Requirement = {
   id: number;
@@ -10,13 +10,23 @@ type Requirement = {
   scheduled_on: string | null;
   requirement_type: { name: string; kind: "document" | "event" };
 };
-type Attendance = { id: number; program_term_requirement_id: number; attended_on: string; confirmed_at: string | null };
-type RequirementData = { requirements: Requirement[]; submissions: Submission[]; attendances: Attendance[] };
+type Attendance = {
+  id: number;
+  program_term_requirement_id: number;
+  attended_on: string;
+  confirmed_at: string | null;
+};
+type RequirementData = {
+  requirements: Requirement[];
+  submissions: Submission[];
+  attendances: Attendance[];
+};
 type Submission = {
   id: number;
   program_term_requirement_id: number;
   status: string;
   revision: number;
+  submitted_at?: string | null;
   document: { original_name: string };
   reviews: { comments: string | null }[];
 };
@@ -45,17 +55,517 @@ export function RequirementWorkspace() {
   }, []);
   return (
     <>
-      <PageHeader title="Requirements" subtitle="Submit documents, record event attendance, and track coordinator confirmation." />
+      {user.role !== "student" && (
+        <PageHeader
+          title="Requirements"
+          subtitle="Submit documents, record event attendance, and track coordinator confirmation."
+        />
+      )}
       {["admin", "coordinator"].includes(user.role) && <RequirementConfiguration />}
       {error && <p role="alert">{error}</p>}
       {!enrollments && !error && <p role="status">Loading enrollments…</p>}
       {enrollments?.length === 0 && <Card>No enrollment records are available.</Card>}
       <div className="space-y-5">
-        {enrollments?.map((item) => (
-          <RequirementsForEnrollment key={item.id} enrollment={item} />
-        ))}
+        {enrollments?.map((item) =>
+          user.role === "student" ? (
+            <StudentRequirements key={item.id} enrollment={item} />
+          ) : (
+            <RequirementsForEnrollment key={item.id} enrollment={item} />
+          ),
+        )}
       </div>
     </>
+  );
+}
+
+function StudentRequirements({ enrollment }: { enrollment: Enrollment }) {
+  const [data, setData] = useState<RequirementData | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [revision, setRevision] = useState(0);
+  const [filter, setFilter] = useState("All");
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState<{ kind: "upload" | "history" | "event"; id?: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    let active = true;
+    setError("");
+    api<RequirementData>(`/enrollments/${enrollment.id}/requirements`)
+      .then((value) => {
+        if (active) setData(value);
+      })
+      .catch((cause: Error) => {
+        if (active) setError(cause.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [enrollment.id, revision]);
+  const submissions = (id: number) =>
+    [...(data?.submissions ?? [])]
+      .filter((item) => item.program_term_requirement_id === id)
+      .sort((a, b) => b.revision - a.revision);
+  function state(requirement: Requirement) {
+    if (requirement.requirement_type.kind === "event") {
+      const attendance = data?.attendances.find(
+        (item) => item.program_term_requirement_id === requirement.id,
+      );
+      return attendance?.confirmed_at ? "Approved" : attendance ? "Pending" : "Missing";
+    }
+    const status = submissions(requirement.id)[0]?.status;
+    return status === "approved"
+      ? "Approved"
+      : status === "rejected"
+        ? "Returned"
+        : status
+          ? "Pending"
+          : "Missing";
+  }
+  const required = data?.requirements.filter((item) => item.is_required) ?? [];
+  const complete = required.filter((item) => state(item) === "Approved").length;
+  const visible =
+    data?.requirements.filter(
+      (item) =>
+        (filter === "All" || state(item) === filter) &&
+        item.requirement_type.name.toLowerCase().includes(search.trim().toLowerCase()),
+    ) ?? [];
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Requirements"
+        subtitle="Upload and track the documents required before and during deployment."
+        action={
+          <Button
+            disabled={!data?.requirements.some((item) => item.requirement_type.kind === "document")}
+            onClick={() => setModal({ kind: "upload" })}
+            className="bg-brand text-white hover:bg-brand/90 font-medium px-4 py-2 rounded-lg shadow-sm"
+          >
+            Upload document
+          </Button>
+        }
+      />
+
+      {error && (
+        <p role="alert" className="rounded-lg bg-brand-soft p-4 text-sm">
+          {error}
+          <button className="ml-3 underline" onClick={() => setRevision((value) => value + 1)}>
+            Retry
+          </button>
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="rounded-lg bg-success-soft p-3 text-sm text-success">
+          {notice}
+        </p>
+      )}
+      {!data && !error && <p role="status">Loading requirements…</p>}
+      {data && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground">Status:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {["All", "Approved", "Pending", "Missing", "Returned"].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={filter === value}
+                    onClick={() => setFilter(value)}
+                    className={cx(
+                      "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                      filter === value
+                        ? "bg-brand text-white shadow-xs"
+                        : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="w-full sm:w-72">
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search requirements…"
+                aria-label="Search requirements"
+                className="w-full rounded-lg border border-border bg-card px-3.5 py-1.5 text-sm placeholder:text-muted-foreground focus:border-brand focus:outline-hidden"
+              />
+            </div>
+          </div>
+
+          <Card className="p-0 overflow-hidden border border-border/80 bg-card rounded-xl shadow-xs">
+            {!data.requirements.length ? (
+              <p className="p-8 text-center text-sm text-muted-foreground">
+                No requirements have been configured for your program and term.
+              </p>
+            ) : !visible.length ? (
+              <div className="p-8 text-center">
+                <p className="mb-3 text-sm text-muted-foreground">
+                  No requirements match your current search and filters.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFilter("All");
+                    setSearch("");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[620px] text-left text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-border/60 text-xs font-semibold text-muted-foreground tracking-wider uppercase bg-muted/20">
+                      <th scope="col" className="py-3.5 px-6 font-semibold">
+                        DOCUMENT
+                      </th>
+                      <th scope="col" className="py-3.5 px-6 font-semibold">
+                        STATUS
+                      </th>
+                      <th scope="col" className="py-3.5 px-6 font-semibold">
+                        DATE
+                      </th>
+                      <th scope="col" className="py-3.5 px-6 font-semibold">
+                        ACTION
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {visible.map((item) => {
+                      const current = submissions(item.id)[0];
+                      const status = state(item);
+                      const isEvent = item.requirement_type.kind === "event";
+
+                      let dateLabel = "No due date";
+                      if (isEvent) {
+                        dateLabel = item.scheduled_on ?? "Date not announced";
+                      } else if (current?.submitted_at) {
+                        const formatted = new Date(current.submitted_at).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          },
+                        );
+                        dateLabel = status === "Approved" ? formatted : `Submitted ${formatted}`;
+                      } else if (item.due_at) {
+                        dateLabel = `Due ${new Date(item.due_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}`;
+                      }
+
+                      return (
+                        <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-4 px-6 font-medium text-foreground">
+                            {item.requirement_type.name}
+                          </td>
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            {status === "Approved" && (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#DEF7EC] text-[#03543F]">
+                                Approved
+                              </span>
+                            )}
+                            {status === "Pending" && (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#FEF08A] text-[#92400E]">
+                                Pending
+                              </span>
+                            )}
+                            {status === "Missing" && (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#FEE2E2] text-[#991B1B]">
+                                Missing
+                              </span>
+                            )}
+                            {status === "Returned" && (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#FDE8E8] text-[#C81E1E]">
+                                Returned
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-4 px-6 text-muted-foreground whitespace-nowrap">
+                            {dateLabel}
+                          </td>
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            {isEvent ? (
+                              <button
+                                className="font-semibold text-brand hover:underline cursor-pointer"
+                                aria-label={`Attendance ${item.requirement_type.name}`}
+                                onClick={() => setModal({ kind: "event", id: item.id })}
+                              >
+                                View
+                              </button>
+                            ) : current ? (
+                              <button
+                                className="font-semibold text-brand hover:underline cursor-pointer"
+                                aria-label={`View ${item.requirement_type.name}`}
+                                onClick={() => setModal({ kind: "history", id: item.id })}
+                              >
+                                View
+                              </button>
+                            ) : (
+                              <button
+                                className="font-semibold text-brand hover:underline cursor-pointer"
+                                aria-label={`Upload ${item.requirement_type.name}`}
+                                onClick={() => setModal({ kind: "upload", id: item.id })}
+                              >
+                                Upload
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+          {modal && (
+            <RequirementDialog
+              key={`${modal.kind}-${modal.id ?? "new"}`}
+              mode={modal}
+              data={data}
+              enrollmentId={enrollment.id}
+              onClose={() => setModal(null)}
+              onSaved={() => {
+                setRevision((value) => value + 1);
+                setModal(null);
+                setNotice("Record submitted. Your coordinator will review it.");
+              }}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function RequirementDialog({
+  mode,
+  data,
+  enrollmentId,
+  onClose,
+  onSaved,
+}: {
+  mode: { kind: "upload" | "history" | "event"; id?: number };
+  data: RequirementData;
+  enrollmentId: number;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [currentKind, setCurrentKind] = useState(mode.kind);
+  const [selected, setSelected] = useState(String(mode.id ?? ""));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const element = dialog.current;
+    element?.showModal();
+    return () => element?.close();
+  }, []);
+  const requirement = data.requirements.find((item) => item.id === Number(selected));
+  const history = data.submissions
+    .filter((item) => item.program_term_requirement_id === Number(selected))
+    .sort((a, b) => b.revision - a.revision);
+  async function download(item: Submission) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/v1/submissions/${item.id}/document`, {
+        credentials: "same-origin",
+      });
+      if (!response.ok)
+        throw new Error(
+          response.status === 404
+            ? "The uploaded file is unavailable. Upload a replacement or contact your coordinator."
+            : "Unable to download this file. Please try again.",
+        );
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = item.document.original_name;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to download.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <dialog
+      ref={dialog}
+      aria-labelledby="requirement-dialog-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!busy) onClose();
+      }}
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border bg-card p-6 text-foreground shadow-xl backdrop:bg-black/35"
+    >
+      <div className="flex items-center justify-between pb-3 border-b border-border">
+        <h2 id="requirement-dialog-title" className="text-xl font-semibold">
+          {currentKind === "upload"
+            ? "Upload document"
+            : (requirement?.requirement_type.name ?? "Requirement details")}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={busy}
+          className="text-muted-foreground hover:text-foreground p-1 rounded-lg"
+          aria-label="Close dialog"
+        >
+          ✕
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-4 rounded-lg bg-brand-soft p-3 text-sm">
+          {error}
+        </p>
+      )}
+      {currentKind === "upload" ? (
+        <form
+          className="mt-5 space-y-5"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (busy) return;
+            const payload = new FormData(event.currentTarget);
+            const file = payload.get("file");
+            setError("");
+            if (!(file instanceof File) || file.size === 0) {
+              setError("Choose a non-empty file.");
+              return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+              setError("Choose a file no larger than 10 MB.");
+              return;
+            }
+            if (!/\.(pdf|jpe?g|png|docx)$/i.test(file.name)) {
+              setError("Use PDF, JPG, PNG or DOCX.");
+              return;
+            }
+            setBusy(true);
+            try {
+              await upload(`/enrollments/${enrollmentId}/requirements`, payload);
+              onSaved();
+            } catch (cause) {
+              setError(
+                cause instanceof Error
+                  ? cause.message
+                  : "Unable to upload. Your selection is retained.",
+              );
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <label className="block text-sm font-medium">
+            Requirement
+            <select
+              name="requirement_id"
+              required
+              disabled={busy}
+              value={selected}
+              onChange={(event) => setSelected(event.target.value)}
+              className="mt-2 block w-full rounded-lg border bg-background p-3"
+            >
+              <option value="">Select a document requirement</option>
+              {data.requirements
+                .filter((item) => item.requirement_type.kind === "document")
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.requirement_type.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="block text-sm font-medium">
+            Document file
+            <input
+              type="file"
+              name="file"
+              required
+              disabled={busy}
+              accept=".pdf,.jpg,.jpeg,.png,.docx"
+              className="mt-2 block w-full rounded-lg border p-3 text-sm"
+            />
+          </label>
+          <p className="text-xs text-muted-foreground">
+            PDF, JPG, PNG or DOCX · Maximum 10 MB. Replacements create a new revision for review and
+            preserve earlier files.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" disabled={busy} onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? "Uploading…" : "Submit document"}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          {mode.kind === "event" && requirement && (
+            <EventRequirement
+              requirement={requirement}
+              enrollmentId={enrollmentId}
+              attendance={data.attendances.find(
+                (item) => item.program_term_requirement_id === requirement.id,
+              )}
+              onSaved={onSaved}
+            />
+          )}
+          {mode.kind === "history" && (
+            <div className="mt-5 space-y-4">
+              {history.map((item) => (
+                <section key={item.id} className="rounded-lg border p-4">
+                  <p className="break-words font-medium">
+                    Revision {item.revision}: {item.document.original_name}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {item.status.replaceAll("_", " ")}
+                  </p>
+                  {item.reviews.map(
+                    (review, index) =>
+                      review.comments && (
+                        <p key={index} className="mt-2 whitespace-pre-wrap text-sm">
+                          {review.comments}
+                        </p>
+                      ),
+                  )}
+                  <Button
+                    className="mt-3"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => download(item)}
+                  >
+                    Download revision {item.revision}
+                  </Button>
+                </section>
+              ))}
+            </div>
+          )}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+            {currentKind === "history" && (
+              <Button variant="outline" disabled={busy} onClick={() => setCurrentKind("upload")}>
+                Upload replacement revision
+              </Button>
+            )}
+            <Button disabled={busy} onClick={onClose} className="ml-auto">
+              Close
+            </Button>
+          </div>
+        </>
+      )}
+    </dialog>
   );
 }
 
@@ -127,7 +637,10 @@ export function RequirementConfiguration() {
               is_required: required,
               required_before_deployment: deployment,
               due_at: due ? new Date(due).toISOString() : null,
-              scheduled_on: config?.types.find((item) => item.id === Number(type))?.kind === "event" ? scheduled || null : null,
+              scheduled_on:
+                config?.types.find((item) => item.id === Number(type))?.kind === "event"
+                  ? scheduled || null
+                  : null,
             });
             setConfig(await api<Config>("/requirement-configuration"));
             setMessage("Requirement configuration saved.");
@@ -180,8 +693,14 @@ export function RequirementConfiguration() {
           />
         </label>
         {config?.types.find((item) => item.id === Number(type))?.kind === "event" && (
-          <label className="text-sm">Event date (leave empty until announced)
-            <input type="date" value={scheduled} onChange={(event) => setScheduled(event.target.value)} className="mt-1 block w-full rounded border p-2" />
+          <label className="text-sm">
+            Event date (leave empty until announced)
+            <input
+              type="date"
+              value={scheduled}
+              onChange={(event) => setScheduled(event.target.value)}
+              className="mt-1 block w-full rounded border p-2"
+            />
           </label>
         )}
         <div className="space-y-2 text-sm">
@@ -238,9 +757,7 @@ function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
   const [comments, setComments] = useState<Record<number, string>>({});
   useEffect(() => {
     let active = true;
-    api<RequirementData>(
-      `/enrollments/${enrollment.id}/requirements`,
-    )
+    api<RequirementData>(`/enrollments/${enrollment.id}/requirements`)
       .then((value) => {
         if (active) setData(value);
       })
@@ -268,9 +785,17 @@ function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
       <div className="divide-y">
         {data?.requirements.map((requirement) => {
           if (requirement.requirement_type.kind === "event") {
-            return <EventRequirement key={requirement.id} requirement={requirement} enrollmentId={enrollment.id}
-              attendance={data.attendances.find((item) => item.program_term_requirement_id === requirement.id)}
-              onSaved={() => setRevision((value) => value + 1)} />;
+            return (
+              <EventRequirement
+                key={requirement.id}
+                requirement={requirement}
+                enrollmentId={enrollment.id}
+                attendance={data.attendances.find(
+                  (item) => item.program_term_requirement_id === requirement.id,
+                )}
+                onSaved={() => setRevision((value) => value + 1)}
+              />
+            );
           }
           const submissions = data.submissions.filter(
             (item) => item.program_term_requirement_id === requirement.id,
@@ -400,8 +925,16 @@ function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
   );
 }
 
-function EventRequirement({ requirement, enrollmentId, attendance, onSaved }: {
-  requirement: Requirement; enrollmentId: number; attendance: Attendance | undefined; onSaved: () => void;
+function EventRequirement({
+  requirement,
+  enrollmentId,
+  attendance,
+  onSaved,
+}: {
+  requirement: Requirement;
+  enrollmentId: number;
+  attendance: Attendance | undefined;
+  onSaved: () => void;
 }) {
   const user = useSessionUser();
   const [date, setDate] = useState(attendance?.attended_on ?? "");
@@ -413,28 +946,76 @@ function EventRequirement({ requirement, enrollmentId, attendance, onSaved }: {
     setMessage("");
     try {
       const base = `/enrollments/${enrollmentId}/event-attendances`;
-      await mutate(confirm ? `${base}/${attendance?.id}/confirm` : base,
-        confirm ? {} : { requirement_id: requirement.id, attended_on: date });
+      await mutate(
+        confirm ? `${base}/${attendance?.id}/confirm` : base,
+        confirm ? {} : { requirement_id: requirement.id, attended_on: date },
+      );
       onSaved();
-      setMessage(confirm ? "Attendance confirmed." : "Attendance recorded; awaiting coordinator confirmation.");
+      setMessage(
+        confirm
+          ? "Attendance confirmed."
+          : "Attendance recorded; awaiting coordinator confirmation.",
+      );
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Unable to save attendance.");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
-  return <section className="py-4">
-    <h3 className="font-semibold">{requirement.requirement_type.name}{requirement.is_required ? " (required)" : " (optional)"}</h3>
-    <p className="text-sm">{requirement.scheduled_on ? `Scheduled: ${requirement.scheduled_on}` : "Date not yet announced"}</p>
-    <p className="text-sm">Status: {attendance?.confirmed_at ? "Confirmed" : attendance ? "Attended — awaiting confirmation" : "Not attended"}
-      {attendance ? ` — Attended ${attendance.attended_on}` : ""}</p>
-    {user.role === "student" && !attendance?.confirmed_at && <form className="my-3 flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); void save(false); }}>
-      <label className="text-sm">Attendance date
-        <input aria-label={`${requirement.requirement_type.name} attendance date`} className="mt-1 block rounded border p-2" type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
-      </label>
-      <Button type="submit" disabled={busy}>Record attendance</Button>
-    </form>}
-    {user.role === "coordinator" && attendance && !attendance.confirmed_at && <Button variant="outline" className="mt-3" disabled={busy} onClick={() => void save(true)}>Confirm attendance</Button>}
-    {message && <p role="status" className="mt-2 text-sm">{message}</p>}
-  </section>;
+  return (
+    <section className="py-4">
+      <h3 className="font-semibold">
+        {requirement.requirement_type.name}
+        {requirement.is_required ? " (required)" : " (optional)"}
+      </h3>
+      <p className="text-sm">
+        {requirement.scheduled_on
+          ? `Scheduled: ${requirement.scheduled_on}`
+          : "Date not yet announced"}
+      </p>
+      <p className="text-sm">
+        Status:{" "}
+        {attendance?.confirmed_at
+          ? "Confirmed"
+          : attendance
+            ? "Attended — awaiting confirmation"
+            : "Not attended"}
+        {attendance ? ` — Attended ${attendance.attended_on}` : ""}
+      </p>
+      {user.role === "student" && !attendance?.confirmed_at && (
+        <form
+          className="my-3 flex flex-wrap items-end gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void save(false);
+          }}
+        >
+          <label className="text-sm">
+            Attendance date
+            <input
+              aria-label={`${requirement.requirement_type.name} attendance date`}
+              className="mt-1 block rounded border p-2"
+              type="date"
+              required
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </label>
+          <Button type="submit" disabled={busy}>
+            Record attendance
+          </Button>
+        </form>
+      )}
+      {user.role === "coordinator" && attendance && !attendance.confirmed_at && (
+        <Button variant="outline" className="mt-3" disabled={busy} onClick={() => void save(true)}>
+          Confirm attendance
+        </Button>
+      )}
+      {message && (
+        <p role="status" className="mt-2 text-sm">
+          {message}
+        </p>
+      )}
+    </section>
+  );
 }
-
-

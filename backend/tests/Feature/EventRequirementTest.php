@@ -11,6 +11,8 @@ use App\Models\StudentEnrollment;
 use App\Models\User;
 use App\Services\ProgramRequirementTemplates;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\InternMatchReferenceSeeder;
+use Database\Seeders\ProgramSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -23,20 +25,21 @@ class EventRequirementTest extends TestCase
 
     private function context(): array
     {
-        $this->seed(DatabaseSeeder::class);
+        $this->seed([DatabaseSeeder::class, ProgramSeeder::class, InternMatchReferenceSeeder::class]);
         $term = ProgramTerm::factory()->create(['program_id' => Program::where('code', 'BSIT')->firstOrFail()->id]);
         ProgramRequirementTemplates::apply($term);
         $student = StudentEnrollment::factory()->create(['program_term_id' => $term->id]);
         $event = $term->requirements()->whereHas('requirementType', fn ($q) => $q->where('code', 'pdos'))->firstOrFail();
         $coordinator = User::factory()->withRole(Role::Coordinator)->create();
         $coordinator->programs()->attach($term->program_id);
+
         return [$student, $event, $coordinator];
     }
 
     public function test_confirmed_catalog_is_program_scoped_idempotent_and_has_unscheduled_events(): void
     {
         [$student, $event] = $this->context();
-        $this->seed(DatabaseSeeder::class);
+        $this->seed([DatabaseSeeder::class, ProgramSeeder::class, InternMatchReferenceSeeder::class]);
         ProgramRequirementTemplates::apply($student->programTerm);
         $this->assertDatabaseCount('program_requirement_templates', 14);
         $this->assertSame(10, $student->programTerm->requirements()->whereHas('requirementType', fn ($q) => $q->where('kind', 'document'))->count());

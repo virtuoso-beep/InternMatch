@@ -23,6 +23,7 @@ class ProfileResource extends JsonResource
             'contact_number' => $this->profile?->contact_number,
             'address' => $this->profile?->address,
             'bio' => $this->profile?->bio,
+            'avatar_url' => $this->profile?->avatar_path ? '/api/v1/profile/photo?v='.substr(hash('sha256', $this->profile->avatar_path), 0, 16) : null,
             'preferred_internship_location' => $this->profile?->preferred_internship_location,
             'knowledge_areas' => $this->profile?->knowledge_areas,
             'latitude' => $this->profile?->latitude,

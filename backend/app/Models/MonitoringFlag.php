@@ -34,12 +34,12 @@ class MonitoringFlag extends Model
     /** @return BelongsTo<User, $this> */
     public function raisedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'raised_by');
+        return $this->belongsTo(User::class, 'raised_by')->withTrashed();
     }
 
     /** @return BelongsTo<User, $this> */
     public function resolvedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'resolved_by');
+        return $this->belongsTo(User::class, 'resolved_by')->withTrashed();
     }
 }

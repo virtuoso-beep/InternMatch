@@ -20,6 +20,7 @@ class Administration extends Page
     public string $section = 'users';
 
     public const SECTIONS = [
+        'chat-settings' => 'Chat Availability',
         'users' => 'User Accounts',
         'roles' => 'Roles & Permissions',
         'hosts' => 'Host Establishments',

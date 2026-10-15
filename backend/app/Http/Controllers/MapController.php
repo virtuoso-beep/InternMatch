@@ -26,6 +26,7 @@ class MapController extends Controller
             $enrollment = StudentAccess::enrollments($user)->where('status', 'enrolled')->latest('id')->first();
         }
         $student = null;
+        $eligibleOpportunities = [];
         if ($enrollment) {
             $profile = $enrollment->student->user->profile;
             if ($profile?->latitude !== null && $profile?->longitude !== null) {
@@ -33,9 +34,14 @@ class MapController extends Controller
             }
             $hostIds = [];
             foreach (Opportunity::where('academic_term_id', $enrollment->programTerm->academic_term_id)->whereHas('programs', fn ($q) => $q->whereKey($enrollment->programTerm->program_id))->get() as $opportunity) {
-                if ($eligibility->inspect($enrollment, $opportunity)) { $hostIds[] = $opportunity->host_establishment_id; }
+                if ($facts = $eligibility->inspect($enrollment, $opportunity)) {
+                    $hostIds[] = $opportunity->host_establishment_id;
+                    $eligibleOpportunities[$opportunity->host_establishment_id][] = ['id' => $opportunity->id, 'title' => $opportunity->title, 'available_slots' => $facts['capacity_remaining'], 'moa_expires_on' => $facts['moa_expires_on']];
+                }
             }
-            if ($enrollment->currentPlacement) { $hostIds[] = $enrollment->currentPlacement->host_establishment_id; }
+            if ($enrollment->currentPlacement) {
+                $hostIds[] = $enrollment->currentPlacement->host_establishment_id;
+            }
             $hosts = HostEstablishment::whereIn('id', $hostIds);
         } elseif ($user->role === Role::Dean) {
             $hosts = HostEstablishment::whereHas('opportunities.programs', fn ($q) => $q->whereIn('programs.id', $user->programs()->select('programs.id')));
@@ -43,10 +49,12 @@ class MapController extends Controller
             $hosts = HostAccess::query($user);
         }
 
-        return response()->json(['student' => $student, 'hosts' => $hosts->orderBy('name')->get()->map(function ($host) use ($student) {
+        return response()->json(['student' => $student, 'hosts' => $hosts->orderBy('name')->get()->map(function ($host) use ($student, $eligibleOpportunities, $enrollment) {
             $hasCoordinates = $host->latitude !== null && $host->longitude !== null;
 
             return ['id' => $host->id, 'name' => $host->name, 'city' => $host->city, 'latitude' => $hasCoordinates ? (float) $host->latitude : null, 'longitude' => $hasCoordinates ? (float) $host->longitude : null,
+                'eligible_opportunities' => $eligibleOpportunities[$host->id] ?? [],
+                'current_placement' => $enrollment?->currentPlacement?->host_establishment_id === $host->id,
                 'distance_km' => $student && $hasCoordinates ? Haversine::kilometers($student['latitude'], $student['longitude'], (float) $host->latitude, (float) $host->longitude) : null];
         }), 'distance_kind' => 'straight_line'], headers: ['Cache-Control' => 'no-store']);
     }

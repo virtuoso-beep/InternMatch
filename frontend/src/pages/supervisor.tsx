@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/im/ui";
+import { ChatWorkspace } from "@/components/im/ChatWorkspace";
 import { NotificationList } from "@/components/im/NotificationList";
 import { MoaWorkspace } from "@/components/im/MoaWorkspace";
 import { LiveDashboard } from "@/components/im/LiveDashboard";
@@ -9,17 +10,20 @@ import { ProfileEditor } from "@/components/im/ProfileEditor";
 
 export function SupervisorSection({ section }: { section: string }) {
   switch (section) {
-    case "notifications": return <NotificationList />;
+    case "inbox":
+      return <ChatWorkspace />;
+    case "notifications":
+      return <NotificationList />;
     case "profile":
       return <ProfileEditor role="supervisor" />;
     case "":
       return <LiveDashboard />;
     case "interns":
-      return <MonitoringWorkspace />;
+      return <MonitoringWorkspace key="interns" view="interns" />;
     case "attendance":
-      return <MonitoringWorkspace />;
+      return <MonitoringWorkspace key="attendance" view="attendance" />;
     case "evaluations":
-      return <MonitoringWorkspace />;
+      return <MonitoringWorkspace key="evaluations" view="evaluations" />;
     case "company":
       return <HostWorkspace />;
     case "opportunities":

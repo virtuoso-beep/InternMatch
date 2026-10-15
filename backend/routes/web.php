@@ -42,6 +42,12 @@ Route::prefix('api/v1')->group(function (): void {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('session', [AuthController::class, 'show'])->middleware(['auth', 'active']);
     Route::middleware(['auth', 'active'])->group(function (): void {
+        Route::get('chat/settings', [\App\Http\Controllers\ChatController::class, 'settings']);
+        Route::put('chat/settings', [\App\Http\Controllers\ChatController::class, 'updateSettings']);
+        Route::get('chat/conversations', [\App\Http\Controllers\ChatController::class, 'index']);
+        Route::get('chat/conversations/{conversation}', [\App\Http\Controllers\ChatController::class, 'show']);
+        Route::post('chat/conversations/{conversation}/messages', [\App\Http\Controllers\ChatController::class, 'send'])->middleware('throttle:30,1');
+        Route::post('chat/conversations/{conversation}/read', [\App\Http\Controllers\ChatController::class, 'read']);
         Route::get('dashboard', DashboardController::class);
         Route::get('program-analytics', \App\Http\Controllers\ProgramAnalyticsController::class);
         Route::get('recommendation-reviews', [\App\Http\Controllers\RecommendationReviewController::class, 'index']);
@@ -63,6 +69,7 @@ Route::prefix('api/v1')->group(function (): void {
         Route::post('placements/{placement}/journals', [MonitoringController::class, 'journal']);
         Route::post('journals/{journal}/review', [MonitoringController::class, 'reviewJournal']);
         Route::get('notifications', [NotificationController::class, 'index']);
+        Route::patch('notifications/read-all', [NotificationController::class, 'readAll']);
         Route::patch('notifications/{notification}/read', [NotificationController::class, 'read']);
         Route::get('enrollments/{enrollment}/requirements', [RequirementController::class, 'index']);
         Route::post('enrollments/{enrollment}/requirements', [RequirementController::class, 'submit']);
@@ -113,6 +120,8 @@ Route::prefix('api/v1')->group(function (): void {
         Route::patch('programs/{program}', [ProgramController::class, 'update']);
         Route::put('users/{user}/programs', ProgramAccessController::class);
         Route::get('profile', [ProfileController::class, 'show']);
+        Route::get('profile/photo', [ProfileController::class, 'photo']);
+        Route::post('profile/photo', [ProfileController::class, 'uploadPhoto']);
         Route::patch('profile', [ProfileController::class, 'update']);
     });
 });

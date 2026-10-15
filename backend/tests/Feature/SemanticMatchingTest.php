@@ -39,15 +39,22 @@ class SemanticMatchingTest extends TestCase
     public function test_generation_filters_first_freezes_facts_notifies_and_records_empty_generations(): void
     {
         [$student, $opportunity] = $this->context();
+        $skill = $student->student->studentCompetencies()->firstOrFail();
+        $skill->update(['level' => 82]);
+        $opportunity->competencies()->attach($skill->competency_id, ['minimum_level' => 50, 'is_required' => true]);
         $this->cache($student->student);
         $this->cache($opportunity);
         Http::fake(['*/recommendations' => Http::response(['data' => [['id' => $opportunity->id, 'similarity_score' => 0.83]], 'model_name' => config('matching.model'), 'model_version' => config('matching.revision')])]);
         $url = '/api/v1/enrollments/'.$student->id.'/recommendations';
-        $this->actingAs($student->student->user)->postJson($url)->assertOk()->assertJsonPath('data.0.similarity_score', 0.83)->assertJsonPath('data.0.capacity_at_time', 2);
+        $this->actingAs($student->student->user)->postJson($url)->assertOk()->assertJsonPath('data.0.similarity_score', 0.83)->assertJsonPath('data.0.capacity_at_time', 2)
+            ->assertJsonPath('data.0.snapshot.competencies.0.level', 82);
         $this->assertDatabaseCount('notifications', 1);
         $this->assertDatabaseCount('recommendations', 1);
         $opportunity->update(['status' => 'closed']);
-        $this->getJson($url)->assertOk()->assertJsonPath('data.0.capacity_at_time', 2);
+        $skill->update(['level' => 20]);
+        $this->getJson($url)->assertOk()->assertJsonPath('data.0.capacity_at_time', 2)
+            ->assertJsonPath('data.0.snapshot.competencies.0.level', 82);
+        $skill->update(['level' => 82]);
         $this->postJson($url)->assertOk()->assertJsonCount(0, 'data');
         $this->getJson($url)->assertOk()->assertJsonCount(0, 'data');
         $this->assertDatabaseCount('recommendation_generations', 2);

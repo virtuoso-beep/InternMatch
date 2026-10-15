@@ -39,7 +39,7 @@ class Evaluation extends Model
     /** @return BelongsTo<User, $this> */
     public function evaluator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'evaluator_id');
+        return $this->belongsTo(User::class, 'evaluator_id')->withTrashed();
     }
 
     /** @return HasMany<EvaluationScore, $this> */

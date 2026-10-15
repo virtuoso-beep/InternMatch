@@ -31,8 +31,10 @@ export function ProgramMonitoringSettings() {
   const [config, setConfig] = useState<Config | null>(null);
   const [selected, setSelected] = useState("");
   const [message, setMessage] = useState("");
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
+    setMessage("");
     api<Config>("/program-monitoring")
       .then((value) => {
         if (active) setConfig(value);
@@ -43,18 +45,28 @@ export function ProgramMonitoringSettings() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [revision]);
   const program = config?.programs.find((item) => item.id === Number(selected));
   return (
     <>
       <PageHeader
-        title="Monitoring configuration"
+        title="Monitoring settings"
         subtitle="Enter department-confirmed settings. No default thresholds or evaluation criteria are assumed."
       />
-      {message && <p role="alert">{message}</p>}
+      {message && (
+        <p role="alert">
+          {message}{" "}
+          <Button variant="outline" onClick={() => setRevision((v) => v + 1)}>
+            Try again
+          </Button>
+        </p>
+      )}
+      {!config && !message && <p role="status">Loading monitoring settings…</p>}
+      {config?.programs.length === 0 && <Card>No programs are assigned to your account.</Card>}
       <label className="mb-4 block text-sm">
         Program
         <select
+          aria-label="Program"
           value={selected}
           onChange={(event) => setSelected(event.target.value)}
           className="ml-2 rounded border p-2"
@@ -74,6 +86,7 @@ export function ProgramMonitoringSettings() {
           currentRubric={
             program.evaluation_rubric_id ? config?.rubrics[program.evaluation_rubric_id] : undefined
           }
+          saved={() => setRevision((v) => v + 1)}
         />
       )}
     </>
@@ -83,9 +96,11 @@ export function ProgramMonitoringSettings() {
 function Settings({
   program,
   currentRubric,
+  saved,
 }: {
   program: Program;
   currentRubric: Config["rubrics"][number] | undefined;
+  saved: () => void;
 }) {
   const [name, setName] = useState("");
   const [approval, setApproval] = useState("");
@@ -145,6 +160,7 @@ function Settings({
                 },
               );
               setRubric(result.data);
+              saved();
               setMessage(
                 "New rubric version saved. Existing evaluations keep their original rubric.",
               );
@@ -155,69 +171,86 @@ function Settings({
             }
           }}
         >
-          <label className="block text-sm">
-            Rubric name
-            <input
-              required
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="mt-1 block w-full rounded border p-2"
-            />
-          </label>
-          <label className="block text-sm">
-            Department approval reference
-            <input
-              required
-              value={approval}
-              onChange={(event) => setApproval(event.target.value)}
-              className="mt-1 block w-full rounded border p-2"
-            />
-          </label>
-          {criteria.map((criterion, index) => (
-            <div key={index} className="grid gap-2 sm:grid-cols-3">
-              {(["name", "max_score", "weight"] as const).map((key) => (
-                <label key={key} className="text-sm">
-                  {key === "name" ? "Criterion" : key === "max_score" ? "Maximum score" : "Weight"}
-                  <input
-                    required
-                    type={key === "name" ? "text" : "number"}
-                    min={key === "weight" ? "0.0001" : "0.01"}
-                    step={key === "weight" ? "0.0001" : "0.01"}
-                    value={criterion[key]}
-                    onChange={(event) =>
-                      setCriteria((current) =>
-                        current.map((item, i) =>
-                          i === index ? { ...item, [key]: event.target.value } : item,
-                        ),
-                      )
-                    }
-                    className="mt-1 block w-full rounded border p-2"
-                  />
-                </label>
-              ))}
-              {criteria.length > 1 && (
-                <Button
-                  variant="outline"
-                  onClick={() => setCriteria((current) => current.filter((_, i) => i !== index))}
-                >
-                  Remove criterion
-                </Button>
-              )}
+          <fieldset disabled={busy} className="space-y-3">
+            <label className="block text-sm">
+              Rubric name
+              <input
+                required
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="mt-1 block w-full rounded border p-2"
+              />
+            </label>
+            <label className="block text-sm">
+              Department approval reference
+              <input
+                required
+                value={approval}
+                onChange={(event) => setApproval(event.target.value)}
+                className="mt-1 block w-full rounded border p-2"
+              />
+            </label>
+            {criteria.map((criterion, index) => (
+              <div key={index} className="grid gap-2 sm:grid-cols-3">
+                {(["name", "max_score", "weight"] as const).map((key) => (
+                  <label key={key} className="text-sm">
+                    {key === "name"
+                      ? "Criterion"
+                      : key === "max_score"
+                        ? "Maximum score"
+                        : "Weight"}
+                    <input
+                      required
+                      type={key === "name" ? "text" : "number"}
+                      min={key === "weight" ? "0.0001" : "0.01"}
+                      step={key === "weight" ? "0.0001" : "0.01"}
+                      value={criterion[key]}
+                      onChange={(event) =>
+                        setCriteria((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, [key]: event.target.value } : item,
+                          ),
+                        )
+                      }
+                      className="mt-1 block w-full rounded border p-2"
+                    />
+                  </label>
+                ))}
+                {criteria.length > 1 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setCriteria((current) => current.filter((_, i) => i !== index))}
+                  >
+                    Remove criterion
+                  </Button>
+                )}
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                disabled={criteria.length >= 100}
+                onClick={() =>
+                  setCriteria((current) => [...current, { name: "", max_score: "", weight: "" }])
+                }
+              >
+                Add criterion
+              </Button>
+              <Button type="submit" disabled={busy}>
+                Save new rubric version
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setName("");
+                  setApproval("");
+                  setCriteria([{ name: "", max_score: "", weight: "" }]);
+                }}
+              >
+                Clear rubric draft
+              </Button>
             </div>
-          ))}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() =>
-                setCriteria((current) => [...current, { name: "", max_score: "", weight: "" }])
-              }
-            >
-              Add criterion
-            </Button>
-            <Button type="submit" disabled={busy}>
-              Save new rubric version
-            </Button>
-          </div>
+          </fieldset>
         </form>
       </Card>
       <Card>
@@ -245,6 +278,7 @@ function Settings({
                 ),
               );
               setMessage("Monitoring thresholds saved.");
+              saved();
             } catch (cause) {
               setMessage(cause instanceof Error ? cause.message : "Unable to save rules.");
             } finally {
@@ -252,58 +286,91 @@ function Settings({
             }
           }}
         >
-          <label className="block text-sm">
-            Academic term
-            <select
-              required
-              value={termId}
-              onChange={(event) => setTermId(event.target.value)}
-              className="ml-2 rounded border p-2"
+          <fieldset disabled={busy} className="space-y-3">
+            <label className="block text-sm">
+              Academic term
+              <select
+                aria-label="Academic term"
+                required
+                value={termId}
+                onChange={(event) => setTermId(event.target.value)}
+                className="ml-2 rounded border p-2"
+              >
+                <option value="">Select term</option>
+                {terms.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.academic_term.code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              Remaining days threshold
+              <input
+                required
+                type="number"
+                min="0"
+                max="365"
+                value={days}
+                onChange={(event) => setDays(event.target.value)}
+                className="ml-2 rounded border p-2"
+              />
+            </label>
+            <label className="block text-sm">
+              Remaining hours threshold
+              <input
+                required
+                type="number"
+                min="1"
+                max="10000"
+                value={hours}
+                onChange={(event) => setHours(event.target.value)}
+                className="ml-2 rounded border p-2"
+              />
+            </label>
+            <label className="block text-sm">
+              Department approval reference
+              <input
+                required
+                value={ruleApproval}
+                onChange={(event) => setRuleApproval(event.target.value)}
+                className="mt-1 block w-full rounded border p-2"
+              />
+            </label>
+            {term && (
+              <p className="rounded-lg bg-muted p-3 text-sm" role="status">
+                {term.monitoring_rules
+                  ? "Saved rules exist for this term."
+                  : "This term has no confirmed hours thresholds."}{" "}
+                {days !== "" &&
+                  hours !== "" &&
+                  `Preview: flag when remaining days ≤ ${days} AND remaining certified-work hours needed ≥ ${hours}.`}
+              </p>
+            )}
+            <Button type="submit" disabled={busy || !termId}>
+              Save thresholds
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!termId}
+              onClick={() => {
+                setDays(
+                  term?.monitoring_rules
+                    ? String(term.monitoring_rules.remaining_days_threshold)
+                    : "",
+                );
+                setHours(
+                  term?.monitoring_rules
+                    ? String(term.monitoring_rules.remaining_hours_threshold)
+                    : "",
+                );
+                setRuleApproval(term?.monitoring_rules?.approval_reference ?? "");
+                setMessage("");
+              }}
             >
-              <option value="">Select term</option>
-              {terms.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.academic_term.code}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            Remaining days threshold
-            <input
-              required
-              type="number"
-              min="0"
-              max="365"
-              value={days}
-              onChange={(event) => setDays(event.target.value)}
-              className="ml-2 rounded border p-2"
-            />
-          </label>
-          <label className="block text-sm">
-            Remaining hours threshold
-            <input
-              required
-              type="number"
-              min="1"
-              max="10000"
-              value={hours}
-              onChange={(event) => setHours(event.target.value)}
-              className="ml-2 rounded border p-2"
-            />
-          </label>
-          <label className="block text-sm">
-            Department approval reference
-            <input
-              required
-              value={ruleApproval}
-              onChange={(event) => setRuleApproval(event.target.value)}
-              className="mt-1 block w-full rounded border p-2"
-            />
-          </label>
-          <Button type="submit" disabled={busy}>
-            Save thresholds
-          </Button>
+              Reset to saved thresholds
+            </Button>
+          </fieldset>
         </form>
       </Card>
     </div>

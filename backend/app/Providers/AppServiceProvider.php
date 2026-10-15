@@ -3,7 +3,10 @@
 namespace App\Providers;
 
 use App\Enums\Permission;
+use App\Models\Placement;
+use App\Models\StudentEnrollment;
 use App\Models\User;
+use App\Services\ChatAccess;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -26,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        StudentEnrollment::created(fn ($enrollment) => ChatAccess::ensure($enrollment));
+        Placement::saved(fn ($placement) => ChatAccess::ensure($placement->studentEnrollment, $placement));
         // This first-party SPA uses sessions only; no personal access tokens are issued.
         Sanctum::getAccessTokenFromRequestUsing(fn (): null => null);
 

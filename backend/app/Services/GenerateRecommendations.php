@@ -52,6 +52,7 @@ class GenerateRecommendations
             $enrollment = StudentEnrollment::whereKey($enrollment->id)->lockForUpdate()->firstOrFail();
             abort_unless($this->embeddings->key($enrollment->student)['source_text_hash'] === $studentVector->source_text_hash, 409, 'Competencies changed during matching. Retry after processing.');
             $profile = $enrollment->student->user->profile;
+            $levels = $enrollment->student->studentCompetencies()->pluck('level', 'competency_id');
             $rows = [];
             foreach ($scores as $id => $score) {
                 $opportunity = Opportunity::findOrFail($id);
@@ -61,12 +62,18 @@ class GenerateRecommendations
                 }
                 abort_unless($this->embeddings->key($opportunity)['source_text_hash'] === $sources[$id]->source_text_hash, 409, 'Opportunity changed during matching. Please retry.');
                 $host = $opportunity->hostEstablishment;
+                $skills = $opportunity->competencies->map(fn ($skill) => [
+                    'name' => $skill->name,
+                    'level' => $levels->has($skill->id) ? (int) $levels[$skill->id] : null,
+                    'minimum_level' => (int) $skill->pivot->minimum_level,
+                ])->values()->all();
                 $distance = $profile?->latitude !== null && $profile?->longitude !== null && $host->latitude !== null && $host->longitude !== null
                     ? Haversine::kilometers((float) $profile->latitude, (float) $profile->longitude, (float) $host->latitude, (float) $host->longitude) : null;
                 $rows[] = ['opportunity_id' => $id, 'similarity_score' => $score, 'distance_km' => $distance,
                     'capacity_at_time' => $facts['capacity_remaining'], 'moa_status_at_time' => $facts['moa_status'],
                     'snapshot' => $facts + ['opportunity_title' => $opportunity->title, 'host_name' => $host->name,
                         'host_id' => $host->id, 'city' => $host->city, 'description' => $opportunity->description, 'tasks' => $opportunity->tasks,
+                        'competencies' => $skills,
                         'model_name' => config('matching.model'), 'model_version' => config('matching.revision'),
                         'student_source_hash' => $studentVector->source_text_hash, 'opportunity_source_hash' => $sources[$id]->source_text_hash,
                         'distance_kind' => 'straight_line', 'criteria' => 'Cosine descending; ties use known distance ascending, then opportunity ID. No requirement-completion ranking feature.']];

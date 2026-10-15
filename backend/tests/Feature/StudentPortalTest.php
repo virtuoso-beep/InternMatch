@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\Role;
 use App\Models\Competency;
+use App\Models\CompetencyEvidence;
 use App\Models\Moa;
 use App\Models\Opportunity;
 use App\Models\Placement;
@@ -123,5 +124,26 @@ class StudentPortalTest extends TestCase
         $this->deleteJson('/api/v1/competencies/'.$record->id)->assertNoContent();
         $this->assertDatabaseMissing('student_competencies', ['id' => $record->id]);
         $this->assertDatabaseCount('audit_logs', 3);
+    }
+
+    public function test_competency_evidence_sources_are_scoped_and_invalid_levels_are_rejected(): void
+    {
+        $enrollment = StudentEnrollment::factory()->create();
+        $record = StudentCompetency::factory()->create(['student_id' => $enrollment->student_id]);
+        CompetencyEvidence::factory()->create(['student_competency_id' => $record->id, 'source' => 'portfolio', 'description' => 'Private evidence details']);
+        CompetencyEvidence::factory()->create(['source' => 'other_student_source']);
+
+        $this->actingAs($enrollment->student->user)->getJson('/api/v1/competencies')
+            ->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.evidence.0.source', 'portfolio')
+            ->assertJsonMissing(['source' => 'other_student_source'])
+            ->assertJsonMissing(['description' => 'Private evidence details']);
+        foreach ([-1, 101, 50.5, null] as $level) {
+            $this->postJson('/api/v1/competencies', ['competency_id' => $record->competency_id, 'level' => $level])
+                ->assertUnprocessable()->assertJsonValidationErrors('level');
+        }
+        $this->deleteJson('/api/v1/competencies/'.$record->id)->assertConflict();
+        $this->actingAs(User::factory()->withRole(Role::Coordinator)->create())
+            ->getJson('/api/v1/competencies')->assertForbidden();
     }
 }

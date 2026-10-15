@@ -32,6 +32,6 @@ class RequirementReview extends Model
     /** @return BelongsTo<User, $this> */
     public function reviewer(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'reviewed_by');
+        return $this->belongsTo(User::class, 'reviewed_by')->withTrashed();
     }
 }

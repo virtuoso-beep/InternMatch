@@ -15,10 +15,19 @@ export function downloadText(filename: string, content: string, type = "text/pla
   URL.revokeObjectURL(url);
 }
 
-export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+export function PageHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+}) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
+        <p className="mb-2 text-sm font-medium text-brand">Dashboard / {title}</p>
         <h1 className="text-2xl font-bold text-foreground">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
@@ -29,7 +38,12 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cx("min-w-0 rounded-lg border border-border bg-card p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]", className)}>
+    <div
+      className={cx(
+        "min-w-0 rounded-xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]",
+        className,
+      )}
+    >
       {children}
     </div>
   );
@@ -56,7 +70,12 @@ export type Tone = keyof typeof toneMap;
 
 export function Pill({ children, tone = "muted" }: { children: ReactNode; tone?: Tone }) {
   return (
-    <span className={cx("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold", toneMap[tone])}>
+    <span
+      className={cx(
+        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
+        toneMap[tone],
+      )}
+    >
       {children}
     </span>
   );
@@ -64,10 +83,34 @@ export function Pill({ children, tone = "muted" }: { children: ReactNode; tone?:
 
 export function statusTone(status: string): Tone {
   const s = status.toLowerCase();
-  if (["approved", "active", "verified", "deployed", "on track", "ahead", "submitted", "published", "high", "completed", "healthy"].some((k) => s.includes(k)))
+  if (
+    [
+      "approved",
+      "active",
+      "verified",
+      "deployed",
+      "on track",
+      "ahead",
+      "submitted",
+      "published",
+      "high",
+      "completed",
+      "healthy",
+    ].some((k) => s.includes(k))
+  )
     return "success";
-  if (["pending", "draft", "expiring", "moderate", "review", "flagged", "warning"].some((k) => s.includes(k))) return "warn";
-  if (["missing", "disabled", "at risk", "low", "closed", "failed", "unplaced"].some((k) => s.includes(k))) return "brand";
+  if (
+    ["pending", "draft", "expiring", "moderate", "review", "flagged", "warning"].some((k) =>
+      s.includes(k),
+    )
+  )
+    return "warn";
+  if (
+    ["missing", "disabled", "at risk", "low", "closed", "failed", "unplaced"].some((k) =>
+      s.includes(k),
+    )
+  )
+    return "brand";
   return "muted";
 }
 
@@ -79,7 +122,13 @@ export function matchTone(match: number): Tone {
 
 export function StatCard({ label, value, tone }: { label: string; value: string; tone?: Tone }) {
   const color =
-    tone === "success" ? "text-success" : tone === "warn" ? "text-warn" : tone === "brand" ? "text-brand" : "text-foreground";
+    tone === "success"
+      ? "text-success"
+      : tone === "warn"
+        ? "text-warn"
+        : tone === "brand"
+          ? "text-brand"
+          : "text-foreground";
   return (
     <Card className="p-4">
       <p className="text-sm text-muted-foreground">{label}</p>
@@ -140,7 +189,13 @@ export function ActionDialog({
 }: {
   title: string;
   description?: string;
-  fields: Array<{ name: string; label: string; placeholder?: string; type?: "text" | "email" | "number" | "select"; options?: string[] }>;
+  fields: Array<{
+    name: string;
+    label: string;
+    placeholder?: string;
+    type?: "text" | "email" | "number" | "select";
+    options?: string[];
+  }>;
   submitLabel?: string;
   initialValues?: Record<string, string>;
   open: boolean;
@@ -152,9 +207,19 @@ export function ActionDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 px-4" role="presentation">
-      <div role="dialog" aria-modal="true" aria-labelledby="action-dialog-title" className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-xl">
-        <h2 id="action-dialog-title" className="text-lg font-semibold text-foreground">{title}</h2>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 px-4"
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="action-dialog-title"
+        className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-xl"
+      >
+        <h2 id="action-dialog-title" className="text-lg font-semibold text-foreground">
+          {title}
+        </h2>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         <form
           className="mt-5 space-y-4"
@@ -166,16 +231,24 @@ export function ActionDialog({
         >
           {fields.map((field) => (
             <label key={field.name} className="block">
-              <span className="mb-1.5 block text-xs font-semibold tracking-wide text-muted-foreground uppercase">{field.label}</span>
+              <span className="mb-1.5 block text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                {field.label}
+              </span>
               {field.type === "select" ? (
                 <select
                   required
                   value={values[field.name] ?? ""}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                  onChange={(event) =>
+                    setValues((current) => ({ ...current, [field.name]: event.target.value }))
+                  }
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/25"
                 >
                   <option value="">Select an option</option>
-                  {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
+                  {field.options?.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
                 </select>
               ) : (
                 <input
@@ -183,14 +256,18 @@ export function ActionDialog({
                   type={field.type ?? "text"}
                   value={values[field.name] ?? ""}
                   placeholder={field.placeholder}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                  onChange={(event) =>
+                    setValues((current) => ({ ...current, [field.name]: event.target.value }))
+                  }
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-brand focus:ring-2 focus:ring-brand/25"
                 />
               )}
             </label>
           ))}
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
             <Button type="submit">{submitLabel}</Button>
           </div>
         </form>
@@ -236,7 +313,10 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
         <thead>
           <tr className="border-b border-border text-left">
             {head.map((h) => (
-              <th key={h} className="pb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              <th
+                key={h}
+                className="pb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+              >
                 {h}
               </th>
             ))}
@@ -249,14 +329,25 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
 }
 
 export function Row({ children }: { children: ReactNode }) {
-  return <tr className="border-b border-border/70 last:border-0 [&>td]:py-3 [&>td]:pr-4">{children}</tr>;
+  return (
+    <tr className="border-b border-border/70 last:border-0 [&>td]:py-3 [&>td]:pr-4">{children}</tr>
+  );
 }
 
-export function Meter({ value, tone = "brand" }: { value: number; tone?: "brand" | "success" | "warn" }) {
+export function Meter({
+  value,
+  tone = "brand",
+}: {
+  value: number;
+  tone?: "brand" | "success" | "warn";
+}) {
   const bg = tone === "success" ? "bg-success" : tone === "warn" ? "bg-warn" : "bg-brand";
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-      <div className={cx("h-full rounded-full", bg)} style={{ width: `${Math.min(100, value)}%` }} />
+      <div
+        className={cx("h-full rounded-full", bg)}
+        style={{ width: `${Math.min(100, value)}%` }}
+      />
     </div>
   );
 }

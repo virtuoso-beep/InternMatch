@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/im/ui";
+import { ChatWorkspace } from "@/components/im/ChatWorkspace";
 import { AccessibilityMap } from "@/components/im/AccessibilityMap";
 import { ProfileEditor } from "@/components/im/ProfileEditor";
 import { StudentOverview } from "@/components/im/StudentOverview";
@@ -10,6 +11,7 @@ import { MonitoringWorkspace } from "@/components/im/MonitoringWorkspace";
 
 export function StudentSection({ section }: { section: string }) {
   switch (section) {
+    case "inbox": return <ChatWorkspace />;
     case "":
       return <StudentDashboard />;
     case "internship":

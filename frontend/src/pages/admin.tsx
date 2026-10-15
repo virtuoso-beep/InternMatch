@@ -1,4 +1,5 @@
 import { NotificationList } from "@/components/im/NotificationList";
+import { ChatSettings } from "@/components/im/ChatWorkspace";
 import { MoaWorkspace } from "@/components/im/MoaWorkspace";
 import { LiveDashboard } from "@/components/im/LiveDashboard";
 import { ProgramMonitoringSettings } from "@/components/im/ProgramMonitoringSettings";
@@ -28,6 +29,7 @@ import { ProfileEditor } from "@/components/im/ProfileEditor";
 
 export function AdminSection({ section }: { section: string }) {
   switch (section) {
+    case "chat-settings": return <ChatSettings />;
     case "notifications": return <NotificationList />;
     case "monitoring-settings": return <ProgramMonitoringSettings />;
     case "profile":

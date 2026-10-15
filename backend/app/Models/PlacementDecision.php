@@ -32,7 +32,7 @@ class PlacementDecision extends Model
     /** @return BelongsTo<User, $this> */
     public function coordinator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'decided_by');
+        return $this->belongsTo(User::class, 'decided_by')->withTrashed();
     }
 
     /** @return BelongsTo<Opportunity, $this> */

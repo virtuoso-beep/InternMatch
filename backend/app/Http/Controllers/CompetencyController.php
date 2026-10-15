@@ -28,7 +28,7 @@ class CompetencyController extends Controller
         $vocabulary = Competency::query()->whereIn('id', DB::table('program_competencies')
             ->whereIn('program_id', $programs)->select('competency_id'))->orderBy('name')->get(['id', 'name']);
 
-        return response()->json(['data' => $student->studentCompetencies()->with('competency')->get(), 'vocabulary' => $vocabulary]);
+        return response()->json(['data' => $student->studentCompetencies()->with(['competency', 'evidence:id,student_competency_id,source'])->get(), 'vocabulary' => $vocabulary]);
     }
 
     public function store(Request $request)

@@ -27,7 +27,7 @@ class Document extends Model
     /** @return BelongsTo<User, $this> */
     public function uploader(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'uploaded_by');
+        return $this->belongsTo(User::class, 'uploaded_by')->withTrashed();
     }
 
     /** @return HasMany<CompetencyEvidence, $this> */

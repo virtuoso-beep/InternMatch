@@ -37,6 +37,6 @@ class TimeLog extends Model
     /** @return BelongsTo<User, $this> */
     public function verifier(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'verified_by');
+        return $this->belongsTo(User::class, 'verified_by')->withTrashed();
     }
 }
