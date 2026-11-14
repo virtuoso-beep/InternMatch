@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AdminRedirect } from "@/components/im/AdminRedirect";
+import { AppShell } from "@/components/im/AppShell";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -16,5 +16,5 @@ export const Route = createFileRoute("/admin")({
       },
     ],
   }),
-  component: AdminRedirect,
+  component: () => <AppShell role="admin" />,
 });

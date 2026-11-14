@@ -325,7 +325,7 @@ export function ChatWorkspace({ compact = false }: { compact?: boolean }) {
               <p className="border-t p-3 text-sm text-muted-foreground">
                 {detail.conversation.coordinator_available
                   ? "This conversation is read-only because the enrollment or deployment has ended."
-                  : "Messaging is unavailable until exactly one active coordinator is assigned to this program."}
+                  : "Messaging is unavailable until an active coordinator is assigned to this program."}
               </p>
             )
           )}

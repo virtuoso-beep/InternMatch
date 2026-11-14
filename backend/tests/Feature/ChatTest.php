@@ -31,6 +31,28 @@ class ChatTest extends TestCase
         return [$enrollment, $student, $coordinator, $supervisor, $placement, $conversation];
     }
 
+    public function test_program_chat_rejects_cross_program_reads_messages_and_notifications(): void
+    {
+        [$itEnrollment, $itStudent, $itCoordinator, $host, $placement, $itChat] = $this->fixture();
+        $itEnrollment->programTerm->program->update(['code' => 'BSIT']);
+        $csEnrollment = StudentEnrollment::factory()->create();
+        $csEnrollment->programTerm->program->update(['code' => 'BSCS']);
+        $csCoordinator = User::factory()->withRole(Role::Coordinator)->create();
+        $csCoordinator->programs()->attach($csEnrollment->programTerm->program_id);
+        $csStudent = $csEnrollment->student->user;
+        $csChat = Conversation::withoutGlobalScope('participant')->where('student_enrollment_id', $csEnrollment->id)->whereNull('placement_id')->sole();
+        foreach ([[$itStudent, $csChat], [$itCoordinator, $csChat], [$csStudent, $itChat], [$csCoordinator, $itChat]] as [$actor, $chat]) {
+            $url = '/api/v1/chat/conversations/'.$chat->id;
+            $this->actingAs($actor)->getJson($url)->assertNotFound();
+            $this->postJson($url.'/messages', ['body' => 'Cross-program message', 'client_id' => (string) Str::uuid()])->assertNotFound();
+        }
+        $this->assertSame(0, ChatMessage::count());
+        $this->actingAs($itStudent)->postJson('/api/v1/chat/conversations/'.$itChat->id.'/messages', ['body' => 'IT-only message', 'client_id' => (string) Str::uuid()])->assertOk();
+        $this->assertSame(1, $itCoordinator->notifications()->count());
+        $this->assertSame(0, $csCoordinator->notifications()->count());
+        $this->assertSame(0, $csStudent->notifications()->count());
+    }
+
     public function test_scoped_enrollment_and_placement_conversations_are_created_automatically(): void
     {
         [$e, $s, $c, $h, $p, $conversation] = $this->fixture();
@@ -105,15 +127,19 @@ class ChatTest extends TestCase
         $this->actingAs($c)->getJson('/api/v1/chat/conversations/'.$conversation->id)->assertNotFound();
     }
 
-    public function test_duplicate_coordinator_assignments_and_role_conversion_are_rejected(): void
+    public function test_multiple_coordinators_can_be_assigned_and_participate_in_chat(): void
     {
-        [$e, $s, $c] = $this->fixture();
+        [$e, $s, $c, $h, $p, $conversation] = $this->fixture();
         $other = User::factory()->withRole(Role::Coordinator)->create();
         $admin = User::factory()->withRole(Role::Admin)->create();
-        $this->actingAs($admin)->putJson('/api/v1/users/'.$other->id.'/programs', ['program_ids' => [$e->programTerm->program_id]])->assertUnprocessable();
+        $this->actingAs($admin)->putJson('/api/v1/users/'.$other->id.'/programs', ['program_ids' => [$e->programTerm->program_id]])->assertOk();
+        $this->actingAs($s)->postJson('/api/v1/chat/conversations/'.$conversation->id.'/messages', ['body' => 'Both coordinators receive this', 'client_id' => (string) Str::uuid()])->assertOk()->assertJsonCount(4, 'conversation.participants');
+        $this->assertSame(1, $c->notifications()->count());
+        $this->assertSame(1, $other->notifications()->count());
+        $this->actingAs($other)->getJson('/api/v1/chat/conversations/'.$conversation->id)->assertOk()->assertJsonPath('conversation.writable', true);
         $dean = User::factory()->withRole(Role::Dean)->create();
-        $this->putJson('/api/v1/users/'.$dean->id.'/programs', ['program_ids' => [$e->programTerm->program_id]])->assertOk();
-        $this->patchJson('/api/v1/users/'.$dean->id.'/access', ['role' => 'coordinator'])->assertUnprocessable();
-        $this->assertSame('dean', $dean->refresh()->role->value);
+        $this->actingAs($admin)->putJson('/api/v1/users/'.$dean->id.'/programs', ['program_ids' => [$e->programTerm->program_id]])->assertOk();
+        $this->patchJson('/api/v1/users/'.$dean->id.'/access', ['role' => 'coordinator'])->assertOk();
+        $this->assertSame('coordinator', $dean->refresh()->role->value);
     }
 }

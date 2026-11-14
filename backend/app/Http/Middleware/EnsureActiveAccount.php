@@ -25,6 +25,9 @@ class EnsureActiveAccount
             return response()->json(['message' => 'Your account is not active.'], 403);
         }
 
+        if ($request->user()->must_change_password && ! $request->is('api/v1/session', 'api/v1/first-password')) {
+            return response()->json(['message' => 'Change your temporary password before accessing the portal.', 'code' => 'password_change_required'], 403);
+        }
         return $next($request);
     }
 }

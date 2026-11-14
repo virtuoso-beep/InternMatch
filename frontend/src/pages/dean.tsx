@@ -8,16 +8,30 @@ import { PageHeader } from "@/components/im/ui";
 
 export function DeanSection({ section }: { section: string }) {
   switch (section) {
-    case "notifications": return <NotificationList />;
-    case "profile": return <ProfileEditor role="dean" />;
-    case "": return <LiveDashboard />;
+    case "notifications":
+      return <NotificationList />;
+    case "profile":
+      return <ProfileEditor role="dean" />;
+    case "":
+      return <LiveDashboard />;
     case "performance":
     case "hosts":
     case "equity":
-    case "analytics": return <ProgramAnalytics section={section} />;
-    case "accreditation": return <ReportWorkspace title="Accreditation reports" />;
-    case "export": return <ReportWorkspace title="Export data" />;
-    case "audit": return <AuditLog />;
-    default: return <PageHeader title="Not found" subtitle="This dean page does not exist." />;
+    case "analytics":
+      return <ProgramAnalytics section={section} />;
+    case "accreditation":
+      return (
+        <ReportWorkspace
+          key="accreditation"
+          title="Accreditation reports"
+          presentation="accreditation"
+        />
+      );
+    case "export":
+      return <ReportWorkspace key="export" title="Export data" presentation="export" />;
+    case "audit":
+      return <AuditLog />;
+    default:
+      return <PageHeader title="Not found" subtitle="This dean page does not exist." />;
   }
 }

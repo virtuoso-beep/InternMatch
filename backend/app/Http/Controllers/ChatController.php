@@ -61,7 +61,7 @@ class ChatController extends Controller
             'host' => $conversation->placement?->hostEstablishment?->name,
             'enrollment_id' => $conversation->student_enrollment_id, 'placement_id' => $conversation->placement_id,
             'writable' => ChatAccess::writable($conversation),
-            'coordinator_available' => ChatAccess::coordinator($conversation->enrollment) !== null,
+            'coordinator_available' => ChatAccess::coordinators($conversation->enrollment)->isNotEmpty(),
             'participants' => array_map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->role->value], ChatAccess::participants($conversation)),
             'updated_at' => $conversation->updated_at];
     }

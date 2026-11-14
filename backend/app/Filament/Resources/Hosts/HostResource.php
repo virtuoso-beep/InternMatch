@@ -68,7 +68,7 @@ class HostResource extends Resource
                     Hidden::make('_existing')->default(false),
                     Select::make('program_id')->label('Program')->required()->disabled(fn (Get $get) => (bool) $get('_existing'))->dehydrated()->options(function () {
                         $user = Filament::auth()->user();
-                        $query = Program::query();
+                        $query = Program::query()->where('is_active', true);
                         if ($user->role === Role::Coordinator) {
                             $query->whereIn('id', $user->programs()->select('programs.id'));
                         }

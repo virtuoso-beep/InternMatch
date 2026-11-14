@@ -31,7 +31,9 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email', 'max:255'],
+            'email' => ['bail', 'required', 'string', 'max:255', function ($attribute, $value, $fail) {
+                if (! preg_match('/^[0-9]{6}$/', $value) && ! filter_var($value, FILTER_VALIDATE_EMAIL)) $fail('Enter a six-digit Student ID or a valid email address.');
+            }],
             'password' => ['required', 'string', 'max:4096'],
             'remember' => ['sometimes', 'boolean'],
         ];
@@ -49,8 +51,16 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+         $identifier = trim((string) $this->input('email'));
+        $credentials = ['password' => $this->input('password')];
+        if (preg_match('/^[0-9]{6}$/', $identifier)) {
+            $credentials['id'] = \App\Models\Student::where('student_number', $identifier)->value('user_id') ?? 0;
+            $credentials['role'] = 'student';
+        } else {
+            $credentials['email'] = $identifier;
+        }
         if (! Auth::guard('web')->attemptWhen(
-            $this->safe()->only(['email', 'password']),
+            $credentials,
             fn (User $user): bool => $requireActiveRole
                 ? $user->status === AccountStatus::Active && $user->role !== null
                 : $user->status !== AccountStatus::Disabled,

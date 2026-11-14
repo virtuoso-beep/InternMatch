@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   CoordinatorStudents,
   CoordinatorRecommendations,
@@ -6,7 +7,7 @@ import { PageHeader } from "@/components/im/ui";
 import { ChatWorkspace } from "@/components/im/ChatWorkspace";
 import { NotificationList } from "@/components/im/NotificationList";
 import { AllocationWorkspace } from "@/components/im/AllocationWorkspace";
-import { ReportWorkspace } from "@/components/im/ReportWorkspace";
+import { CoordinatorAnalytics } from "@/components/im/CoordinatorAnalytics";
 import { MoaWorkspace } from "@/components/im/MoaWorkspace";
 import { LiveDashboard } from "@/components/im/LiveDashboard";
 import { CoordinatorMonitoring } from "@/components/im/CoordinatorMonitoring";
@@ -18,6 +19,14 @@ import { AccessibilityMap } from "@/components/im/AccessibilityMap";
 import { ProfileEditor } from "@/components/im/ProfileEditor";
 
 export function CoordinatorSection({ section }: { section: string }) {
+  const [importRevision, setImportRevision] = useState(0);
+  useEffect(() => {
+    const refresh = () => setImportRevision(value => value + 1);
+    const storage = (event: StorageEvent) => { if (event.key === "internmatch:records-imported") refresh(); };
+    window.addEventListener("internmatch:records-imported", refresh);
+    window.addEventListener("storage", storage);
+    return () => { window.removeEventListener("internmatch:records-imported", refresh); window.removeEventListener("storage", storage); };
+  }, []);
   switch (section) {
     case "inbox":
       return <ChatWorkspace />;
@@ -28,11 +37,11 @@ export function CoordinatorSection({ section }: { section: string }) {
     case "profile":
       return <ProfileEditor role="coordinator" />;
     case "":
-      return <LiveDashboard />;
+      return <LiveDashboard key={importRevision} />;
     case "recommendations":
       return <CoordinatorRecommendations />;
     case "approvals":
-      return <AllocationWorkspace />;
+      return <AllocationWorkspace key={importRevision} />;
     case "students":
       return <CoordinatorStudents />;
     case "opportunities":
@@ -40,7 +49,7 @@ export function CoordinatorSection({ section }: { section: string }) {
     case "hosts":
       return <HostWorkspace />;
     case "progress":
-      return <CoordinatorMonitoring key="progress" mode="progress" />;
+      return <CoordinatorMonitoring key={`progress-${importRevision}`} mode="progress" />;
     case "requirements":
       return <RequirementWorkspace />;
     case "evaluations":
@@ -48,7 +57,7 @@ export function CoordinatorSection({ section }: { section: string }) {
     case "monitoring-settings":
       return <ProgramMonitoringSettings />;
     case "analytics":
-      return <ReportWorkspace title="Analytics and reports" />;
+      return <CoordinatorAnalytics />;
     case "map":
       return (
         <>
@@ -56,7 +65,7 @@ export function CoordinatorSection({ section }: { section: string }) {
             title="Accessibility map"
             subtitle="Placement distribution across host establishments in the Davao Region."
           />
-          <AccessibilityMap note="Use the map to balance placements against student travel burden." />
+          <AccessibilityMap key={importRevision} note="Use the map to balance placements against student travel burden." />
         </>
       );
     default:

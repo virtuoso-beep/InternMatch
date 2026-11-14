@@ -9,7 +9,7 @@ use App\Models\StudentEnrollment;
 
 class PlacementReadiness
 {
-    public function reasons(StudentEnrollment $enrollment): array
+    public function reasons(StudentEnrollment $enrollment, ?int $exceptPlacementId = null): array
     {
         $reasons = [];
         $term = $enrollment->programTerm;
@@ -25,7 +25,7 @@ class PlacementReadiness
         if (! $enrollment->academic_eligibility_confirmed || ! $enrollment->eligibility_confirmed_at) {
             $reasons[] = 'Coordinator academic eligibility confirmation is missing or negative.';
         }
-        if ($enrollment->placements()->whereIn('status', ['pending', 'approved', 'active', 'completed'])->exists()) {
+        if ($enrollment->placements()->when($exceptPlacementId, fn ($q) => $q->whereKeyNot($exceptPlacementId))->whereIn('status', ['pending', 'approved', 'active', 'completed'])->exists()) {
             $reasons[] = 'Enrollment already has a current or completed placement.';
         }
         $requirements = $term->requirements()->where('is_required', true)->where('required_before_deployment', true)->with('requirementType')->get();

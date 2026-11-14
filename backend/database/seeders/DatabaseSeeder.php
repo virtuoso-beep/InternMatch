@@ -20,7 +20,6 @@ class DatabaseSeeder extends Seeder
     {
         foreach ([
             ['name' => 'Student Demo', 'email' => 'student@example.com', 'role' => Role::Student],
-            ['name' => 'Richard Misa', 'email' => 'r.misa@example.com', 'role' => Role::Coordinator],
             ['name' => 'Supervisor Demo', 'email' => 'supervisor@example.com', 'role' => Role::Supervisor],
             ['name' => 'Dean Demo', 'email' => 'dean@example.com', 'role' => Role::Dean],
             ['name' => 'Admin Demo', 'email' => 'admin@example.com', 'role' => Role::Admin],

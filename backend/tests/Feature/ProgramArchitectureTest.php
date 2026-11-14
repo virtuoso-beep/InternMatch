@@ -9,7 +9,7 @@ use App\Models\Placement;
 use App\Models\Program;
 use App\Models\ProgramTerm;
 use App\Models\User;
-use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\ProgramSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -20,14 +20,15 @@ class ProgramArchitectureTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_reference_seed_has_sixteen_programs_without_inventing_hours_or_accounts(): void
+    public function test_reference_seed_has_four_programs_without_inventing_hours_or_accounts(): void
     {
-        $this->seed(DatabaseSeeder::class);
-        $this->seed(DatabaseSeeder::class);
-        $this->assertSame(16, Program::count());
+        $this->seed(ProgramSeeder::class);
+        $this->seed(ProgramSeeder::class);
+        $this->assertSame(4, Program::count());
         $this->assertSame(0, User::count());
         $this->assertSame(486, Program::where('code', 'BSIT')->firstOrFail()->required_ojt_hours);
-        $this->assertSame(0, Program::where('code', '!=', 'BSIT')->whereNotNull('required_ojt_hours')->count());
+        $this->assertSame(350, Program::where('code', 'BSCS')->firstOrFail()->required_ojt_hours);
+        $this->assertSame(0, Program::whereNotIn('code', ['BSIT', 'BSCS'])->whereNotNull('required_ojt_hours')->count());
         foreach (Program::withCount('competencies')->get() as $program) {
             $this->assertSame(strtoupper($program->code), $program->code);
             $this->assertSame($program->code === 'BSIT' ? 4 : 15, $program->competencies_count);
@@ -37,7 +38,7 @@ class ProgramArchitectureTest extends TestCase
         $bsit->update(['required_ojt_hours' => 420, 'internship_term' => '4th year, second semester']);
         $user = User::factory()->withRole(Role::Student)->create(['email' => 'student@example.com']);
         $password = $user->password;
-        $this->seed(DatabaseSeeder::class);
+        $this->seed(ProgramSeeder::class);
         $this->assertSame($password, $user->fresh()->password);
         $this->assertSame(420, $bsit->fresh()->required_ojt_hours);
     }

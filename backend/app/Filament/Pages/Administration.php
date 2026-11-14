@@ -21,6 +21,10 @@ class Administration extends Page
 
     public const SECTIONS = [
         'chat-settings' => 'Chat Availability',
+        'students' => 'Students',
+        'student-import' => 'Student Import',
+        'terms' => 'Academic Terms',
+        'settings' => 'System Settings',
         'users' => 'User Accounts',
         'roles' => 'Roles & Permissions',
         'hosts' => 'Host Establishments',

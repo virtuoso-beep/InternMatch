@@ -26,9 +26,6 @@ class AccountAccessController extends Controller
                 if ($attributes['role'] === 'coordinator') {
                     $programIds = $record->programs()->pluck('programs.id')->all();
                     Program::whereIn('id', $programIds)->orderBy('id')->lockForUpdate()->get();
-                    if (User::where('role', 'coordinator')->whereKeyNot($record->id)->whereHas('programs', fn ($q) => $q->whereIn('programs.id', $programIds))->exists()) {
-                        throw ValidationException::withMessages(['role' => 'A program assigned to this account already has a coordinator. Update its program assignments first.']);
-                    }
                 }
                 $record->role = $attributes['role'];
             }

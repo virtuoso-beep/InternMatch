@@ -37,17 +37,15 @@ class ChatAccess
         };
     }
 
-    public static function coordinator(StudentEnrollment $enrollment): ?User
+    public static function coordinators(StudentEnrollment $enrollment): \Illuminate\Support\Collection
     {
-        $users = $enrollment->programTerm->program->coordinators
+        return $enrollment->programTerm->program->coordinators
             ->filter(fn ($user) => $user->role === Role::Coordinator && $user->status->value === 'active');
-
-        return $users->count() === 1 ? $users->first() : null;
     }
 
     public static function writable(Conversation $conversation): bool
     {
-        if (! self::enabled() || ! self::coordinator($conversation->enrollment)) {
+        if (! self::enabled() || self::coordinators($conversation->enrollment)->isEmpty()) {
             return false;
         }
         if ($conversation->placement_id) {
@@ -68,7 +66,7 @@ class ChatAccess
 
     public static function participants(Conversation $conversation): array
     {
-        $users = [$conversation->enrollment->student->user, self::coordinator($conversation->enrollment)];
+        $users = [$conversation->enrollment->student->user, ...self::coordinators($conversation->enrollment)->all()];
         if ($conversation->placement_id && self::activePlacement(Placement::whereKey($conversation->placement_id))->exists()) {
             $users[] = $conversation->placement->supervisor;
         }

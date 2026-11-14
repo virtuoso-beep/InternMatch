@@ -15,6 +15,16 @@ use Illuminate\Support\Facades\DB;
 
 class StudentPortalController extends Controller
 {
+    public function studentHistory(Request $request, int $enrollment)
+    {
+        abort_unless($request->user()->role === Role::Coordinator, 403);
+        $record = StudentAccess::enrollments($request->user())->with(['student.user' => fn ($q) => $q->withTrashed()->with('profile')])->findOrFail($enrollment);
+        $history = StudentAccess::enrollments($request->user())->where('student_id', $record->student_id)
+            ->with(['programTerm.program', 'programTerm.academicTerm', 'placements.hostEstablishment', 'placements.opportunity'])
+            ->orderByDesc('enrolled_on')->get();
+        return response()->json(['student' => $record->student, 'enrollments' => $history], headers: ['Cache-Control' => 'no-store']);
+    }
+
     public function generate(Request $request, int $enrollment, GenerateRecommendations $matching)
     {
         abort_unless(in_array($request->user()->role, [Role::Student, Role::Coordinator], true), 403);
@@ -41,7 +51,7 @@ class StudentPortalController extends Controller
         abort_if($request->user()->role === Role::Dean, 403, 'Program chairs and deans access approved reports.');
 
         return response()->json(['data' => StudentAccess::enrollments($request->user())
-            ->with(['student.user:id,name', 'programTerm.program', 'programTerm.academicTerm', 'currentPlacement.hostEstablishment', 'currentPlacement.opportunity'])
+            ->with(['student.user' => fn ($q) => $q->withTrashed()->select('id','name','email'), 'programTerm.program', 'programTerm.academicTerm', 'currentPlacement.hostEstablishment', 'currentPlacement.opportunity'])
             ->orderByDesc('enrolled_on')->get()], headers: ['Cache-Control' => 'no-store']);
     }
 

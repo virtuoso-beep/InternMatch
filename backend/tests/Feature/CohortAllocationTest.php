@@ -94,4 +94,17 @@ class CohortAllocationTest extends TestCase
         $this->actingAs($coordinator)->postJson($url, ['eligible' => true, 'reason' => 'Confirmed synthetic academic record.'])->assertNoContent();
         $this->assertDatabaseHas('student_enrollments', ['id' => $e->id, 'academic_eligibility_confirmed' => true, 'eligibility_confirmed_by' => $coordinator->id]);
     }
+
+    public function test_pending_import_is_updated_in_place_after_normal_approval_checks(): void
+    {
+        [$e, $coordinator, $supervisor, $opportunity] = $this->fixture();
+        $id = $this->actingAs($coordinator)->postJson('/api/v1/program-terms/'.$e->program_term_id.'/allocation')->assertCreated()->json('id');
+        $item = DB::table('placement_proposal_items')->where('placement_proposal_id', $id)->where('student_enrollment_id', $e->id)->first();
+        $placement = \App\Models\Placement::create(['student_enrollment_id' => $e->id, 'host_establishment_id' => $opportunity->host_establishment_id,
+            'opportunity_id' => $opportunity->id, 'status' => 'pending', 'starts_on' => today(), 'placement_proposal_item_id' => $item->id]);
+        $decision = ['decision' => 'approve', 'reason' => 'Reviewed the imported pending placement.', 'supervisor_id' => $supervisor->id,
+            'starts_on' => today()->toDateString(), 'ends_on' => today()->addMonth()->toDateString()];
+        $this->postJson('/api/v1/allocation-items/'.$item->id.'/decision', $decision)->assertOk()->assertJsonPath('data.id', $placement->id)->assertJsonPath('data.status', 'approved');
+        $this->assertDatabaseCount('placements', 1);
+    }
 }

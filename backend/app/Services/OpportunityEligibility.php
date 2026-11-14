@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 class OpportunityEligibility
 {
     /** Paperwork deliberately does not filter browsing or recommendations. */
-    public function inspect(StudentEnrollment $enrollment, Opportunity $opportunity): ?array
+    public function inspect(StudentEnrollment $enrollment, Opportunity $opportunity, ?int $exceptPlacementId = null): ?array
     {
         $programTerm = $enrollment->programTerm;
         $programId = $programTerm->program_id;
@@ -35,6 +35,7 @@ class OpportunityEligibility
             return null;
         }
         $occupied = Placement::query()->whereIn('status', ['pending', 'approved', 'active', 'completed'])
+            ->when($exceptPlacementId, fn ($q) => $q->whereKeyNot($exceptPlacementId))
             ->whereHas('studentEnrollment.programTerm', fn ($query) => $query
                 ->where('program_id', $programId)->where('academic_term_id', $programTerm->academic_term_id));
         $opportunityRemaining = (int) $capacity - (clone $occupied)->where('opportunity_id', $opportunity->id)->count();

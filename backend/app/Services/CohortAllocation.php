@@ -103,14 +103,15 @@ class CohortAllocation
             $item = DB::table('placement_proposal_items')->where('id', $itemId)->lockForUpdate()->first();
             abort_unless($item->review_status === 'pending', 409, 'This proposal item has already been reviewed.');
             $enrollment = StudentEnrollment::whereKey($item->student_enrollment_id)->lockForUpdate()->firstOrFail();
+            $imported = Placement::where('placement_proposal_item_id', $item->id)->where('status', 'pending')->lockForUpdate()->first();
             $placement = null;
             if ($data['decision'] === 'approve') {
-                $reasons = $this->readiness->reasons($enrollment);
+                $reasons = $this->readiness->reasons($enrollment, $imported?->id);
                 abort_if($reasons !== [], 422, implode(' ', $reasons));
                 $opportunity = Opportunity::findOrFail($data['opportunity_id'] ?? $item->opportunity_id);
                 HostEstablishment::whereKey($opportunity->host_establishment_id)->lockForUpdate()->firstOrFail();
                 $opportunity = Opportunity::whereKey($opportunity->id)->lockForUpdate()->firstOrFail();
-                $facts = $this->eligibility->inspect($enrollment, $opportunity);
+                $facts = $this->eligibility->inspect($enrollment, $opportunity, $imported?->id);
                 abort_unless($facts, 422, 'Opportunity capacity, program, term or agreement eligibility changed.');
                 abort_if($data['ends_on'] > $facts['moa_expires_on'], 422, 'The MOA must cover the entire placement period.');
                 abort_if($data['starts_on'] < $facts['moa_effective_on'], 422, 'Placement starts before the MOA takes effect.');
@@ -118,11 +119,13 @@ class CohortAllocation
                 abort_if($opportunity->ends_on && $data['ends_on'] > $opportunity->ends_on->toDateString(), 422, 'Placement ends after the opportunity period.');
                 $supervisor = User::findOrFail($data['supervisor_id']);
                 abort_unless($supervisor->role === Role::Supervisor && $supervisor->status->value === 'active' && $supervisor->isAssignedToHost($opportunity->host_establishment_id), 422, 'Select an active supervisor assigned to this host.');
-                $placement = Placement::create(['student_enrollment_id' => $enrollment->id, 'host_establishment_id' => $opportunity->host_establishment_id, 'opportunity_id' => $opportunity->id, 'moa_id' => $facts['moa_id'], 'supervisor_id' => $supervisor->id, 'status' => 'approved', 'starts_on' => $data['starts_on'], 'ends_on' => $data['ends_on'], 'placement_proposal_item_id' => $item->id]);
+                $placement = $imported ?? new Placement;
+                $placement->fill(['student_enrollment_id' => $enrollment->id, 'host_establishment_id' => $opportunity->host_establishment_id, 'opportunity_id' => $opportunity->id, 'moa_id' => $facts['moa_id'], 'supervisor_id' => $supervisor->id, 'status' => 'approved', 'starts_on' => $data['starts_on'], 'ends_on' => $data['ends_on'], 'placement_proposal_item_id' => $item->id])->save();
                 $placement->decisions()->create(['decided_by' => $actor->id, 'decision' => 'approve', 'from_opportunity_id' => $item->opportunity_id, 'to_opportunity_id' => $opportunity->id, 'reason' => $data['reason'], 'decided_at' => now()]);
                 $enrollment->student->user->notify(new PortalNotification('Placement approved', 'Your coordinator approved your placement at '.$opportunity->hostEstablishment->name.'.'));
                 $supervisor->notify(new PortalNotification('Intern assigned', 'A coordinator assigned an intern to your host establishment.'));
             }
+            if ($imported && ! $placement) $imported->update(['status' => 'rejected']);
             DB::table('placement_proposal_items')->where('id', $itemId)->update(['review_status' => $placement ? 'approved' : 'rejected', 'review_reason' => $data['reason'], 'reviewed_by' => $actor->id, 'reviewed_at' => now(), 'updated_at' => now()]);
             $items = DB::table('placement_proposal_items')->where('placement_proposal_id', $item->placement_proposal_id);
             if (! (clone $items)->where('review_status', 'pending')->exists()) {

@@ -13,7 +13,7 @@ class ProgramController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Program::query()->withCount('competencies')->orderBy('code');
+        $query = Program::query()->where('is_active', true)->withCount('competencies')->orderBy('code');
         if (in_array($user->role, [Role::Coordinator, Role::Dean], true)) {
             $query->whereIn('id', $user->programs()->select('programs.id'));
         } elseif (! $user->hasPermission(Permission::ManageAcademicRecords)) {

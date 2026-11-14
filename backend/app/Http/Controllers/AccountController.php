@@ -19,8 +19,18 @@ class AccountController extends Controller
     {
         abort_unless($request->user()->hasPermission(Permission::ManageAccounts), 403);
 
-        return response()->json(User::select('id', 'name', 'email', 'role', 'status')
-            ->with(['programs:id,code', 'hostEstablishments:id,name'])->orderBy('name')->paginate(50), headers: ['Cache-Control' => 'no-store']);
+        $filters = $request->validate(['search' => 'nullable|string|max:255', 'role' => ['nullable', Rule::enum(Role::class)], 'status' => ['nullable', Rule::enum(AccountStatus::class)]]);
+        $accounts = User::select('id', 'name', 'email', 'role', 'status')
+            ->when($filters['search'] ?? null, fn ($q, $s) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$s.'%')->orWhere('email', 'like', '%'.$s.'%')->orWhereHas('student', fn ($q) => $q->where('student_number', 'like', '%'.$s.'%'))))
+            ->when($filters['role'] ?? null, fn ($q, $v) => $q->where('role', $v))
+            ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
+            ->with(['programs:id,code', 'hostEstablishments:id,name'])->orderBy('name')->paginate(50)->withQueryString();
+        $accounts->getCollection()->each(function (User $account) use ($request) {
+            $identity = (new \App\Http\Resources\AuthenticatedUserResource($account))->toArray($request);
+            $account->setAttribute('program_label', $identity['program_label']);
+        });
+
+        return response()->json($accounts, headers: ['Cache-Control' => 'no-store']);
     }
 
     public function assignHosts(Request $request, User $user)

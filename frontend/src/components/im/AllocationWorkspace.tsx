@@ -77,7 +77,7 @@ export function AllocationWorkspace() {
     <>
       <PageHeader
         title="Pending approvals"
-        subtitle="Review cohort proposals and confirm each final placement."
+        subtitle="Choose a student’s proposed placement, then approve it or record why it cannot proceed."
       />
       {error && (
         <p role="alert" className="text-destructive">
@@ -87,9 +87,9 @@ export function AllocationWorkspace() {
       {!data && !error && <p role="status">Loading allocation records…</p>}
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm font-semibold">
-          Program cohort
+          Program and term
           <select
-            aria-label="Program cohort"
+            aria-label="Program and term"
             className={inputClass}
             value={cohort}
             disabled={busy}
@@ -106,73 +106,107 @@ export function AllocationWorkspace() {
             ))}
           </select>
         </label>
-        <Button
-          disabled={busy || !cohort}
-          onClick={() => void perform(() => mutate(`/program-terms/${cohort}/allocation`, {}))}
-        >
-          Generate allocation proposal
-        </Button>
       </div>
-      <div className="my-5 flex flex-wrap gap-3">
-        <label className="text-sm">
-          Search proposed students
-          <input
-            type="search"
-            className={inputClass}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
-        <label className="text-sm">
-          Review status
-          <select
-            aria-label="Review status"
-            className={inputClass}
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
+      <div className="my-5 rounded-xl border bg-card p-4">
+        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Placement decisions">
+          {[
+            ["pending", "Needs decision"],
+            ["approved", "Approved"],
+            ["rejected", "Rejected"],
+            ["all", "All"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={status === value}
+              className={`rounded-full px-4 py-2 text-sm font-medium ${status === value ? "bg-brand text-white" : "bg-muted text-muted-foreground"}`}
+              onClick={() => setStatus(value ?? "pending")}
+            >
+              {label} (
+              {proposal?.items.filter((item) => value === "all" || item.review_status === value)
+                .length ?? 0}
+              )
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-0 flex-1 text-sm">
+            Find student
+            <input
+              type="search"
+              placeholder="Search student name"
+              className={inputClass}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          {search && (
+            <Button variant="ghost" onClick={() => setSearch("")}>
+              Clear search
+            </Button>
+          )}
+          <a
+            className="py-2 text-sm font-semibold text-brand underline"
+            href="/coordinator/requirements"
           >
-            {["pending", "approved", "rejected", "all"].map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </label>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setSearch("");
-            setStatus("pending");
-          }}
-        >
-          Reset filters
-        </Button>
-        <a
-          className="self-center text-sm font-semibold text-brand underline"
-          href="/coordinator/requirements"
-        >
-          Review requirement documents →
-        </a>
+            Check requirements →
+          </a>
+        </div>
       </div>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="space-y-5">
         <Card>
-          <CardTitle>Placement approvals</CardTitle>
+          <CardTitle>
+            {status === "pending"
+              ? "Students awaiting a decision"
+              : status === "approved"
+                ? "Approved proposals"
+                : status === "rejected"
+                  ? "Rejected proposals"
+                  : "All proposed placements"}
+          </CardTitle>
           {!proposal ? (
-            <p>No proposal has been generated for this cohort.</p>
+            <p>
+              No proposed placements yet. Open “Create new proposals” below to prepare a batch for
+              this program and term.
+            </p>
           ) : (
             <>
               <p className="mb-3 text-sm text-muted-foreground">
-                Proposal {proposal.id} · {proposal.status}. Proposed slots are not final
-                reservations.
+                Latest batch #{proposal.id}. Counts and decisions shown here belong to this batch.
+                Slots are checked again when you approve.
               </p>
-              <p className="mb-3 text-sm">
-                {
-                  proposal.items.filter(
-                    (item) =>
-                      (status === "all" || item.review_status === status) &&
-                      item.student_name.toLowerCase().includes(search.trim().toLowerCase()),
-                  ).length
-                }{" "}
-                matching proposals
-              </p>
+              {!proposal.items.some(
+                (item) =>
+                  (status === "all" || item.review_status === status) &&
+                  item.student_name.toLowerCase().includes(search.trim().toLowerCase()),
+              ) && (
+                <div className="my-4 rounded-lg bg-muted/40 p-5 text-center">
+                  <p className="font-medium">
+                    {search
+                      ? "No students match your search."
+                      : status === "pending"
+                        ? "No proposals are waiting for a decision."
+                        : `No ${status === "all" ? "" : status + " "}proposals in this batch.`}
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {search
+                      ? "Try another name or clear the search."
+                      : "Choose another tab to see earlier decisions in this batch."}
+                  </p>
+                  {status !== "all" && (
+                    <Button
+                      variant="outline"
+                      className="mt-3"
+                      onClick={() => {
+                        setStatus("all");
+                        setSearch("");
+                      }}
+                    >
+                      View all in this batch
+                    </Button>
+                  )}
+                </div>
+              )}
               <div className="space-y-3">
                 {proposal.items
                   .filter(
@@ -212,7 +246,7 @@ export function AllocationWorkspace() {
                               setEnd("");
                             }}
                           >
-                            Review / reassign
+                            Review placement
                           </Button>
                         </div>
                       )}
@@ -222,8 +256,14 @@ export function AllocationWorkspace() {
             </>
           )}
         </Card>
-        <Card>
-          <CardTitle>Placement readiness</CardTitle>
+        <details className="rounded-xl border bg-card p-5">
+          <summary className="cursor-pointer font-semibold">
+            Student eligibility and requirements
+          </summary>
+          <p className="my-3 text-sm text-muted-foreground">
+            Use this section when a student cannot proceed. Academic review checks eligibility; it
+            does not approve a placement.
+          </p>
           <div className="space-y-3">
             {data?.students
               .filter((s) => String(s.program_term_id) === cohort)
@@ -254,7 +294,24 @@ export function AllocationWorkspace() {
             department records. Requirement documents and event attendance are reviewed in
             Requirements.
           </p>
-        </Card>
+        </details>
+        <details className="rounded-xl border bg-card p-5">
+          <summary className="cursor-pointer font-semibold">Create new proposals</summary>
+          <p className="my-3 text-sm text-muted-foreground">
+            Prepare a new matching batch for the selected program and term. This does not approve
+            placements or reserve slots. The new batch becomes the list shown above.
+          </p>
+          <Button
+            disabled={busy || !cohort}
+            onClick={() => {
+              setStatus("pending");
+              setSearch("");
+              void perform(() => mutate(`/program-terms/${cohort}/allocation`, {}));
+            }}
+          >
+            {busy ? "Preparing…" : "Create proposal batch"}
+          </Button>
+        </details>
       </div>
       {(review || assessment) && (
         <dialog
@@ -355,11 +412,32 @@ export function AllocationWorkspace() {
               Decision reason
               <textarea
                 className={inputClass}
+                rows={3}
+                placeholder="Explain why you are approving or rejecting this proposal."
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 maxLength={2000}
               />
             </label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              At least 5 characters. Your reason is saved with the decision.
+            </p>
+            {review && (
+              <div className="mt-4 rounded-lg border bg-muted/40 p-3 text-sm">
+                <p>
+                  <strong>Approve:</strong> confirm the selected opportunity, supervisor and dates.
+                  To change the host, select a different opportunity above.
+                </p>
+                <p className="mt-2">
+                  <strong>Reject:</strong> close this proposal without approving a placement.
+                  Reconsideration requires a new proposal. The student’s enrollment stays unchanged.
+                </p>
+                <p className="mt-2 text-muted-foreground">
+                  Rejection does not currently notify the student. Explain the decision through
+                  Chat.
+                </p>
+              </div>
+            )}
             {error && (
               <p role="alert" className="mt-2 text-sm text-destructive">
                 {error}

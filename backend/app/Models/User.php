@@ -20,8 +20,13 @@ use Illuminate\Notifications\Notifiable;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, \Filament\Models\Contracts\HasName
 {
+    public function getFilamentName(): string
+    {
+        return $this->name.' · All programs';
+    }
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, \Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -42,6 +47,7 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'must_change_password' => 'boolean',
             'role' => Role::class,
             'status' => AccountStatus::class,
         ];

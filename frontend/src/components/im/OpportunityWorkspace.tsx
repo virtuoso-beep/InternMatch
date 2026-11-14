@@ -1,5 +1,7 @@
+import { AdminFormDialog } from "./AdminFormDialog";
 import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
+import { ExcelImportButton } from "./ExcelImportButton";
 import type { PlacementReference } from "@/lib/placement";
 import { Button, Card, CardTitle, PageHeader, Pill, statusTone } from "./ui";
 
@@ -88,10 +90,11 @@ export function OpportunityWorkspace() {
               setMessage("");
             }}
           >
-            Post opportunity
+            + Add Opportunity
           </Button>
         }
       />
+      <ExcelImportButton module="opportunity" onImported={() => setRevision((v) => v + 1)} />
       {message && (
         <p role="status" className="mb-4">
           {message}
@@ -99,7 +102,10 @@ export function OpportunityWorkspace() {
       )}
       {!reference && !message && <p role="status">Loading opportunities…</p>}
       {form && reference && (
-        <Card className="mb-5">
+        <AdminFormDialog
+          title={form.id ? "Edit Opportunity" : "Add Opportunity"}
+          onClose={() => setForm(null)}
+        >
           <CardTitle>{form.id ? "Edit opportunity" : "New opportunity"}</CardTitle>
           <form
             className="space-y-3"
@@ -335,7 +341,7 @@ export function OpportunityWorkspace() {
               </Button>
             </div>
           </form>
-        </Card>
+        </AdminFormDialog>
       )}
       {reference && items.length === 0 && (
         <Card>No opportunities are recorded in your access scope.</Card>

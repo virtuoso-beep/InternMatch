@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ROLES } from "@/lib/internmatch";
+import { managementUrl } from "@/lib/management";
 
 import sealUrl from "@/assets/umtc-seal.png";
 import { login } from "@/lib/api";
-import { managementUrl } from "@/lib/management";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -45,8 +45,8 @@ function AuthPage() {
   useEffect(() => setReady(true), []);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !email.includes("@")) {
-      setError("Enter your institutional email address.");
+    if (!email.trim()) {
+      setError("Enter your 6-digit Student ID or email address.");
       return;
     }
     if (!password) {
@@ -58,11 +58,8 @@ function AuthPage() {
     try {
       const user = await login(email.trim(), password, keepSignedIn);
       setPassword("");
-      if (user.role === "admin") {
-        window.location.assign(managementUrl());
-        return;
-      }
-      await navigate({ to: ROLES[user.role].base });
+      if (user.role === "admin") window.location.assign(managementUrl());
+      else await navigate({ to: ROLES[user.role].base });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Sign-in failed. Please try again.");
     } finally {
@@ -123,7 +120,7 @@ function AuthPage() {
             {/* Email */}
             <label className="block">
               <span className="mb-1.5 block text-sm font-semibold text-foreground">
-                Institutional email
+                Student ID or email
               </span>
               <div className="relative">
                 <svg
@@ -138,11 +135,11 @@ function AuthPage() {
                   <path d="m3 7 9 6 9-6" />
                 </svg>
                 <input
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name.000000.tc@umindanao.edu.ph"
-                  autoComplete="email"
+                  placeholder="6-digit Student ID or email address"
+                  autoComplete="username"
                   className="w-full rounded-lg border border-input bg-background py-3 pr-4 pl-10 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
               </div>

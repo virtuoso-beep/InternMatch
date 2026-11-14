@@ -184,3 +184,7 @@
     color-mix(in oklab, var(--brand) 60%, black) 100%
   );
 }
+
+/* Retain wheel, touch and keyboard scrolling without a visible menu scrollbar. */
+.im-hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.im-hide-scrollbar::-webkit-scrollbar { display: none; }

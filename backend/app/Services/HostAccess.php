@@ -28,6 +28,7 @@ class HostAccess
 
             return $query->where(function ($hosts) use ($programs) {
                 $hosts->whereIn('id', DB::table('host_program_capacity')->whereIn('program_id', $programs)->select('host_establishment_id'))
+                    ->orWhereIn('id', DB::table('import_host_program')->whereIn('program_id', $programs)->select('host_establishment_id'))
                     ->orWhereHas('opportunities.programs', fn ($query) => $query->whereIn('programs.id', $programs))
                     ->orWhereHas('moas.programs', fn ($query) => $query->whereIn('programs.id', $programs));
             });

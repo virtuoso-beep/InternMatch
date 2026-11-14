@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ApiError, currentUser, type SessionUser } from "@/lib/api";
 import { ROLES, type RoleKey } from "@/lib/internmatch";
-import { managementUrl } from "@/lib/management";
+
+import { FirstPassword } from "./FirstPassword";
 
 const SessionContext = createContext<{
   user: SessionUser;
@@ -46,10 +47,6 @@ export function SessionGuard({ role, children }: { role: RoleKey; children: Reac
     currentUser()
       .then((session) => {
         if (!active) return;
-        if (session.role === "admin") {
-          window.location.replace(managementUrl());
-          return;
-        }
         if (session.role !== role) {
           void navigate({ to: ROLES[session.role].base, replace: true });
           return;
@@ -84,6 +81,7 @@ export function SessionGuard({ role, children }: { role: RoleKey; children: Reac
       </main>
     );
   }
+  if (user.must_change_password) return <FirstPassword onChanged={setUser} />;
   return (
     <SessionContext.Provider value={{ user, updateUser: setUser }}>
       {children}

@@ -20,6 +20,14 @@ class RecommendationReviewController extends Controller
         $records->through(fn ($record) => [
             'id' => $record->id, 'student_name' => $record->studentEnrollment->student->user->name,
             'program' => $record->studentEnrollment->programTerm->program->code,
+            'host_name' => $record->snapshot['host_name'] ?? null,
+            'opportunity_title' => $record->snapshot['opportunity_title'] ?? null,
+            'similarity_score' => $record->similarity_score,
+            'distance_km' => $record->distance_km,
+            'available_slots' => $record->capacity_at_time,
+            'moa_status' => $record->moa_status_at_time,
+            'generation_id' => $record->generation_id,
+            'generated_at' => $record->generated_at?->toIso8601String(),
             'explanation' => RecommendationReview::explanation($record),
             'history' => $history->get($record->id, collect())->values(),
         ]);

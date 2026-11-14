@@ -39,6 +39,9 @@ export function NotificationList() {
   const [filter, setFilter] = useState("All");
   const [markingAll, setMarkingAll] = useState(false);
   const [marking, setMarking] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -57,8 +60,14 @@ export function NotificationList() {
   }, [page, revision, filter]);
 
   const visible =
-    result?.data.filter((item) =>
-      filter === "All" ? true : filter === "Unread" ? !item.read_at : !!item.read_at,
+    result?.data.filter(
+      (item) =>
+        (filter === "All" ? true : filter === "Unread" ? !item.read_at : !!item.read_at) &&
+        `${item.data.title} ${item.data.body}`
+          .toLowerCase()
+          .includes(search.trim().toLowerCase()) &&
+        (!category ||
+          (category === "messages" ? !!item.data.conversation_id : !item.data.conversation_id)),
     ) ?? [];
 
   async function markAllRead() {
@@ -67,6 +76,7 @@ export function NotificationList() {
     setMarkingAll(true);
     try {
       await mutate("/notifications/read-all", undefined, "PATCH");
+      setNotice("All notifications marked as read.");
       setPage(1);
       window.dispatchEvent(new Event("internmatch:notifications-changed"));
       setRevision((value) => value + 1);
@@ -81,7 +91,7 @@ export function NotificationList() {
     <>
       <PageHeader
         title="Notifications"
-        subtitle="Updates from recorded system events."
+        subtitle="Keep track of internship updates, requirements and conversations."
         action={
           result && result.unread_count > 0 ? (
             <Button variant="outline" disabled={markingAll || !!marking} onClick={markAllRead}>
@@ -90,6 +100,28 @@ export function NotificationList() {
           ) : undefined
         }
       />
+      <div className="mb-5 grid gap-3 sm:grid-cols-2">
+        <Card>
+          <p className="text-sm text-muted-foreground">Unread updates</p>
+          <p className="mt-1 text-3xl font-semibold text-brand">{result?.unread_count ?? "—"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Across all your notifications</p>
+        </Card>
+        <Card>
+          <p className="font-semibold">Your notification inbox</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Unread updates have a highlighted edge. Marking an update as read keeps it available in
+            the Read tab.
+          </p>
+          <Button
+            variant="outline"
+            className="mt-3"
+            disabled={(!result && !error) || markingAll || !!marking}
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            Refresh notifications
+          </Button>
+        </Card>
+      </div>
       <FilterChips
         options={["All", "Unread", "Read"]}
         value={filter}
@@ -99,6 +131,53 @@ export function NotificationList() {
           setResult(null);
         }}
       />
+      <div className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
+        <label className="min-w-0 flex-1 text-sm">
+          Search this page
+          <input
+            type="search"
+            placeholder="Search notification title or message"
+            className="mt-1 block w-full rounded border p-2"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+        <label className="text-sm">
+          Update type
+          <select
+            aria-label="Notification type"
+            className="mt-1 block rounded border p-2"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+          >
+            <option value="">All types</option>
+            <option value="messages">Conversations</option>
+            <option value="events">System updates</option>
+          </select>
+        </label>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSearch("");
+            setCategory("");
+          }}
+        >
+          Clear search and type
+        </Button>
+        <p className="w-full text-xs text-muted-foreground">
+          Read-status tabs cover your full inbox. Search and type filters apply to the current page.
+        </p>
+      </div>
+      {notice && (
+        <p role="status" className="mb-3 text-sm text-emerald-700">
+          {notice}
+        </p>
+      )}
+      {result && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Showing {visible.length} of {result.data.length} updates on page {page}.
+        </p>
+      )}
       {error && (
         <p role="alert" className="mb-4 rounded-lg bg-brand-soft p-4 text-sm text-brand">
           {error}
@@ -122,10 +201,17 @@ export function NotificationList() {
       {result && result.data.length > 0 && visible.length === 0 && (
         <Card className="py-10 text-center">
           <p className="text-sm text-muted-foreground">
-            No {filter.toLowerCase()} notifications on this page.
+            No notifications match your search and type on this page.
           </p>
-          <Button variant="outline" className="mt-3" onClick={() => setFilter("All")}>
-            Show all
+          <Button
+            variant="outline"
+            className="mt-3"
+            onClick={() => {
+              setSearch("");
+              setCategory("");
+            }}
+          >
+            Reset search and type
           </Button>
         </Card>
       )}
@@ -148,18 +234,33 @@ export function NotificationList() {
                 {item.data.conversation_id ? "💬" : "📋"}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <p className={cx("text-sm", !item.read_at ? "font-semibold" : "font-medium")}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <p
+                    className={cx(
+                      "break-words text-sm",
+                      !item.read_at ? "font-semibold" : "font-medium",
+                    )}
+                  >
                     {item.data.title}
                   </p>
                   <span
                     className="shrink-0 text-xs text-muted-foreground"
-                    title={new Date(item.created_at).toLocaleString()}
+                    title={
+                      new Date(item.created_at).toLocaleString("en-PH", {
+                        timeZone: "Asia/Manila",
+                      }) + " (Asia/Manila)"
+                    }
                   >
                     {timeAgo(item.created_at)}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{item.data.body}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                  {item.data.body}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {item.read_at ? "Read" : "Unread"} ·{" "}
+                  {item.data.conversation_id ? "Conversation" : "System update"}
+                </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   {item.data.conversation_id &&
                     ["student", "coordinator", "supervisor"].includes(user.role) && (
@@ -178,6 +279,7 @@ export function NotificationList() {
                         setMarking(item.id);
                         try {
                           await mutate(`/notifications/${item.id}/read`, undefined, "PATCH");
+                          setNotice("Notification marked as read.");
                           setPage(1);
                           window.dispatchEvent(new Event("internmatch:notifications-changed"));
                           setRevision((value) => value + 1);
@@ -192,7 +294,7 @@ export function NotificationList() {
                         }
                       }}
                     >
-                      Mark as read
+                      {marking === item.id ? "Marking…" : "Mark as read"}
                     </Button>
                   )}
                 </div>

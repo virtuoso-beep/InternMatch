@@ -13,6 +13,8 @@ services:
       start_period: 120s
   mysql:
     image: mysql:8.4
+    ports:
+      - "127.0.0.1:3307:3306"
     environment:
       MYSQL_DATABASE: internmatchlaravel
       MYSQL_ROOT_PASSWORD: Admin123!
@@ -98,6 +100,7 @@ services:
       - "8080:8080"
     volumes:
       - ./frontend:/app
+      - ./backend/public/admin-ui:/backend/public/admin-ui
       - frontend_node_modules:/app/node_modules
     depends_on:
       - backend

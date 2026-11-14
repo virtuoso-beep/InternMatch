@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, mutate, upload } from "@/lib/api";
+import { RequirementCompliance } from "./RequirementCompliance";
 import { useSessionUser } from "./SessionGuard";
 import { Button, Card, CardTitle, cx, PageHeader, Pill } from "./ui";
 
@@ -57,7 +58,7 @@ export function RequirementWorkspace() {
     <>
       {user.role !== "student" && (
         <PageHeader
-          title="Requirements"
+          title={user.role === "coordinator" ? "Requirements tracking" : "Requirements"}
           subtitle="Submit documents, record event attendance, and track coordinator confirmation."
         />
       )}
@@ -65,6 +66,9 @@ export function RequirementWorkspace() {
       {error && <p role="alert">{error}</p>}
       {!enrollments && !error && <p role="status">Loading enrollments…</p>}
       {enrollments?.length === 0 && <Card>No enrollment records are available.</Card>}
+      {user.role === "coordinator" && enrollments && (
+        <RequirementCompliance enrollments={enrollments} />
+      )}
       <div className="space-y-5">
         {enrollments?.map((item) =>
           user.role === "student" ? (

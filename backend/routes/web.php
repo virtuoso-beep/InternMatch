@@ -42,6 +42,16 @@ Route::prefix('api/v1')->group(function (): void {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('session', [AuthController::class, 'show'])->middleware(['auth', 'active']);
     Route::middleware(['auth', 'active'])->group(function (): void {
+        Route::post('first-password', [AuthController::class, 'firstPassword'])->middleware('throttle:10,1');
+        Route::get('coordinator-students/{enrollment}/history', [StudentPortalController::class, 'studentHistory']);
+        Route::get('coordinator-imports/history', [\App\Http\Controllers\CoordinatorImportController::class, 'history']);
+        Route::get('coordinator-imports/student-template', [\App\Http\Controllers\CoordinatorImportController::class, 'template']);
+        Route::post('coordinator-imports/{id}/credentials', [\App\Http\Controllers\CoordinatorImportController::class, 'credentials'])->middleware('throttle:10,1');
+        Route::get('coordinator-imports/reference', [\App\Http\Controllers\CoordinatorImportController::class, 'reference']);
+        Route::post('coordinator-imports', [\App\Http\Controllers\CoordinatorImportController::class, 'upload'])->middleware('throttle:10,1');
+        Route::post('coordinator-imports/{id}/map', [\App\Http\Controllers\CoordinatorImportController::class, 'map']);
+        Route::post('coordinator-imports/{id}/preview', [\App\Http\Controllers\CoordinatorImportController::class, 'preview']);
+        Route::post('coordinator-imports/{id}/confirm', [\App\Http\Controllers\CoordinatorImportController::class, 'confirm'])->middleware('throttle:10,1');
         Route::get('chat/settings', [\App\Http\Controllers\ChatController::class, 'settings']);
         Route::put('chat/settings', [\App\Http\Controllers\ChatController::class, 'updateSettings']);
         Route::get('chat/conversations', [\App\Http\Controllers\ChatController::class, 'index']);
@@ -97,6 +107,14 @@ Route::prefix('api/v1')->group(function (): void {
         Route::post('opportunities', [OpportunityController::class, 'store']);
         Route::put('opportunities/{opportunity}', [OpportunityController::class, 'update']);
         Route::get('audit-logs', AuditController::class);
+        Route::get('admin/overview', [\App\Http\Controllers\AdminWorkspaceController::class, 'overview']);
+        Route::patch('admin/terms/{term}', [\App\Http\Controllers\AdminWorkspaceController::class, 'term']);
+        Route::get('admin/settings', [\App\Http\Controllers\AdminWorkspaceController::class, 'settings']);
+        Route::put('admin/settings', [\App\Http\Controllers\AdminWorkspaceController::class, 'saveSettings']);
+        Route::get('branding', [\App\Http\Controllers\AdminWorkspaceController::class, 'branding']);
+        Route::get('backup-status', \App\Http\Controllers\BackupStatusController::class);
+        Route::get('recommendation-batch-reports', [\App\Http\Controllers\RecommendationBatchReportController::class, 'index']);
+        Route::post('recommendation-batch-reports', [\App\Http\Controllers\RecommendationBatchReportController::class, 'store']);
         Route::get('enrollments', [StudentPortalController::class, 'enrollments']);
         Route::get('allocation', [\App\Http\Controllers\AllocationController::class, 'index']);
         Route::get('map', \App\Http\Controllers\MapController::class);

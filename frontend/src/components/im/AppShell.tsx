@@ -19,18 +19,67 @@ export function AppShell({ role }: { role: RoleKey }) {
 function AuthenticatedShell({ role }: { role: RoleKey }) {
   const user = useSessionUser();
   const cfg = ROLES[role];
+  const programLabel = user.program_label ?? "No program assigned";
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [open, setOpen] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState("");
+  const [branding, setBranding] = useState({
+    system_name: "InternMatch",
+    institution: "University of Mindanao Tagum College",
+    display_timezone: "Asia/Manila",
+  });
+  useEffect(() => {
+    let active = true;
+    const refresh = () =>
+      api<{ data: { system_name: string; institution: string; display_timezone: string } }>(
+        "/branding",
+      )
+        .then((r) => {
+          if (active) setBranding(r.data);
+        })
+        .catch(() => {});
+    void refresh();
+    window.addEventListener("internmatch:branding-updated", refresh);
+    return () => {
+      active = false;
+      window.removeEventListener("internmatch:branding-updated", refresh);
+    };
+  }, []);
+  useEffect(() => {
+    setExpandedGroup(
+      cfg.nav.find((g) =>
+        g.items.some((i) => pathname === (i.section ? `${cfg.base}/${i.section}` : cfg.base)),
+      )?.group ?? "",
+    );
+  }, [pathname, cfg]);
   const [chatOpen, setChatOpen] = useState(false);
   const canChat = ["student", "coordinator", "supervisor"].includes(role);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [menu, setMenu] = useState<"none" | "bell" | "user">("none");
   const [notifications, setNotifications] = useState<NotificationPage | null>(null);
   const [notificationError, setNotificationError] = useState("");
   const [notificationRevision, setNotificationRevision] = useState(0);
   const [logoutError, setLogoutError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelClose = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+  };
+  const showNavigation = () => {
+    cancelClose();
+    setCollapsed(false);
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    hoverTimer.current = setTimeout(() => setCollapsed(true), 250);
+  };
+  useEffect(
+    () => () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    },
+    [],
+  );
   const barRef = useRef<HTMLDivElement>(null);
   const initials = user.name
     .split(" ")
@@ -70,6 +119,7 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
       if (event.key === "Escape") {
         setMenu("none");
         setOpen(false);
+        setCollapsed(true);
         setChatOpen(false);
       }
     };
@@ -98,8 +148,13 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
             ☰
           </button>
           <Link to="/" className="flex items-center gap-2 text-xl font-bold">
-            <img src={sealUrl} alt="UM Tagum College seal" className="size-8" />
-            InternMatch
+            <img
+              src={sealUrl}
+              alt="UM Tagum College seal"
+              className="size-8"
+              title={branding.institution}
+            />
+            {branding.system_name}
           </Link>
         </div>
         <div ref={barRef} className="relative flex items-center gap-2">
@@ -124,7 +179,12 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
             <span className="flex size-9 items-center justify-center rounded-full bg-white/15 font-semibold">
               {initials}
             </span>
-            <span className="hidden max-w-48 truncate text-sm sm:block">{user.name}</span>
+            <span
+              className="hidden max-w-64 truncate text-sm sm:block"
+              title={`${user.name} · ${programLabel}`}
+            >
+              {user.name} · {programLabel}
+            </span>
           </button>
           {menu === "bell" && (
             <div className="absolute top-12 right-0 z-40 w-80 max-w-[90vw] rounded-lg border border-border bg-card text-foreground shadow-lg">
@@ -151,7 +211,9 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
                     <p className="font-semibold">{item.data.title}</p>
                     <p className="mt-1">{item.data.body}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {new Date(item.created_at).toLocaleString()}
+                      {new Date(item.created_at).toLocaleString("en-PH", {
+                        timeZone: branding.display_timezone,
+                      })}
                     </p>
                   </li>
                 ))}
@@ -168,7 +230,12 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
           )}
           {menu === "user" && (
             <div className="absolute top-12 right-0 z-40 w-64 rounded-lg border border-border bg-card text-foreground shadow-lg">
-              <p className="border-b p-4 text-sm font-semibold">{cfg.title}</p>
+              <div className="border-b p-4 text-sm">
+                <p className="font-semibold">{user.name}</p>
+                <p className="mt-1">
+                  {cfg.title} · {programLabel}
+                </p>
+              </div>
               <Link
                 to={`${cfg.base}/$section` as "/student/$section"}
                 params={{ section: "profile" }}
@@ -212,6 +279,9 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
         >
           <Link
             to={cfg.base}
+            onMouseEnter={showNavigation}
+            onMouseLeave={scheduleClose}
+            onFocus={showNavigation}
             className="flex w-full flex-col items-center gap-2 rounded-3xl bg-[#d2e3fc] px-1 py-4 text-xs font-semibold text-[#17385e]"
           >
             <span aria-hidden="true" className="text-2xl">
@@ -219,6 +289,15 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
             </span>
             Dashboard
           </Link>
+          {role === "admin" && (
+            <Link
+              to="/admin/$section"
+              params={{ section: "chat-settings" }}
+              className="flex w-full flex-col items-center gap-2 rounded-3xl py-4 text-xs text-[#17385e] hover:bg-white"
+            >
+              Chat
+            </Link>
+          )}
           {canChat && (
             <button
               onClick={() => setChatOpen((v) => !v)}
@@ -249,13 +328,22 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
           />
         )}
         <aside
+          aria-label="Role navigation"
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          onFocusCapture={cancelClose}
           className={cx(
-            "fixed top-16 bottom-0 left-0 z-20 w-64 shrink-0 overflow-y-auto border-r bg-card p-4 lg:sticky lg:h-[calc(100vh-4rem)] lg:translate-x-0",
-            open ? "visible translate-x-0" : "invisible -translate-x-full lg:visible",
-            collapsed && "lg:hidden",
+            "im-hide-scrollbar fixed top-16 bottom-0 left-0 z-20 w-64 overflow-y-auto border-r bg-card p-4 shadow-lg lg:left-24",
+            open ? "visible translate-x-0" : "invisible -translate-x-full",
+            !collapsed && "lg:visible lg:translate-x-0",
           )}
         >
-          <p className="mb-5 px-3 text-sm font-semibold text-brand">{cfg.title}</p>
+          <div className="mb-5 px-3 text-sm text-brand">
+            <p className="font-semibold">{cfg.title}</p>
+            <p className="mt-1 break-words">
+              {user.name} · {programLabel}
+            </p>
+          </div>
           {canChat && (
             <div className="mb-5 lg:hidden">
               <button
@@ -282,12 +370,37 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
               </button>
             </div>
           )}
+          {role === "admin" && (
+            <Link
+              to="/admin/$section"
+              params={{ section: "notifications" }}
+              onClick={() => setOpen(false)}
+              className="mb-5 block rounded-xl bg-[#d2e3fc] p-4 text-sm font-semibold text-[#17385e]"
+            >
+              Notifications
+            </Link>
+          )}
           {cfg.nav.map((group) => (
             <div key={group.group} className="mb-5">
-              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                {group.group}
-              </p>
-              <nav aria-label={group.group} className="space-y-1">
+              {
+                <button
+                  type="button"
+                  onClick={() => setExpandedGroup((v) => (v === group.group ? "" : group.group))}
+                  aria-expanded={expandedGroup === group.group}
+                  className={cx(
+                    "flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm font-semibold",
+                    expandedGroup === group.group ? "bg-brand-soft text-brand" : "hover:bg-muted",
+                  )}
+                >
+                  <span>{group.group}</span>
+                  <span aria-hidden="true">{expandedGroup === group.group ? "−" : "+"}</span>
+                </button>
+              }
+              <nav
+                aria-label={group.group}
+                hidden={expandedGroup !== group.group}
+                className="ml-4 mt-1 space-y-1 border-l pl-2"
+              >
                 {group.items.map((item) => {
                   const target = item.section ? `${cfg.base}/${item.section}` : cfg.base;
                   const active = pathname === target || pathname === `${target}/`;
@@ -296,7 +409,10 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
                       key={item.section}
                       to={target}
                       aria-current={active ? "page" : undefined}
-                      onClick={() => setOpen(false)}
+                      onClick={() => {
+                        setOpen(false);
+                        setCollapsed(true);
+                      }}
                       className={cx(
                         "block rounded-lg px-3 py-2 text-sm",
                         active ? "bg-brand-soft font-semibold text-brand" : "hover:bg-muted",

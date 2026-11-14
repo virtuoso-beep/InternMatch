@@ -24,7 +24,7 @@ class ProgramMonitoringController extends Controller
     {
         $user = $request->user();
         abort_unless($user->hasPermission(Permission::ManageAcademicRecords) || $user->role === Role::Coordinator, 403);
-        $programs = Program::query()->when($user->role === Role::Coordinator, fn ($query) => $query->whereIn('id', $user->programs()->select('programs.id')))
+        $programs = Program::query()->where('is_active', true)->when($user->role === Role::Coordinator, fn ($query) => $query->whereIn('id', $user->programs()->select('programs.id')))
             ->with(['programTerms.academicTerm'])->orderBy('code')->get();
         $rubrics = EvaluationRubric::with('criteria')->whereIn('id', $programs->pluck('evaluation_rubric_id')->filter())->get()->keyBy('id');
 

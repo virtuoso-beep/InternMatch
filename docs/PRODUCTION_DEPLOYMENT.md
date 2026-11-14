@@ -43,8 +43,8 @@ Point your domain's A record (e.g., `internmatch.example.com`) to the server's p
    ```
 
 ## 4. Backup & Restore Procedures
-- **Backups:** The script `deploy/backup.sh` handles database and uploads backup. Add it to a daily cron job.
-- **Restore:** Run `./deploy/restore.sh <timestamp>` to restore a specific backup.
+- **Backups:** With Python 3.12+ installed, run `INTERNMATCH_PRODUCTION=1 bash deploy/backup.sh`. This captures the database plus private and public uploads with checksums. Use a maintenance window for coordinated database/document consistency. Production scheduling is deployment-specific; the current installation uses Windows locally instead.
+- **Recovery drill:** Run `INTERNMATCH_PRODUCTION=1 bash deploy/restore.sh <backup-id>` to verify checksums and restore into a new isolated testing database and document directory. This no longer overwrites live data or runs migrations. See [local backup and recovery](LOCAL_BACKUP_RECOVERY.md) for the recorded Windows schedule, operational prerequisites and verification scope.
 
 ## 5. Monitoring & Maintenance
 - Check container logs: `docker compose -f docker-compose.yml -f docker-compose.production.yml logs -f`

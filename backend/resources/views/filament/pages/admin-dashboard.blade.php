@@ -1,3 +1,3 @@
 <x-filament-panels::page>
-    @include('filament.pages.workspace-frame', ['workspaceSection' => 'dashboard'])
+    @include('filament.pages.admin-reference-shell', ['workspaceSection' => 'dashboard'])
 </x-filament-panels::page>

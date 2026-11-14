@@ -24,7 +24,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $filters = $request->validate(['program_id' => ['nullable', 'integer', 'exists:programs,id'], 'academic_term_id' => ['nullable', 'integer', 'exists:academic_terms,id'], 'year_level' => ['nullable', 'integer', 'between:1,10']]);
-        $programs = Program::query();
+        $programs = Program::query()->where('is_active', true);
         if (in_array($user->role, [Role::Coordinator, Role::Dean], true)) {
             $programs->whereIn('id', $user->programs()->select('programs.id'));
         } elseif ($user->role === Role::Student) {

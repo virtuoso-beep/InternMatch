@@ -18,3 +18,5 @@ Artisan::command('internmatch:sync-chat', function () {
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Schedule::call(fn () => \Illuminate\Support\Facades\DB::table('import_credential_handoffs')->where('expires_at', '<=', now())->whereNotNull('encrypted_credentials')->update(['encrypted_credentials' => null]))->everyMinute()->name('expire-import-credentials')->withoutOverlapping();

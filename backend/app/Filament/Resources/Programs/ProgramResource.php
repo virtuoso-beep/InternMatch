@@ -35,7 +35,7 @@ class ProgramResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $user = Filament::auth()->user();
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()->where('is_active', true);
         if (! static::canViewAny()) {
             return $query->whereRaw('1 = 0');
         }

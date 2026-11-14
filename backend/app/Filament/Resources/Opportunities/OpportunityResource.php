@@ -61,7 +61,7 @@ class OpportunityResource extends Resource
                 ->helperText('Each program needs host capacity for this term. Existing placements must retain their slots.')
                 ->schema([
                     Select::make('program_id')->label('Program')->required()->options(function () {
-                        $query = Program::query();
+                        $query = Program::query()->where('is_active', true);
                         $user = Filament::auth()->user();
                         if ($user->role === Role::Coordinator) {
                             $query->whereIn('id', $user->programs()->select('programs.id'));

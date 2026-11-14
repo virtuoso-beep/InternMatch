@@ -7,7 +7,7 @@ import { useSessionUser, useUpdateSessionUser } from "./SessionGuard";
 type Profile = {
   id: number;
   name: string;
-  email: string;
+  email: string | null;
   role: RoleKey;
   avatar_url?: string | null;
   contact_number: string | null;
@@ -274,7 +274,7 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
           <CardTitle>Account details</CardTitle>
           <fieldset disabled={saving} className="mt-4 grid gap-5 sm:grid-cols-2">
             {field("name", "Full name")}
-            {readOnlyField("Institutional email", profile.email)}
+            {readOnlyField("Email", profile.email || "Not provided")}
             {field("contact_number", "Contact number")}
             {role === "student" && programAndYear
               ? readOnlyField("Program & year", programAndYear)
@@ -476,7 +476,9 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
               )}
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{ROLES[role].title}</p>
-                <p className="truncate text-xs text-muted-foreground">{profile.email}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {profile.email || "Email not provided"}
+                </p>
               </div>
             </div>
             <div className="mt-4">
