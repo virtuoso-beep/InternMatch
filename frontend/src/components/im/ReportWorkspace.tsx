@@ -34,9 +34,11 @@ const labels: Record<string, string> = {
 export function ReportWorkspace({
   title = "Reports",
   presentation = "cards",
+  headingLevel = 1,
 }: {
   title?: string;
   presentation?: "cards" | "accreditation" | "export";
+  headingLevel?: 1 | 2;
 }) {
   const user = useSessionUser();
   const [data, setData] = useState<Index | null>(null),
@@ -78,6 +80,7 @@ export function ReportWorkspace({
   return (
     <>
       <PageHeader
+        headingLevel={headingLevel}
         title={title}
         subtitle="Program-scoped report snapshots. Deans can access coordinator-approved reports."
       />
@@ -280,6 +283,12 @@ export function ReportWorkspace({
               href={`/api/v1/reports/${selected.id}/download`}
             >
               Download CSV
+            </a>
+            <a
+              className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm font-semibold"
+              href={`/api/v1/reports/${selected.id}/download?format=xlsx`}
+            >
+              Download Excel
             </a>
             {user.role === "coordinator" && !selected.approved_at && (
               <Button

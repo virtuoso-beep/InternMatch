@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Button, Card, PageHeader, downloadText } from "./ui";
+import { Button, Card, PageHeader, downloadText, formatAction } from "./ui";
 import { useSessionUser } from "./SessionGuard";
 
 type AuditPage = {
@@ -86,7 +86,7 @@ export function AuditLog() {
               <option value="">All actions on this page</option>
               {[...new Set(data?.data.map((item) => item.action) ?? [])].sort().map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {formatAction(value)}
                 </option>
               ))}
             </select>
@@ -156,7 +156,9 @@ export function AuditLog() {
                         })}
                       </td>
                       <td className="p-2">{item.actor_name ?? "System / unavailable actor"}</td>
-                      <td className="p-2">{item.action}</td>
+                      <td className="p-2" title={item.action}>
+                        {formatAction(item.action)}
+                      </td>
                       <td className="p-2">{item.subject_id}</td>
                     </tr>
                   ))}

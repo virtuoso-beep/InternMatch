@@ -59,7 +59,7 @@ class ProgramAnalyticsController extends Controller
         $distances = collect();
         $missing = 0;
         foreach ($placements->whereIn('status', [PlacementStatus::Approved, PlacementStatus::Active]) as $placement) {
-            $profile = $placement->studentEnrollment->student->user->profile;
+            $profile = $placement->studentEnrollment->student->user?->profile;
             $host = $placement->hostEstablishment;
             if ($profile?->latitude === null || $profile?->longitude === null || $host->latitude === null || $host->longitude === null) {
                 $missing++;

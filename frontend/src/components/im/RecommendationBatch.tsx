@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, downloadText } from "./ui";
+import { Button, Card, downloadText, formatSimilarity, studentName, formatStatus } from "./ui";
 type Student = {
   id: number;
   status: string;
@@ -92,7 +92,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
       let row: Result;
       if (protectedStudent(student)) {
         row = {
-          student: student.student.user.name,
+          student: studentName(student.student.user),
           status: "Skipped",
           reason: "Existing placement or closed enrollment protected.",
         };
@@ -118,7 +118,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
             after_id: topAfter?.id,
             previous: describe(topBefore),
             current: describe(topAfter),
-            student: student.student.user.name,
+            student: studentName(student.student.user),
             status: signature(before.data) === signature(after.data) ? "Unchanged" : "Updated",
             reason: after.data.length
               ? "Compared opportunity order and similarity with the previous generation."
@@ -126,7 +126,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
           };
         } catch (e) {
           row = {
-            student: student.student.user.name,
+            student: studentName(student.student.user),
             status: "Failed",
             reason: e instanceof Error ? e.message : "Generation failed.",
           };
@@ -351,7 +351,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
                           <>
                             <p className="font-medium">{match.host ?? "Host not recorded"}</p>
                             <p className="text-xs text-muted-foreground">
-                              {(match.similarity * 100).toFixed(1)}% cosine similarity ·{" "}
+                              Similarity score {formatSimilarity(match.similarity)} ·{" "}
                               {match.distance == null
                                 ? "Distance unknown"
                                 : `${match.distance.toFixed(1)} km straight-line`}
@@ -362,7 +362,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
                         )}
                       </td>
                     ))}
-                    <td className="p-2">{r.status}</td>
+                    <td className="p-2">{formatStatus(r.status)}</td>
                     <td className="p-2">{r.reason}</td>
                   </tr>
                 ))}

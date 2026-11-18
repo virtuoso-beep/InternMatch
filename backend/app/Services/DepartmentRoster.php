@@ -56,12 +56,12 @@ class DepartmentRoster
                     $user = new User(['password' => $credentials[$email]]);
                 }
                 $user->forceFill(['name' => $name, 'email' => $email, 'role' => Role::Coordinator, 'status' => AccountStatus::Active])->save();
-                $user->programs()->sync([Program::where('code', $code)->sole()->id]);
+                CoordinatorAssignment::set($user, [Program::where('code', $code)->sole()->id]);
                 $user->programTerms()->detach();
             }
             foreach (User::where('role', Role::Coordinator)->whereNotIn('email', array_keys(self::COORDINATORS))->lockForUpdate()->get() as $user) {
                 self::audit($user, 'account.retired', $user->only(['name', 'email', 'status']) + ['program_ids' => $user->programs()->pluck('programs.id')->all()]);
-                $user->programs()->detach();
+                CoordinatorAssignment::set($user, []);
                 $user->programTerms()->detach();
                 $user->forceFill(['status' => AccountStatus::Disabled])->save();
                 $user->delete();

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
 import { useSessionUser } from "./SessionGuard";
-import { Button, Card, CardTitle } from "./ui";
+import { Button, Card, CardTitle, formatRating } from "./ui";
 
 type Criterion = { id: number; name: string; max_score: string; weight: string };
 type Rubric = { id: number; name: string; version: number; criteria: Criterion[] };
@@ -170,10 +170,10 @@ export function EvaluationPanel({
               {item.period} · {item.status} · {item.evaluator.name}
             </p>
             <p>
-              {item.evaluation_rubric.name} v{item.evaluation_rubric.version} · Weighted percentage:{" "}
+              {item.evaluation_rubric.name} v{item.evaluation_rubric.version} · Overall rating:{" "}
               {item.weighted_percentage === null
                 ? "Incomplete"
-                : `${item.weighted_percentage.toFixed(2)}%`}
+                : formatRating(item.weighted_percentage)}
             </p>
             <ul>
               {item.evaluation_rubric.criteria.map((criterion) => (

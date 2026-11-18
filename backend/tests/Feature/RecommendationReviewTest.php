@@ -15,11 +15,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Concerns\AcknowledgesPrivacyNotice;
 use Tests\TestCase;
 
 class RecommendationReviewTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use AcknowledgesPrivacyNotice;
 
     private function recommendation(StudentEnrollment $enrollment): Recommendation
     {
@@ -67,6 +69,18 @@ class RecommendationReviewTest extends TestCase
             $this->assertSame(403, $error->getStatusCode());
         }
         $this->assertSame(0, DB::table('placement_judgments')->count());
+    }
+
+    public function test_review_list_survives_an_archived_student_account(): void
+    {
+        $enrollment = StudentEnrollment::factory()->create();
+        $this->recommendation($enrollment);
+        $enrollment->student->user->delete(); // retired account (soft delete)
+        $actor = User::factory()->withRole(Role::Coordinator)->create();
+        $actor->programs()->attach($enrollment->programTerm->program_id);
+
+        $this->actingAs($actor)->getJson('/api/v1/recommendation-reviews')->assertOk()
+            ->assertJsonPath('data.0.student_name', 'Archived student account');
     }
 
     public function test_react_review_api_preserves_frozen_facts_history_and_program_scope(): void

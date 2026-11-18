@@ -7,13 +7,17 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { loadEnv } from "vite";
 
-const environment = loadEnv(process.env['NODE_ENV'] ?? 'development', process.cwd(), '');
+const environment = loadEnv(process.env["NODE_ENV"] ?? "development", process.cwd(), "");
 
 export default defineConfig({
   vite: {
     server: {
       proxy: {
-        "/api": { target: process.env['LARAVEL_URL'] ?? environment['LARAVEL_URL'] ?? "http://127.0.0.1:8000", changeOrigin: true },
+        "/api": {
+          target:
+            process.env["LARAVEL_URL"] ?? environment["LARAVEL_URL"] ?? "http://127.0.0.1:8000",
+          changeOrigin: true,
+        },
       },
       watch: {
         // Polling is required for Vite HMR to detect file changes inside Docker on Windows.

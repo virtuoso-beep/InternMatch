@@ -23,7 +23,7 @@ class RecommendationBatchReportController extends Controller {
     $match=\App\Models\Recommendation::where('student_enrollment_id',$enrollment->id)->findOrFail($id);
     return ['host'=>$match->snapshot['host_name']??null,'similarity'=>$match->similarity_score,'distance'=>$match->distance_km];
    };
-   $results[]=['previous'=>$describe($item['before_id']??null),'current'=>$describe($item['after_id']??null),'enrollment_id' =>$enrollment->id,'student'=>$enrollment->student->user->name,'status'=>$item['status'],'reason'=>$item['reason']];
+   $results[]=['previous'=>$describe($item['before_id']??null),'current'=>$describe($item['after_id']??null),'enrollment_id' =>$enrollment->id,'student'=>$enrollment->student->user?->name ?? 'Archived student account','status'=>$item['status'],'reason'=>$item['reason']];
   }
   $id=DB::table('recommendation_batch_reports')->insertGetId(['user_id'=>$request->user()->id,'program_id'=>$program->id,'results'=>json_encode($results),'created_at'=>now()]);
   return response()->json(['id'=>$id],201);

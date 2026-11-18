@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { ROLES } from "@/lib/internmatch";
 import { useSessionUser } from "./SessionGuard";
 import { Button, Card, Pill } from "./ui";
-import { DashboardEmpty, DashboardHeading, DashboardLink, DashboardMetric } from "./DashboardUI";
+import {
+  DashboardEmpty,
+  DashboardHeading,
+  DashboardLink,
+  DashboardMetric,
+  StatusBreakdown,
+} from "./DashboardUI";
 
 type Dashboard = {
   stats: { label: string; value: number }[];
@@ -20,6 +27,10 @@ const layouts: Record<string, { intro: string; metrics: string[]; actions: Actio
       "Active placements",
       "Submissions awaiting review",
       "Certified hours",
+      "Students awaiting placement",
+      "Awaiting students with incomplete requirements",
+      "Available placement slots",
+      "Students needing attention (open monitoring flags)",
     ],
     actions: [
       {
@@ -206,9 +217,13 @@ export function LiveDashboard() {
                     ? "Across the system, independent of program filter"
                     : label === "Certified hours"
                       ? "Verified time logs only"
-                      : program
-                        ? "Within the selected program"
-                        : "Across your accessible programs"
+                      : label === "Available placement slots"
+                        ? "Published opportunities with a valid MOA"
+                        : label === "Students needing attention (open monitoring flags)"
+                          ? "Students with an unresolved monitoring flag"
+                          : program
+                            ? "Within the selected program"
+                            : "Across your accessible programs"
                 }
                 index={index}
                 accent={label === "Certified hours" || label === "Completed placements"}
@@ -216,45 +231,74 @@ export function LiveDashboard() {
             ))}
           </div>
           <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <Card className="!rounded-xl !p-6">
-              <DashboardHeading
-                title="Enrollment by program"
-                description="Enrollment records in the current scope"
-                action={<Pill tone="brand">{total.toLocaleString()} total</Pill>}
-              />
-              {data.program_breakdown.length === 0 ? (
-                <DashboardEmpty>
-                  No enrollment records match this scope. Select another accessible program to
-                  explore its records.
-                </DashboardEmpty>
-              ) : (
-                <ul className="space-y-5">
-                  {data.program_breakdown.map((p) => (
-                    <li key={p.code}>
-                      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                        <span className="font-semibold">{p.code}</span>
-                        <span className="text-muted-foreground">
-                          {Number(p.enrollments).toLocaleString()} enrollments{" "}
-                          <span className="ml-2 font-semibold text-foreground">
-                            {total ? Math.round((Number(p.enrollments) / total) * 100) : 0}%
+            <div className="space-y-5">
+              <Card className="!rounded-xl !p-6">
+                <DashboardHeading
+                  title="Enrollment by program"
+                  description="Enrollment records in the current scope"
+                  action={<Pill tone="brand">{total.toLocaleString()} total</Pill>}
+                />
+                {data.program_breakdown.length === 0 ? (
+                  <DashboardEmpty>
+                    No enrollment records match this scope. Select another accessible program to
+                    explore its records.
+                  </DashboardEmpty>
+                ) : (
+                  <ul className="space-y-5">
+                    {data.program_breakdown.map((p) => (
+                      <li key={p.code}>
+                        <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                          <span className="font-semibold">{p.code}</span>
+                          <span className="text-muted-foreground">
+                            {Number(p.enrollments).toLocaleString()} enrollments{" "}
+                            <span className="ml-2 font-semibold text-foreground">
+                              {total ? Math.round((Number(p.enrollments) / total) * 100) : 0}%
+                            </span>
                           </span>
-                        </span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                        </div>
                         <div
-                          className="h-full rounded-full bg-brand/80"
-                          style={{ width: `${total ? (Number(p.enrollments) / total) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="mt-6 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
-                A student can have more than one enrollment. Counts represent enrollment records,
-                not unique people.
-              </p>
-            </Card>
+                          className="h-2 overflow-hidden rounded-full bg-muted"
+                          aria-hidden="true"
+                        >
+                          <div
+                            className="h-full rounded-full bg-brand/80"
+                            style={{
+                              width: `${total ? (Number(p.enrollments) / total) * 100 : 0}%`,
+                            }}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-6 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
+                  A student can have more than one enrollment. Counts represent enrollment records,
+                  not unique people.
+                </p>
+              </Card>
+              <Card className="!rounded-xl !p-6">
+                <DashboardHeading
+                  title="Placement pipeline"
+                  description="Placement records by status in the current scope"
+                />
+                <StatusBreakdown
+                  title="Placement pipeline"
+                  segments={[
+                    {
+                      label: "Pending decision",
+                      value: metric("Pending placements") ?? 0,
+                      tone: "warn",
+                    },
+                    { label: "Active", value: metric("Active placements") ?? 0, tone: "info" },
+                    {
+                      label: "Completed",
+                      value: metric("Completed placements") ?? 0,
+                      tone: "success",
+                    },
+                  ]}
+                />
+              </Card>
+            </div>
             <Card className="!rounded-xl !p-6">
               <DashboardHeading
                 title="Your workspace"
@@ -276,9 +320,7 @@ export function LiveDashboard() {
                         {action.description}
                       </p>
                     </div>
-                    <span aria-hidden="true" className="text-brand">
-                      →
-                    </span>
+                    <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-brand" />
                   </a>
                 ))}
               </div>

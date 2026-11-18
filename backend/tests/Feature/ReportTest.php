@@ -44,6 +44,21 @@ class ReportTest extends TestCase
         $this->getJson('/api/v1/reports/'.$reports['progress']['id'])->assertJsonPath('data.payload.rows.0.1', '=Unsafe formula name');
         $csv = $this->get('/api/v1/reports/'.$reports['progress']['id'].'/download')->assertOk()->streamedContent();
         $this->assertStringContainsString("'=Unsafe formula name", $csv);
+        // FR-22 XLSX: same snapshot; text is an explicit string cell, never a formula.
+        $xlsx = $this->get('/api/v1/reports/'.$reports['progress']['id'].'/download?format=xlsx')->assertOk()->streamedContent();
+        $path = tempnam(sys_get_temp_dir(), 'report');
+        try {
+            file_put_contents($path, $xlsx);
+            $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+            $cell = $book->getSheet(0)->getCell('B2');
+            $this->assertSame('=Unsafe formula name', $cell->getValue());
+            $this->assertSame(\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING, $cell->getDataType());
+            $this->assertSame('Export details', $book->getSheet(1)->getTitle());
+            $book->disconnectWorksheets();
+        } finally {
+            @unlink($path);
+        }
+        $this->getJson('/api/v1/reports/'.$reports['progress']['id'].'/download?format=pdf')->assertUnprocessable(); // unsupported format rejected
         $this->assertDatabaseHas('audit_logs', ['action' => 'report.exported']);
     }
 

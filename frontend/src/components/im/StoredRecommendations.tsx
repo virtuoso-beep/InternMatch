@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, Field, Pill, matchTone } from "./ui";
+import { Button, Card, Field, Pill, formatSimilarity } from "./ui";
 
 type Skill = { name: string; level: number | null; minimum_level: number };
 type Recommendation = {
@@ -27,7 +27,7 @@ type Available = {
   id: number;
   eligibility: { capacity_remaining: number; moa_expires_on: string };
 };
-type Sort = "Best match" | "Nearest" | "Most slots";
+type Sort = "Highest similarity" | "Nearest" | "Most slots";
 
 export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }) {
   const [items, setItems] = useState<Recommendation[] | null>(null);
@@ -38,7 +38,7 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
-  const [filter, setFilter] = useState<Sort>("Best match");
+  const [filter, setFilter] = useState<Sort>("Highest similarity");
   const [details, setDetails] = useState<Recommendation | null>(null);
   useEffect(() => {
     let active = true;
@@ -112,7 +112,7 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div role="group" aria-label="Sort recommendations" className="flex flex-wrap gap-2">
-          {(["Best match", "Nearest", "Most slots"] as Sort[]).map((option) => (
+          {(["Highest similarity", "Nearest", "Most slots"] as Sort[]).map((option) => (
             <button
               key={option}
               type="button"
@@ -185,18 +185,18 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
       {!loading && items && (
         <p className="text-sm text-muted-foreground">
           {sorted.length} available {sorted.length === 1 ? "recommendation" : "recommendations"} ·
-          Distances are straight-line kilometers. Match scores show competency similarity, not
+          Distances are straight-line kilometers. Similarity scores show competency similarity, not
           placement probability.
         </p>
       )}
       {!loading && sorted.length > 0 && (
         <p role="status" className="text-sm text-muted-foreground">
-          {filter === "Best match"
-            ? "Showing best competency matches first."
+          {filter === "Highest similarity"
+            ? "Showing highest similarity scores first."
             : filter === "Most slots"
-              ? "Showing the most available program slots first. Equal slot counts keep the best-match order."
+              ? "Showing the most available program slots first. Equal slot counts keep the similarity-score order."
               : sorted.every((item) => item.distance_km === null)
-                ? "Distance is not recorded for these matches, so the best-match order is retained. Save your location in My profile and refresh recommendations; hosts also need saved coordinates."
+                ? "Distance is not recorded for these matches, so the similarity-score order is retained. Save your location in My profile and refresh recommendations; hosts also need saved coordinates."
                 : "Showing the nearest recorded locations first. Matches without coordinates appear last."}
         </p>
       )}
@@ -241,8 +241,8 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
                     </p>
                   </div>
                   <span className="shrink-0">
-                    <Pill tone={matchTone(item.similarity_score * 100)}>
-                      {(item.similarity_score * 100).toFixed(1)}% match
+                    <Pill tone="muted">
+                      Rank {item.rank} · Similarity score {formatSimilarity(item.similarity_score)}
                     </Pill>
                   </span>
                 </div>

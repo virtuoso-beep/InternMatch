@@ -188,3 +188,28 @@
 /* Retain wheel, touch and keyboard scrolling without a visible menu scrollbar. */
 .im-hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .im-hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Native <progress> bars use the design tokens instead of browser green/grey. */
+@layer base {
+  progress {
+    appearance: none;
+    height: 0.5rem;
+    border: 0;
+    border-radius: 9999px;
+    overflow: hidden;
+    background-color: var(--muted);
+    color: var(--success);
+  }
+  progress::-webkit-progress-bar {
+    background-color: var(--muted);
+    border-radius: 9999px;
+  }
+  progress::-webkit-progress-value {
+    background-color: var(--success);
+    border-radius: 9999px;
+  }
+  progress::-moz-progress-bar {
+    background-color: var(--success);
+    border-radius: 9999px;
+  }
+}

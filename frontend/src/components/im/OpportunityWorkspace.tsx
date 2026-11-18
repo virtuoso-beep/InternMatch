@@ -364,7 +364,9 @@ export function OpportunityWorkspace() {
             onChange={(event) => setFilter(event.target.value)}
           >
             {["all", "draft", "published", "closed"].map((status) => (
-              <option key={status}>{status}</option>
+              <option key={status} value={status}>
+                {status === "all" ? "All statuses" : status[0]!.toUpperCase() + status.slice(1)}
+              </option>
             ))}
           </select>
         </label>
@@ -419,7 +421,7 @@ export function OpportunityWorkspace() {
                 {item.programs
                   .map(
                     (program) =>
-                      `${program.code}: ${program.pivot.capacity ?? "unconfirmed"} slots`,
+                      `${program.code}: ${program.pivot.capacity ?? "unconfirmed"} ${program.pivot.capacity === 1 ? "slot" : "slots"}`,
                   )
                   .join(" · ")}
               </p>

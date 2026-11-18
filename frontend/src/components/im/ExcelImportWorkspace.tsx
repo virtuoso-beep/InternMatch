@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, mutate, upload } from "@/lib/api";
-import { Button, Card } from "./ui";
+import { Button, Card, formatStatus } from "./ui";
 import { useSessionUser } from "./SessionGuard";
 
-import { downloadImportCredentials } from "@/lib/importCredentials";
+import { activationLabel } from "@/lib/activation";
 
 type Row = Partial<
   Record<
@@ -63,7 +63,15 @@ type Result = {
   updated: number;
   skipped: number;
   failed: number;
-  rows: { source: string; student_id: string | null; status: string; message: string }[];
+  activation_links_sent?: number;
+  activation_email_failed?: number;
+  rows: {
+    source: string;
+    student_id: string | null;
+    status: string;
+    message: string;
+    activation?: string;
+  }[];
 };
 const labels: Record<string, string> = {
   first_name: "First Name",
@@ -158,7 +166,6 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [result, setResult] = useState<Result | null>(null);
-  const [credentialsDownloaded, setCredentialsDownloaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -240,7 +247,7 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
             <input
               type="file"
               accept=".xlsx,.xls"
-              className="my-3 block"
+              className="my-3 block w-full max-w-md cursor-pointer rounded-md border border-dashed border-border bg-background p-2 text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-brand file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand-foreground hover:border-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
           </label>
@@ -285,7 +292,6 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
                 setMapping(response.sheets[selected]?.mapping ?? {});
                 setRows([]);
                 setResult(null);
-                setCredentialsDownloaded(false);
                 invalidate();
                 setPage(0);
               })
@@ -431,7 +437,7 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
                 </div>
                 <p className="text-sm">
                   {module === "student"
-                    ? "Import one program and academic term at a time; values in the workbook must match your selections. New students receive active accounts and temporary passwords. Email is optional. Existing passwords and history are preserved. Hosts and placements are not imported. Enrollment date defaults to today if omitted."
+                    ? "Import one program and academic term at a time; values in the workbook must match your selections. Email is required for new students: each receives a one-time activation link (valid 72 hours) to set their own password and acknowledge the privacy notice. Nobody else sees their password. Existing passwords and history are preserved. Hosts and placements are not imported. Enrollment date defaults to today if omitted."
                     : module === "agreement"
                       ? "Use the real agreement reference and dates. New agreements are drafts until the executed document is attached and verified."
                       : module === "opportunity"
@@ -684,26 +690,6 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
         {result && (
           <Card>
             <h2 className="font-semibold">Import results</h2>
-            {!!result.new_accounts && !credentialsDownloaded && batch && (
-              <div className="my-3 rounded border p-3">
-                <p>
-                  Download credentials once within 15 minutes. Keep this file private and give each
-                  student only their own credentials. Closing this screen does not reset passwords;
-                  available downloads also appear in Import History.
-                </p>
-                <Button
-                  disabled={busy}
-                  onClick={() =>
-                    run(async () => {
-                      await downloadImportCredentials(batch.id);
-                      setCredentialsDownloaded(true);
-                    })
-                  }
-                >
-                  Download temporary credentials
-                </Button>
-              </div>
-            )}
             <p role="status" className="my-3">
               Successful: {result.successful} · Updated: {result.updated} · Skipped:{" "}
               {result.skipped} · Failed: {result.failed}
@@ -714,13 +700,21 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
                 {result.existing_accounts ?? 0} · Enrollments created:{" "}
                 {result.enrollments_created ?? 0} · Enrollments updated:{" "}
                 {result.enrollments_updated ?? 0}
+                {!!result.new_accounts && (
+                  <>
+                    {" "}
+                    · Activation links sent: {result.activation_links_sent ?? 0}
+                    {!!result.activation_email_failed &&
+                      ` · Email failed: ${result.activation_email_failed} (re-send from the student's account)`}
+                  </>
+                )}
               </p>
             )}
             <p className="text-sm">
               Counts refer to source rows. Records below have been saved to this module. Existing
-              credentials are preserved. New student accounts require a password change at first
-              login. Student imports create no placements. New opportunities and agreements from
-              their separate imports remain drafts.
+              passwords are preserved. New student accounts stay pending until the student opens
+              their emailed activation link. Student imports create no placements. New opportunities
+              and agreements from their separate imports remain drafts.
             </p>
             <div className="my-4 flex flex-wrap gap-4">
               {(
@@ -751,6 +745,7 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
                     <th>Source</th>
                     <th>Student ID</th>
                     <th>Result</th>
+                    <th>Activation</th>
                     <th>Details</th>
                   </tr>
                 </thead>
@@ -759,7 +754,8 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
                     <tr key={i} className="border-t">
                       <td className="p-2">{r.source}</td>
                       <td>{r.student_id || "—"}</td>
-                      <td>{r.status}</td>
+                      <td>{formatStatus(r.status)}</td>
+                      <td>{r.activation ? activationLabel(r.activation) : "—"}</td>
                       <td>{r.message}</td>
                     </tr>
                   ))}

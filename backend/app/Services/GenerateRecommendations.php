@@ -51,7 +51,7 @@ class GenerateRecommendations
         return DB::transaction(function () use ($actor, $enrollment, $studentVector, $scores, $sources) {
             $enrollment = StudentEnrollment::whereKey($enrollment->id)->lockForUpdate()->firstOrFail();
             abort_unless($this->embeddings->key($enrollment->student)['source_text_hash'] === $studentVector->source_text_hash, 409, 'Competencies changed during matching. Retry after processing.');
-            $profile = $enrollment->student->user->profile;
+            $profile = $enrollment->student->user?->profile;
             $levels = $enrollment->student->studentCompetencies()->pluck('level', 'competency_id');
             $rows = [];
             foreach ($scores as $id => $score) {

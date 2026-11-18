@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ExternalLink } from "lucide-react";
 import { createRoot } from "react-dom/client";
 import { currentUser, ApiError, type SessionUser } from "@/lib/api";
 import { SessionUserProvider } from "@/components/im/SessionGuard";
@@ -79,13 +80,16 @@ function AdminWorkspace() {
         }}
       >
         {["hosts", "opportunities", "programs"].includes(section) && (
-          <a
-            className="mb-4 inline-block text-sm font-semibold underline"
-            href={`/manage/${section}`}
-            target="_top"
-          >
-            Manage existing {section} records
-          </a>
+          <div className="mb-2 flex justify-end">
+            <a
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-brand-soft hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              href={`/manage/${section}`}
+              target="_top"
+            >
+              Open full {section} manager
+              <ExternalLink size={12} aria-hidden="true" />
+            </a>
+          </div>
         )}
         <AdminSection section={section === "dashboard" ? "" : section} />
       </main>

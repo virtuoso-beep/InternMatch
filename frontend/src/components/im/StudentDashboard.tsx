@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useSessionUser } from "./SessionGuard";
-import { Button, Card, Pill } from "./ui";
+import { Button, Card, Pill, formatSimilarity } from "./ui";
 import {
   DashboardEmpty,
   DashboardHeading,
@@ -227,6 +227,7 @@ function EnrollmentDashboard({ enrollment }: { enrollment: Enrollment }) {
           value={required ? `${finished} / ${required.length}` : "—"}
           hint="Approved documents and confirmed events"
           accent
+          progress={required?.length ? ((finished ?? 0) / required.length) * 100 : null}
         />
         <DashboardMetric
           label="Recommended opportunities"
@@ -242,6 +243,7 @@ function EnrollmentDashboard({ enrollment }: { enrollment: Enrollment }) {
         />
         <DashboardMetric
           label="Certified internship hours"
+          progress={percent}
           value={
             hours === null ? "—" : `${number(hours)} / ${target === null ? "—" : number(target)}`
           }
@@ -291,8 +293,9 @@ function EnrollmentDashboard({ enrollment }: { enrollment: Enrollment }) {
                       <h3 className="font-semibold group-hover:text-brand">
                         {item.snapshot.host_name ?? "Host not recorded"}
                       </h3>
-                      <Pill tone="success">
-                        {(Number(item.similarity_score) * 100).toFixed(1)}% similarity
+                      <Pill tone="muted">
+                        Rank {item.rank} · Similarity score{" "}
+                        {formatSimilarity(item.similarity_score)}
                       </Pill>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">

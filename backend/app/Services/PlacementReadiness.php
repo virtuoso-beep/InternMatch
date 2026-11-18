@@ -32,15 +32,27 @@ class PlacementReadiness
         if ($requirements->isEmpty()) {
             $reasons[] = 'No pre-deployment requirements have been configured for this cohort.';
         }
+        foreach ($this->unmetRequirements($enrollment) as $name) {
+            $reasons[] = $name.' requires approval or confirmed attendance.';
+        }
+
+        return $reasons;
+    }
+
+    /** Names of required pre-deployment requirements that are not yet approved or attended. */
+    public function unmetRequirements(StudentEnrollment $enrollment): array
+    {
+        $unmet = [];
+        $requirements = $enrollment->programTerm->requirements()->where('is_required', true)->where('required_before_deployment', true)->with('requirementType')->get();
         foreach ($requirements as $requirement) {
             $complete = $requirement->requirementType->kind === 'event'
                 ? EventAttendance::where('student_enrollment_id', $enrollment->id)->where('program_term_requirement_id', $requirement->id)->whereNotNull('confirmed_at')->exists()
                 : $enrollment->requirementSubmissions()->where('program_term_requirement_id', $requirement->id)->latest('revision')->first()?->status === SubmissionStatus::Approved;
             if (! $complete) {
-                $reasons[] = $requirement->requirementType->name.' requires approval or confirmed attendance.';
+                $unmet[] = $requirement->requirementType->name;
             }
         }
 
-        return $reasons;
+        return $unmet;
     }
 }

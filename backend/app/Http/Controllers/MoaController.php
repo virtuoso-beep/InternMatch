@@ -66,9 +66,19 @@ class MoaController extends Controller
         abort_if($user->role === Role::Supervisor && $data['status'] !== 'draft', 403, 'Host supervisors can register draft agreements for institutional review.');
         abort_if($data['is_institution_wide'] && $data['program_ids'] !== [], 422, 'Choose institution-wide coverage or specific programs, not both.');
         abort_if(! $data['is_institution_wide'] && $data['program_ids'] === [], 422, 'Specify the programs covered by the agreement.');
+        // Spec §5 (17 Nov 2026): every MOA lists its covered programs; there is no implicit "covers everything" case.
+        // Existing institution-wide records stay readable; new ones are not accepted.
+        abort_if($data['is_institution_wide'] && ! $existing?->is_institution_wide, 422, 'Each agreement must list the programs it covers. Institution-wide coverage is no longer recorded.');
         $record = DB::transaction(function () use ($request, $host, $existing, $data) {
             HostEstablishment::whereKey($host->id)->lockForUpdate()->firstOrFail();
             $record = $existing ? Moa::whereKey($existing->id)->lockForUpdate()->firstOrFail() : new Moa;
+            // Spec §5: only one MOA per establishment may be active at a time; a renewal starts after the current one ends.
+            if ($data['status'] === 'active') {
+                $clash = Moa::where('host_establishment_id', $host->id)->where('status', 'active')
+                    ->when($record->exists, fn ($query) => $query->whereKeyNot($record->id))
+                    ->whereDate('effective_on', '<=', $data['expires_on'])->whereDate('expires_on', '>=', $data['effective_on'])->first();
+                abort_if($clash, 422, 'This establishment already has an active agreement ('.$clash?->reference_number.') for these dates. Enter a renewal that starts after it ends.');
+            }
             if ($record->exists) {
                 $this->authorizeEdit($request, $record);
                 if ($record->placements()->exists()) {

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { PrivacyConsent } from "./PrivacyConsent";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ApiError, currentUser, type SessionUser } from "@/lib/api";
 import { ROLES, type RoleKey } from "@/lib/internmatch";
@@ -82,6 +83,7 @@ export function SessionGuard({ role, children }: { role: RoleKey; children: Reac
     );
   }
   if (user.must_change_password) return <FirstPassword onChanged={setUser} />;
+  if (user.privacy_consent_required) return <PrivacyConsent onAcknowledged={setUser} />;
   return (
     <SessionContext.Provider value={{ user, updateUser: setUser }}>
       {children}

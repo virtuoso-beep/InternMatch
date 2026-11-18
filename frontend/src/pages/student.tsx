@@ -11,7 +11,8 @@ import { MonitoringWorkspace } from "@/components/im/MonitoringWorkspace";
 
 export function StudentSection({ section }: { section: string }) {
   switch (section) {
-    case "inbox": return <ChatWorkspace />;
+    case "inbox":
+      return <ChatWorkspace />;
     case "":
       return <StudentDashboard />;
     case "internship":

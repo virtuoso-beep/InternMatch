@@ -6,6 +6,7 @@ export type SessionUser = {
   email: string | null;
   role: RoleKey;
   must_change_password?: boolean;
+  privacy_consent_required?: boolean;
   student_number?: string | null;
   permissions: string[];
   program_codes?: string[];

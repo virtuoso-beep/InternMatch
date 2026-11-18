@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { api, mutate, upload } from "@/lib/api";
 import { RequirementCompliance } from "./RequirementCompliance";
 import { useSessionUser } from "./SessionGuard";
@@ -427,7 +428,7 @@ function RequirementDialog({
           className="text-muted-foreground hover:text-foreground p-1 rounded-lg"
           aria-label="Close dialog"
         >
-          ✕
+          <X size={18} aria-hidden="true" />
         </button>
       </div>
       {error && (
@@ -775,7 +776,7 @@ function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
   return (
     <Card>
       <CardTitle>
-        {enrollment.student?.user.name ?? enrollment.program_term.program.code} ·{" "}
+        {enrollment.student?.user?.name ?? enrollment.program_term.program.code} ·{" "}
         {enrollment.program_term.academic_term.name}
       </CardTitle>
       {message && (

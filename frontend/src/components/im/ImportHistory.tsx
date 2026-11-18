@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { Button, Card } from "./ui";
 
 import { downloadImportCredentials } from "@/lib/importCredentials";
+import { activationLabel } from "@/lib/activation";
 
 type Batch = {
   id: string;
@@ -14,7 +15,7 @@ type Batch = {
     updated: number;
     skipped: number;
     failed: number;
-    rows: { source: string; status: string; message: string }[];
+    rows: { source: string; status: string; message: string; activation?: string }[];
   };
 };
 export function ImportHistory() {
@@ -73,6 +74,7 @@ export function ImportHistory() {
                     {batch.result.rows.map((row, i) => (
                       <li key={i}>
                         {row.source} — {row.status}: {row.message}
+                        {row.activation && ` · Activation: ${activationLabel(row.activation)}`}
                       </li>
                     ))}
                   </ul>

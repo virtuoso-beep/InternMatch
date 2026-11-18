@@ -28,7 +28,7 @@ class AllocationController extends Controller
         }
         $hosts = HostAccess::query($request->user())->pluck('id');
 
-        return response()->json(['cohorts' => $terms, 'students' => $enrollments->map(fn ($e) => ['id' => $e->id, 'name' => $e->student->user->name, 'program_term_id' => $e->program_term_id, 'academic_eligibility_confirmed' => $e->academic_eligibility_confirmed === null ? null : (bool) $e->academic_eligibility_confirmed, 'reasons' => $readiness->reasons($e)]), 'proposals' => $proposals,
+        return response()->json(['cohorts' => $terms, 'students' => $enrollments->map(fn ($e) => ['id' => $e->id, 'name' => $e->student->user?->name ?? 'Archived student account', 'program_term_id' => $e->program_term_id, 'academic_eligibility_confirmed' => $e->academic_eligibility_confirmed === null ? null : (bool) $e->academic_eligibility_confirmed, 'reasons' => $readiness->reasons($e)]), 'proposals' => $proposals,
             'opportunities' => Opportunity::whereIn('host_establishment_id', $hosts)->where('status', 'published')->get(['id', 'title', 'host_establishment_id']),
             'supervisors' => User::where('role', Role::Supervisor)->where('status', 'active')->whereHas('hostEstablishments', fn ($q) => $q->whereIn('host_establishments.id', $hosts))->with('hostEstablishments:id')->get(['id', 'name'])]);
     }

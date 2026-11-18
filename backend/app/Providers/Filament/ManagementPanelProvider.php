@@ -53,6 +53,6 @@ class ManagementPanelProvider extends PanelProvider
                 AuthenticateSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class,
                 SubstituteBindings::class, DisableBladeIconComponents::class, DispatchServingFilamentEvent::class,
             ])
-            ->authMiddleware([Authenticate::class], isPersistent: true);
+            ->authMiddleware([Authenticate::class, \App\Http\Middleware\RequirePrivacyConsent::class], isPersistent: true);
     }
 }

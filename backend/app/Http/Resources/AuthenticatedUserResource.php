@@ -34,6 +34,9 @@ class AuthenticatedUserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'must_change_password' => (bool) $this->must_change_password,
+            // Spec §17B: the current privacy notice version must be acknowledged before using the portal.
+            'privacy_consent_required' => ! \Illuminate\Support\Facades\DB::table('privacy_consents')
+                ->where('user_id', $this->id)->where('notice_version', config('privacy.version'))->exists(),
             'student_number' => $this->role?->value === 'student' ? $this->student?->student_number : null,
             'role' => $this->role?->value,
             'status' => $this->status->value,

@@ -54,6 +54,17 @@ class ProgramAnalyticsTest extends TestCase
         }
     }
 
+    public function test_retired_student_account_counts_as_missing_coordinates_instead_of_failing(): void
+    {
+        $placement = Placement::factory()->create(['status' => 'active', 'supervisor_id' => User::factory()->withRole(Role::Supervisor)->create()->id, 'starts_on' => today()]);
+        $placement->studentEnrollment->student->user->delete();
+        $actor = User::factory()->withRole(Role::Dean)->create();
+        $actor->programs()->attach($placement->studentEnrollment->programTerm->program_id);
+
+        $this->actingAs($actor)->getJson('/api/v1/program-analytics')->assertOk()
+            ->assertJsonPath('equity.missing_coordinates', 1)->assertJsonPath('equity.median_km', null);
+    }
+
     public function test_empty_scopes_and_missing_coordinates_are_not_invented_zero_distances(): void
     {
         $actor = User::factory()->withRole(Role::Dean)->create();

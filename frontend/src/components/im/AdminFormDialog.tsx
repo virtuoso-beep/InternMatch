@@ -25,7 +25,7 @@ export function AdminFormDialog({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="m-auto max-h-[90vh] w-[min(680px,calc(100vw-32px))] overflow-auto rounded-2xl border-0 bg-white p-6 text-foreground shadow-xl backdrop:bg-black/60"
+      className="m-auto max-h-[90dvh] w-[min(680px,calc(100vw-32px))] overflow-auto rounded-2xl border-0 bg-card p-6 text-foreground shadow-xl backdrop:bg-black/60"
     >
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-xl font-bold">{title}</h2>

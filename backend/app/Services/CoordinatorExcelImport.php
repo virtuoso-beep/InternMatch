@@ -100,7 +100,7 @@ class CoordinatorExcelImport
                         if ($user) {
                             if ($user->trashed() || $user->role !== Role::Student || $user->student || self::norm($user->name) !== self::norm($row['name'] ?? '')) $errors[] = 'Email belongs to another identity or unavailable account; administrator review is required.';
                             else $matched['user_id'] = $user->id;
-                        } else $warnings[] = 'New account will be pending activation. No email or default password will be invented.';
+                        } else $warnings[] = 'New account will be pending until the student opens the emailed activation link.';
                     }
                 }
                 if (! $enrollment) {

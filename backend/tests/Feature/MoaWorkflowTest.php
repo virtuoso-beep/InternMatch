@@ -64,4 +64,26 @@ class MoaWorkflowTest extends TestCase
         $this->get('/api/v1/moas/'.$other->id.'/document')->assertNotFound();
         $this->actingAs(User::factory()->withRole(Role::Student)->create())->getJson('/api/v1/moas')->assertForbidden();
     }
+
+    public function test_spec_section_5_rejects_new_institution_wide_and_a_second_overlapping_active_moa(): void
+    {
+        $admin = User::factory()->withRole(Role::Admin)->create();
+        $host = HostEstablishment::factory()->create();
+        $program = Program::factory()->create();
+        $this->actingAs($admin)->postJson('/api/v1/moas', ['host_establishment_id' => $host->id, 'reference_number' => 'QA-WIDE-ADMIN', 'status' => 'draft', 'is_institution_wide' => true, 'program_ids' => []])
+            ->assertUnprocessable();
+        Storage::fake('local');
+        Moa::factory()->create(['host_establishment_id' => $host->id, 'reference_number' => 'QA-CURRENT', 'status' => 'active', 'effective_on' => '2026-01-01', 'expires_on' => '2026-12-31'])
+            ->programs()->attach($program);
+        foreach (['QA-OVERLAP' => ['2026-06-01', '2027-05-31', 422], 'QA-RENEWAL' => ['2027-01-01', '2027-12-31', 200]] as $reference => [$from, $to, $expected]) {
+            $draft = ['host_establishment_id' => $host->id, 'reference_number' => $reference, 'status' => 'draft', 'is_institution_wide' => false, 'program_ids' => [$program->id]];
+            $id = $this->postJson('/api/v1/moas', $draft)->assertCreated()->json('data.id');
+            $this->post('/api/v1/moas/'.$id.'/document', ['file' => UploadedFile::fake()->create('moa.pdf', 10, 'application/pdf')], ['Accept' => 'application/json'])->assertSuccessful();
+            $response = $this->putJson('/api/v1/moas/'.$id, ['status' => 'active', 'effective_on' => $from, 'expires_on' => $to] + $draft)->assertStatus($expected);
+            if ($expected === 422) {
+                $this->assertStringContainsString('already has an active agreement (QA-CURRENT)', $response->json('message'));
+            }
+        }
+        $this->assertSame(2, Moa::where('host_establishment_id', $host->id)->where('status', 'active')->count());
+    }
 }

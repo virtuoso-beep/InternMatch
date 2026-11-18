@@ -19,16 +19,19 @@ export function PageHeader({
   title,
   subtitle,
   action,
+  headingLevel = 1,
 }: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  headingLevel?: 1 | 2;
 }) {
+  const Heading = headingLevel === 1 ? "h1" : "h2";
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
         <p className="mb-2 text-sm font-medium text-brand">Dashboard / {title}</p>
-        <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+        <Heading className="text-2xl font-bold text-foreground">{title}</Heading>
         {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
       {action}
@@ -68,7 +71,18 @@ const toneMap = {
 
 export type Tone = keyof typeof toneMap;
 
+/** "under_review" -> "Under review". For machine status codes shown to people. */
+export function formatStatus(value: string): string {
+  const text = value.replaceAll("_", " ").trim();
+  return text ? text[0]!.toUpperCase() + text.slice(1) : text;
+}
+
+const STATUS_CODE = /^[a-z]+(?:[_ ][a-z]+)*$/;
+
 export function Pill({ children, tone = "muted" }: { children: ReactNode; tone?: Tone }) {
+  // Plain lowercase status codes ("active", "under_review") read as labels; other content is untouched.
+  const content =
+    typeof children === "string" && STATUS_CODE.test(children) ? formatStatus(children) : children;
   return (
     <span
       className={cx(
@@ -76,7 +90,7 @@ export function Pill({ children, tone = "muted" }: { children: ReactNode; tone?:
         toneMap[tone],
       )}
     >
-      {children}
+      {content}
     </span>
   );
 }
@@ -114,10 +128,10 @@ export function statusTone(status: string): Tone {
   return "muted";
 }
 
-export function matchTone(match: number): Tone {
-  if (match >= 85) return "success";
-  if (match >= 78) return "info";
-  return "warn";
+/** Raw cosine similarity to two decimals (spec §8): never a "% match", no strength labels. */
+export function formatSimilarity(score: number | string | null | undefined): string {
+  const value = Number(score);
+  return score === null || score === undefined || Number.isNaN(value) ? "—" : value.toFixed(2);
 }
 
 export function StatCard({ label, value, tone }: { label: string; value: string; tone?: Tone }) {
@@ -148,6 +162,7 @@ export function Button({
   type = "button",
   disabled = false,
   className,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   variant?: "primary" | "outline" | "ghost";
@@ -155,6 +170,7 @@ export function Button({
   type?: "button" | "submit";
   disabled?: boolean;
   className?: string;
+  "aria-label"?: string;
 }) {
   const styles = {
     primary: "bg-brand text-brand-foreground hover:opacity-90",
@@ -166,8 +182,10 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
+      aria-label={ariaLabel}
       className={cx(
-        "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        // relative: keeps any sr-only text positioned inside the button (no page-wide overflow in scrolled tables)
+        "relative inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
         styles,
         className,
       )}
@@ -215,7 +233,7 @@ export function ActionDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="action-dialog-title"
-        className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-xl"
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-xl"
       >
         <h2 id="action-dialog-title" className="text-lg font-semibold text-foreground">
           {title}
@@ -315,7 +333,8 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
             {head.map((h) => (
               <th
                 key={h}
-                className="pb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                scope="col"
+                className="pr-4 pb-3 align-bottom text-xs font-semibold tracking-wide text-muted-foreground uppercase last:pr-0"
               >
                 {h}
               </th>
@@ -330,7 +349,9 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
 
 export function Row({ children }: { children: ReactNode }) {
   return (
-    <tr className="border-b border-border/70 last:border-0 [&>td]:py-3 [&>td]:pr-4">{children}</tr>
+    <tr className="border-b border-border/70 transition-colors last:border-0 hover:bg-muted/40 [&>td]:py-3 [&>td]:pr-4 [&>td]:align-top [&>td:last-child]:pr-0">
+      {children}
+    </tr>
   );
 }
 
@@ -375,4 +396,45 @@ export function Bars({ data }: { data: Array<{ label: string; value: number; max
       ))}
     </div>
   );
+}
+
+/** Human-readable local date/time for API timestamps; falls back to the raw value. */
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/** "chat.availability_updated" -> "Chat · availability updated". Codes stay raw in exports. */
+export function formatAction(action: string): string {
+  const [area = "", ...rest] = action.split(".");
+  const words = (value: string) => value.replaceAll("_", " ");
+  const head = words(area).replace(/^./, (c) => c.toUpperCase());
+  return rest.length ? `${head} · ${rest.map(words).join(" · ")}` : head;
+}
+
+/** Display name for a student's account; archived (soft-deleted) accounts come back as null. */
+export function studentName(user: { name?: string | null } | null | undefined): string {
+  return user?.name ?? "Archived student account";
+}
+
+/**
+ * Spec §13A: show the weighted result as a 1–5 rating with its descriptor
+ * (4.50–5.00 Outstanding; 3.50–4.49 Very Satisfactory; 2.50–3.49 Satisfactory; 1.50–2.49 Fair; below 1.50 Poor).
+ */
+export function formatRating(percentage: number | string): string {
+  const rating = (Number(percentage) / 100) * 5;
+  const descriptor =
+    rating >= 4.5
+      ? "Outstanding"
+      : rating >= 3.5
+        ? "Very Satisfactory"
+        : rating >= 2.5
+          ? "Satisfactory"
+          : rating >= 1.5
+            ? "Fair"
+            : "Poor";
+  return `${rating.toFixed(2)} / 5 · ${descriptor} (${Number(percentage).toFixed(1)}%)`;
 }

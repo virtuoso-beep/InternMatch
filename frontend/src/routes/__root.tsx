@@ -81,13 +81,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "InternMatch — Practicum Placement System" },
       {
         name: "description",
-        content: "Competency-based internship matching and practicum management for higher-education programs.",
+        content:
+          "Competency-based internship matching and practicum management for higher-education programs.",
       },
       { name: "author", content: "InternMatch" },
       { property: "og:title", content: "InternMatch — Practicum Placement System" },
       {
         property: "og:description",
-        content: "Competency-based internship matching and practicum management for higher-education programs.",
+        content:
+          "Competency-based internship matching and practicum management for higher-education programs.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

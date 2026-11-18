@@ -13,8 +13,11 @@ use App\Models\StudentEnrollment;
 use App\Models\TimeLog;
 use App\Models\User;
 use App\Services\HostAccess;
+use App\Services\OpportunityEligibility;
 use App\Services\PlacementAccess;
+use App\Services\PlacementReadiness;
 use App\Services\StudentAccess;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -69,9 +72,48 @@ class DashboardController extends Controller
         } elseif (in_array($user->role, [Role::Coordinator, Role::Supervisor], true)) {
             $stats[] = ['label' => 'Accessible active hosts (all assigned programs)', 'value' => HostAccess::query($user)->where('is_active', true)->count()];
         }
+        if ($user->role === Role::Coordinator) {
+            array_push($stats, ...$this->coordinatorTiles($enrollments));
+        }
         $breakdown = (clone $enrollments)->join('program_terms', 'program_terms.id', '=', 'student_enrollments.program_term_id')
             ->join('programs', 'programs.id', '=', 'program_terms.program_id')->selectRaw('programs.code, COUNT(*) as enrollments')->groupBy('programs.id', 'programs.code')->orderBy('programs.code')->get();
 
         return response()->json(['stats' => $stats, 'programs' => $availablePrograms, 'program_breakdown' => $breakdown, 'generated_at' => now()->toIso8601String()], headers: ['Cache-Control' => 'no-store']);
+    }
+
+    /** Spec §11 coordinator tiles, built on the existing readiness, eligibility and monitoring-flag rules. */
+    private function coordinatorTiles(Builder $enrollments): array
+    {
+        $enrolled = (clone $enrollments)->where('status', 'enrolled')->with('programTerm.program')->get();
+        $awaiting = (clone $enrollments)->where('status', 'enrolled')
+            ->whereDoesntHave('placements', fn ($query) => $query->whereIn('status', ['pending', 'approved', 'active', 'completed']))
+            ->with('programTerm.program')->get();
+        $readiness = app(PlacementReadiness::class);
+        $incomplete = $awaiting->filter(fn ($enrollment) => $readiness->unmetRequirements($enrollment) !== [])->count();
+        // Slots per host are shared by its opportunities, so count min(host remaining, sum of opportunity remaining).
+        $eligibility = app(OpportunityEligibility::class);
+        $slots = 0;
+        foreach ($enrolled->unique('program_term_id') as $enrollment) {
+            $perHost = [];
+            Opportunity::where('academic_term_id', $enrollment->programTerm->academic_term_id)->where('status', 'published')->get()
+                ->each(function ($opportunity) use ($eligibility, $enrollment, &$perHost) {
+                    if ($info = $eligibility->inspect($enrollment, $opportunity)) {
+                        $host = $opportunity->host_establishment_id;
+                        $perHost[$host]['host'] = $info['host_capacity_remaining'];
+                        $perHost[$host]['opportunities'] = ($perHost[$host]['opportunities'] ?? 0) + $info['opportunity_capacity_remaining'];
+                    }
+                });
+            $slots += array_sum(array_map(fn ($row) => max(0, min($row['host'], $row['opportunities'])), $perHost));
+        }
+        $attention = DB::table('monitoring_flags')->join('placements', 'placements.id', '=', 'monitoring_flags.placement_id')
+            ->whereNull('monitoring_flags.resolved_at')->whereIn('placements.student_enrollment_id', (clone $enrollments)->select('id'))
+            ->distinct()->count('placements.student_enrollment_id');
+
+        return [
+            ['label' => 'Students awaiting placement', 'value' => $awaiting->count()],
+            ['label' => 'Awaiting students with incomplete requirements', 'value' => $incomplete],
+            ['label' => 'Available placement slots', 'value' => $slots],
+            ['label' => 'Students needing attention (open monitoring flags)', 'value' => $attention],
+        ];
     }
 }

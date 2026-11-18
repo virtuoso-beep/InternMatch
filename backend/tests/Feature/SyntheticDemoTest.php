@@ -23,6 +23,7 @@ class SyntheticDemoTest extends TestCase
         foreach (['student', 'coordinator', 'supervisor', 'dean', 'admin'] as $role) {
             User::factory()->create(['email' => $role.'@example.com', 'role' => $role, 'status' => 'active']);
         }
+        $this->seed([\Database\Seeders\ProgramSeeder::class, \Database\Seeders\InternMatchReferenceSeeder::class]);
         $originalAccounts = User::orderBy('id')->get()->map->getAttributes()->all();
         $this->seed(SyntheticDemoSeeder::class);
         $this->assertSame($originalAccounts, User::orderBy('id')->get()->map->getAttributes()->all());
@@ -41,7 +42,7 @@ class SyntheticDemoTest extends TestCase
         $this->assertDatabaseCount('evaluations', 1);
         $this->assertDatabaseCount('time_logs', 5);
         $this->assertDatabaseCount('generated_reports', 7);
-        $this->assertNull(Program::where('code', 'BSCS')->first()->required_ojt_hours);
+        $this->assertSame(350, Program::where('code', 'BSCS')->first()->required_ojt_hours); // confirmed 2026-11-02
         $this->assertNull(Program::where('code', 'BSIT')->first()->evaluation_rubric_id);
         $this->assertSame(0, DB::table('program_term_requirements')->whereNotNull('scheduled_on')->count());
         foreach (Document::all() as $document) {

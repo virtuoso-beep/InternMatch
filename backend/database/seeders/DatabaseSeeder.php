@@ -18,16 +18,26 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Demo accounts are a development convenience only. Never create them in
+        // production, and never reset credentials of accounts that already exist
+        // (the container entrypoint runs this seeder on every start).
+        if (app()->isProduction()) {
+            return;
+        }
+
         foreach ([
             ['name' => 'Student Demo', 'email' => 'student@example.com', 'role' => Role::Student],
-            ['name' => 'Coordinator Demo', 'email' => 'coordinator@example.com', 'role' => Role::Coordinator],
             ['name' => 'Supervisor Demo', 'email' => 'supervisor@example.com', 'role' => Role::Supervisor],
             ['name' => 'Dean Demo', 'email' => 'dean@example.com', 'role' => Role::Dean],
             ['name' => 'Admin Demo', 'email' => 'admin@example.com', 'role' => Role::Admin],
         ] as $account) {
-            User::updateOrCreate(
-                ['email' => $account['email']],
+            if (User::withTrashed()->where('email', $account['email'])->exists()) {
+                continue;
+            }
+
+            User::create(
                 [
+                    'email' => $account['email'],
                     'name' => $account['name'],
                     'password' => Hash::make('password'),
                     'role' => $account['role'],

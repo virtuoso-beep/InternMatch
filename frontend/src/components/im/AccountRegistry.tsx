@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, mutate } from "@/lib/api";
 import type { PlacementReference } from "@/lib/placement";
 import { useSessionUser } from "./SessionGuard";
@@ -21,8 +21,16 @@ const roles = [
   ["dean", "Program chair / dean"],
   ["admin", "System administrator"],
 ];
+const statusTone = (status: string) =>
+  `rounded-full px-3 py-1 capitalize ${status === "active" ? "bg-emerald-50 text-emerald-700" : status === "pending" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`;
+
 export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boolean }) {
   const [creating, setCreating] = useState(false);
+  const createDialog = useRef<HTMLElement>(null);
+  // Move focus into the dialog when it opens so Escape and keyboard users work immediately.
+  useEffect(() => {
+    if (creating) createDialog.current?.focus();
+  }, [creating]);
   const [items, setItems] = useState<Account[] | null>(null);
   const [reference, setReference] = useState<PlacementReference | null>(null);
   const [page, setPage] = useState(1);
@@ -96,10 +104,12 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
           }}
         >
           <section
+            ref={createDialog}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label={studentsOnly ? "Add Student" : "Add User"}
-            className="max-h-[90vh] w-full max-w-xl overflow-auto rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[90dvh] w-full max-w-xl overflow-auto rounded-2xl bg-card p-6 shadow-xl outline-none"
             onKeyDown={(e) => {
               if (e.key === "Escape" && !busy) setCreating(false);
             }}
@@ -312,8 +322,8 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
                 <thead className="border-b text-xs uppercase text-slate-500">
                   <tr>
                     <th className="p-3">Name / email</th>
-                    <th className="p-3">Role</th>
-                    <th className="p-3">Status</th>
+                    <th className="p-3 max-sm:hidden">Role</th>
+                    <th className="p-3 max-sm:hidden">Status</th>
                     <th className="p-3">Action</th>
                   </tr>
                 </thead>
@@ -325,16 +335,18 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
                           {account.name} · {account.program_label}
                         </span>
                         <div className="text-slate-500">{account.email}</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs sm:hidden">
+                          <span>
+                            {roles.find(([value]) => value === account.role)?.[1] ?? "Unassigned"}
+                          </span>
+                          <span className={statusTone(account.status)}>{account.status}</span>
+                        </div>
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 max-sm:hidden">
                         {roles.find(([value]) => value === account.role)?.[1] ?? "Unassigned"}
                       </td>
-                      <td className="p-3">
-                        <span
-                          className={`rounded-full px-3 py-1 capitalize ${account.status === "active" ? "bg-emerald-50 text-emerald-700" : account.status === "pending" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}
-                        >
-                          {account.status}
-                        </span>
+                      <td className="p-3 max-sm:hidden">
+                        <span className={statusTone(account.status)}>{account.status}</span>
                       </td>
                       <td className="p-3">
                         <Button onClick={() => setSelected(account.id)}>
@@ -425,7 +437,11 @@ function AccountForm({
     try {
       await mutate(path, data, method);
       if (path.endsWith("/access")) setSavedRole(role);
-      setMessage("Access saved.");
+      setMessage(
+        path.endsWith("/activation")
+          ? `Activation link sent to ${account.email ?? "the account e-mail"}. It works once and expires in 72 hours unless re-sent.`
+          : "Access saved.",
+      );
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Unable to save access.");
     } finally {
@@ -487,21 +503,49 @@ function AccountForm({
         </div>
         {(savedRole === "coordinator" || savedRole === "dean") && (
           <fieldset className="mt-4 rounded border p-3">
-            <legend>Assigned programs</legend>
+            <legend>
+              {savedRole === "coordinator" ? "Assigned program" : "Assigned programs"}
+            </legend>
+            {savedRole === "coordinator" && (
+              <p className="mb-2 text-xs text-muted-foreground">
+                A coordinator holds exactly one program at a time; a program can have several
+                coordinators. Changing it ends the current assignment and keeps it in history.
+              </p>
+            )}
             <div className="mb-3 flex flex-wrap gap-3">
+              {savedRole === "coordinator" && (
+                <label className="text-sm">
+                  <input
+                    type="radio"
+                    name={`program-${account.id}`}
+                    checked={programs.length === 0}
+                    onChange={() => setPrograms([])}
+                  />{" "}
+                  No program
+                </label>
+              )}
               {reference.programs.map((item) => (
                 <label key={item.id} className="text-sm">
-                  <input
-                    type="checkbox"
-                    checked={programs.includes(item.id)}
-                    onChange={(event) =>
-                      setPrograms(
-                        event.target.checked
-                          ? [...programs, item.id]
-                          : programs.filter((id) => id !== item.id),
-                      )
-                    }
-                  />{" "}
+                  {savedRole === "coordinator" ? (
+                    <input
+                      type="radio"
+                      name={`program-${account.id}`}
+                      checked={programs.length === 1 && programs[0] === item.id}
+                      onChange={() => setPrograms([item.id])}
+                    />
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={programs.includes(item.id)}
+                      onChange={(event) =>
+                        setPrograms(
+                          event.target.checked
+                            ? [...programs, item.id]
+                            : programs.filter((id) => id !== item.id),
+                        )
+                      }
+                    />
+                  )}{" "}
                   {item.code}
                 </label>
               ))}
@@ -516,6 +560,20 @@ function AccountForm({
             </Button>
           </fieldset>
         )}
+        <fieldset className="mt-4 rounded border p-3">
+          <legend>Account activation</legend>
+          <p className="mb-3 text-xs text-muted-foreground">
+            E-mail a one-time link so the person can set their own password. Sending a new link
+            cancels any earlier unused link.
+          </p>
+          <Button
+            variant="outline"
+            disabled={busy || !account.email}
+            onClick={() => void save(`/users/${account.id}/activation`, {}, "POST")}
+          >
+            Send activation link
+          </Button>
+        </fieldset>
         {savedRole === "supervisor" && (
           <fieldset className="mt-4 rounded border p-3">
             <legend>Assigned establishments</legend>

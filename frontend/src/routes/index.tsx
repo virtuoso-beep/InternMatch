@@ -1,4 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  Activity,
+  BarChart3,
+  MapPin,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  type LucideIcon,
+} from "lucide-react";
 import { ROLES, ROLE_ORDER } from "@/lib/internmatch";
 import heroInterns from "@/assets/hero-interns.jpg";
 import sealUrl from "@/assets/umtc-seal.png";
@@ -25,28 +34,34 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const CAPABILITIES = [
+const CAPABILITIES: { icon: LucideIcon; title: string; body: string }[] = [
   {
+    icon: Search,
     title: "Semantic competency matching",
     body: "Multilingual sentence embeddings represent student competencies and host tasks, retrieved by cosine similarity.",
   },
   {
+    icon: SlidersHorizontal,
     title: "Supervised reranking",
-    body: "Planned optional reranking requires approved placement judgments and held-out evaluation. No trained ranker is currently available.",
+    body: "Optional Logistic Regression reranking is used only when enough approved coordinator judgments exist and evaluation supports it. Until then, semantic similarity and defined placement criteria are used.",
   },
   {
+    icon: BarChart3,
     title: "Constrained cohort allocation",
     body: "Allocation respects host capacity, MOA validity, program requirements, suitability, and travel burden.",
   },
   {
+    icon: MapPin,
     title: "Geospatial accessibility",
-    body: "Planned Haversine analysis measures straight-line distance in kilometers, not travel time or road distance.",
+    body: "Haversine analysis measures straight-line distance in kilometers. It is not travel time or road distance.",
   },
   {
+    icon: Activity,
     title: "Monitoring & risk flags",
     body: "Certified hours, requirements, supervisor evaluations, hour-accrual pace, and completion-risk thresholds.",
   },
   {
+    icon: ShieldCheck,
     title: "Coordinator authority",
     body: "Recommendations are decision support. Coordinators review, modify, approve, or reject every placement.",
   },
@@ -61,9 +76,17 @@ const ROLE_SUMMARY: Record<string, string> = {
 };
 
 const PROCESS = [
-  { n: "01", title: "Preprocess", body: "Competency and task descriptions are cleaned for embedding." },
+  {
+    n: "01",
+    title: "Preprocess",
+    body: "Competency and task descriptions are cleaned for embedding.",
+  },
   { n: "02", title: "Retrieve", body: "Cosine similarity over multilingual sentence embeddings." },
-  { n: "03", title: "Rerank", body: "Use similarity and defined criteria unless a trained ranker has been validated." },
+  {
+    n: "03",
+    title: "Rerank",
+    body: "Use similarity and defined criteria unless a trained ranker has been validated.",
+  },
   { n: "04", title: "Decide", body: "Coordinator reviews, modifies, approves, or rejects." },
 ];
 
@@ -84,13 +107,19 @@ function Landing() {
             </div>
           </div>
           <nav className="hidden items-center gap-7 text-sm text-foreground md:flex">
-            <a href="#capabilities" className="hover:text-brand">Capabilities</a>
-            <a href="#roles" className="hover:text-brand">Roles</a>
-            <a href="#process" className="hover:text-brand">Process</a>
+            <a href="#capabilities" className="hover:text-brand">
+              Capabilities
+            </a>
+            <a href="#roles" className="hover:text-brand">
+              Roles
+            </a>
+            <a href="#process" className="hover:text-brand">
+              Process
+            </a>
           </nav>
           <Link
             to="/auth"
-            className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground transition-opacity hover:opacity-90"
+            className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warn"
           >
             Sign in
           </Link>
@@ -107,16 +136,16 @@ function Landing() {
               Internship placement decided by competency, not familiarity.
             </h1>
             <p className="mt-5 max-w-xl text-base opacity-90">
-              InternMatch centralizes student profiles, host establishments, deployments, requirements, and evaluations
-              for UM Tagum College — plans to support placement decisions through semantic matching and
-              geospatial accessibility analysis.
+              InternMatch centralizes student profiles, host establishments, deployments,
+              requirements, and evaluations for UM Tagum College — supporting placement decisions
+              with semantic matching and geospatial accessibility analysis.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 to="/auth"
-                className="rounded-md bg-brand-foreground px-5 py-2.5 text-sm font-semibold text-brand transition-opacity hover:opacity-90"
+                className="rounded-md bg-brand-foreground px-5 py-2.5 text-sm font-semibold text-brand transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warn"
               >
-                Access the system →
+                Access the system
               </Link>
               <a
                 href="#capabilities"
@@ -127,9 +156,9 @@ function Landing() {
             </div>
             <dl className="mt-10 grid max-w-lg grid-cols-3 gap-6 border-t border-brand-foreground/20 pt-6">
               {[
-                ["16", "Academic programs"],
                 ["5", "User roles"],
                 ["19", "Functional requirements"],
+                ["E5", "Semantic model"],
               ].map(([v, l]) => (
                 <div key={l}>
                   <dt className="text-2xl font-bold text-warn">{v}</dt>
@@ -153,12 +182,18 @@ function Landing() {
           One platform for placement, allocation, and monitoring
         </h2>
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          The modules below describe the intended system. This development version does not yet implement the full placement and monitoring workflow.
+          Decision support for placement, allocation, and monitoring. Final placement authority
+          always stays with the Practicum Coordinator.
         </p>
         <div className="mt-10 grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-2 lg:grid-cols-3">
           {CAPABILITIES.map((c) => (
-            <article key={c.title} className="border-b border-border p-6 last:border-b-0 sm:border-r sm:[&:nth-child(2n)]:border-r-0 lg:[&:nth-child(2n)]:border-r lg:[&:nth-child(3n)]:border-r-0">
-              <div className="mb-4 flex size-9 items-center justify-center rounded-md bg-warn-soft text-warn">◆</div>
+            <article
+              key={c.title}
+              className="border-b border-border p-6 last:border-b-0 sm:border-r sm:[&:nth-child(2n)]:border-r-0 lg:[&:nth-child(2n)]:border-r lg:[&:nth-child(3n)]:border-r-0"
+            >
+              <div className="mb-4 flex size-9 items-center justify-center rounded-md bg-warn-soft text-warn">
+                <c.icon size={18} aria-hidden="true" />
+              </div>
               <h3 className="text-base font-semibold text-foreground">{c.title}</h3>
               <p className="mt-2 text-sm text-muted-foreground">{c.body}</p>
             </article>
@@ -168,7 +203,9 @@ function Landing() {
 
       <section id="roles" className="border-y border-border bg-card">
         <div className="mx-auto max-w-6xl px-5 py-16 lg:py-20">
-          <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">Role-based access</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
+            Role-based access
+          </h2>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {ROLE_ORDER.map((r) => (
               <Link
@@ -185,7 +222,9 @@ function Landing() {
       </section>
 
       <section id="process" className="mx-auto max-w-6xl px-5 py-16 lg:py-20">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">How a placement is formed</h2>
+        <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
+          How a placement is formed
+        </h2>
         <ol className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PROCESS.map((s) => (
             <li key={s.n} className="border-t-2 border-warn pt-4">
@@ -205,12 +244,15 @@ function Landing() {
               <p className="text-lg font-bold">
                 Intern<span className="text-warn">Match</span>
               </p>
-              <p className="text-[10px] font-semibold tracking-[0.18em] uppercase opacity-80">UM Tagum College</p>
+              <p className="text-[10px] font-semibold tracking-[0.18em] uppercase opacity-80">
+                UM Tagum College
+              </p>
             </div>
           </div>
           <p className="mt-4 max-w-3xl text-sm opacity-80">
-            InternMatch · University of Mindanao Tagum College · Department of Computing Education. Recommendations are
-            decision-support information; final placement authority remains with the practicum coordinator.
+            InternMatch · University of Mindanao Tagum College · Department of Computing Education.
+            Recommendations are decision-support information; final placement authority remains with
+            the practicum coordinator.
           </p>
         </div>
       </footer>

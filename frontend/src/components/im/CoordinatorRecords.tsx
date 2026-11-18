@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, PageHeader, Row, Table, Pill, statusTone } from "./ui";
+import { activationLabel } from "@/lib/activation";
+import {
+  Button,
+  Card,
+  PageHeader,
+  Row,
+  Table,
+  Pill,
+  statusTone,
+  formatSimilarity,
+  studentName,
+} from "./ui";
 import { RecommendationBatch } from "./RecommendationBatch";
 import { ExcelImportButton } from "./ExcelImportButton";
 
@@ -10,7 +21,17 @@ import { StudentHistory } from "./StudentHistory";
 type Enrollment = {
   id: number;
   status: string;
-  student: { student_number: string; user: { name: string; email: string | null } };
+  student: {
+    student_number: string;
+    user: {
+      id: number;
+      name: string;
+      email: string | null;
+      status?: string;
+      /** Spec §17A-B: link_sent | activated | expired (absent when no link was ever sent). */
+      activation?: string | null;
+    };
+  };
   program_term: { program: { code: string }; academic_term: { name: string } };
   current_placement: null | { status: string; host_establishment: { name: string } };
 };
@@ -39,6 +60,21 @@ export function CoordinatorStudents() {
   const [term, setTerm] = useState("");
   const [enrollmentStatus, setEnrollmentStatus] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
+  const [sending, setSending] = useState<number | null>(null);
+  const [notice, setNotice] = useState("");
+  const sendActivation = async (user: Enrollment["student"]["user"]) => {
+    setSending(user.id);
+    setNotice("");
+    try {
+      await mutate(`/users/${user.id}/activation`, {}, "POST");
+      setNotice(`Activation link sent to ${user.email}. Any earlier link no longer works.`);
+      setRevision((v) => v + 1);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "The activation link could not be sent.");
+    } finally {
+      setSending(null);
+    }
+  };
   const [program, setProgram] = useState("");
   const [sort, setSort] = useState("name");
   const [page, setPage] = useState(1);
@@ -76,15 +112,15 @@ export function CoordinatorStudents() {
         (!term || r.program_term.academic_term.name === term) &&
         (!enrollmentStatus || r.status === enrollmentStatus) &&
         (!program || r.program_term.program.code === program) &&
-        `${r.student.user.name} ${r.student.student_number} ${r.student.user.email ?? ""} ${r.program_term.academic_term.name} ${r.current_placement?.host_establishment.name ?? ""}`
+        `${studentName(r.student.user)} ${r.student.student_number} ${r.student.user?.email ?? ""} ${r.program_term.academic_term.name} ${r.current_placement?.host_establishment.name ?? ""}`
           .toLowerCase()
           .includes(search.trim().toLowerCase()),
     )
     .sort((a, b) =>
       sort === "program"
         ? a.program_term.program.code.localeCompare(b.program_term.program.code) ||
-          a.student.user.name.localeCompare(b.student.user.name)
-        : a.student.user.name.localeCompare(b.student.user.name),
+          studentName(a.student.user).localeCompare(studentName(b.student.user))
+        : studentName(a.student.user).localeCompare(studentName(b.student.user)),
     );
   const pages = Math.max(1, Math.ceil(filtered.length / 20));
   const visible = filtered.slice((page - 1) * 20, page * 20);
@@ -225,6 +261,11 @@ export function CoordinatorStudents() {
               Clear filters
             </Button>
           </div>
+          {notice && (
+            <p className="mb-3 rounded border p-3 text-sm" role="status">
+              {notice}
+            </p>
+          )}
           <p className="mb-3 text-sm text-muted-foreground" role="status">
             {filtered.length} of {rows.length} enrollment records. A student may have multiple
             academic terms.
@@ -254,11 +295,31 @@ export function CoordinatorStudents() {
                         className="text-brand underline"
                         onClick={() => setSelectedStudent(r.id)}
                       >
-                        {r.student.user.name}
+                        {studentName(r.student.user)}
                       </button>
                       <span className="block text-xs font-normal text-muted-foreground">
                         {r.student.student_number}
                       </span>
+                      {r.student.user.status === "pending" && (
+                        <span className="mt-1 flex flex-wrap items-center gap-2 text-xs font-normal">
+                          <Pill tone="warn">
+                            {r.student.user.activation
+                              ? `Not activated · ${activationLabel(r.student.user.activation)}`
+                              : "Not activated"}
+                          </Pill>
+                          {r.student.user.email && (
+                            <Button
+                              variant="outline"
+                              disabled={sending === r.student.user.id}
+                              onClick={() => void sendActivation(r.student.user)}
+                            >
+                              {r.student.user.activation
+                                ? "Re-send activation link"
+                                : "Send activation link"}
+                            </Button>
+                          )}
+                        </span>
+                      )}
                     </td>
                     <td>{r.program_term.program.code}</td>
                     <td>{r.program_term.academic_term.name}</td>
@@ -463,7 +524,7 @@ export function CoordinatorRecommendations() {
                   "Student",
                   "Program",
                   "Recommended host",
-                  "Similarity",
+                  "Similarity score",
                   "Distance",
                   "Slots",
                   "MOA",
@@ -480,10 +541,8 @@ export function CoordinatorRecommendations() {
                       <p className="text-xs text-muted-foreground">{r.opportunity_title}</p>
                     </td>
                     <td>
-                      <span className="rounded-full bg-emerald-50 px-2 py-1 font-semibold text-emerald-800">
-                        {r.similarity_score == null
-                          ? "—"
-                          : `${(r.similarity_score * 100).toFixed(1)}%`}
+                      <span className="rounded-full bg-muted px-2 py-1 font-semibold tabular-nums">
+                        {formatSimilarity(r.similarity_score)}
                       </span>
                     </td>
                     <td>{r.distance_km == null ? "Unknown" : `${r.distance_km.toFixed(1)} km`}</td>
@@ -502,8 +561,12 @@ export function CoordinatorRecommendations() {
                       </p>
                     </td>
                     <td>
-                      <Button variant="outline" onClick={() => setSelected(r.id)}>
-                        Review recommendation #{r.id}
+                      <Button
+                        variant="outline"
+                        aria-label={`Review recommendation #${r.id}`}
+                        onClick={() => setSelected(r.id)}
+                      >
+                        Review
                       </Button>
                     </td>
                   </Row>

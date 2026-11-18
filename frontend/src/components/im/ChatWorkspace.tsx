@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, mutate, ApiError } from "@/lib/api";
 import { useSessionUser } from "./SessionGuard";
-import { Button } from "./ui";
+import { Button, Pill } from "./ui";
 
 type Conversation = {
   id: number;
@@ -346,7 +346,12 @@ export function ChatSettings() {
   }, []);
   return (
     <section className="rounded-xl border bg-card p-6">
-      <h1 className="text-2xl font-bold">Chat availability</h1>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-bold">Chat availability</h1>
+        {enabled !== null && (
+          <Pill tone={enabled ? "success" : "muted"}>{enabled ? "Chat is on" : "Chat is off"}</Pill>
+        )}
+      </div>
       <p className="my-4 text-muted-foreground">
         Enable or disable messaging for students, coordinators and assigned host supervisors.
         Administrators cannot read conversations. Changes are audit logged.
@@ -358,6 +363,14 @@ export function ChatSettings() {
         <Button
           disabled={busy}
           onClick={async () => {
+            if (
+              enabled &&
+              !window.confirm(
+                "Disable chat for all students, coordinators and supervisors? Existing messages are kept.",
+              )
+            ) {
+              return;
+            }
             setBusy(true);
             setError("");
             try {

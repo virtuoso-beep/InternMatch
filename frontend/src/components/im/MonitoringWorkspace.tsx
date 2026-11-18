@@ -10,6 +10,8 @@ import {
   StatCard,
   StatGrid,
   statusTone,
+  studentName,
+  formatRating,
 } from "./ui";
 import { useSessionUser } from "./SessionGuard";
 import { EvaluationPanel } from "./EvaluationPanel";
@@ -27,7 +29,12 @@ export type Placement = {
     program_term: { program: { code: string } };
   };
   supervisor: { name: string } | null;
-  moa?: { status: string; expires_on: string; effective_on: string } | null;
+  moa?: {
+    status: string;
+    lifecycle_status?: string;
+    expires_on: string;
+    effective_on: string;
+  } | null;
 };
 type Log = {
   id: number;
@@ -123,7 +130,7 @@ export function MonitoringWorkspace({
           {result.data.map((item) => (
             <Card key={item.id}>
               <div className="flex items-start justify-between gap-3">
-                <CardTitle>{item.student_enrollment.student.user.name}</CardTitle>
+                <CardTitle>{studentName(item.student_enrollment.student.user)}</CardTitle>
                 <Pill tone={statusTone(item.status)}>{item.status}</Pill>
               </div>
               <p className="text-sm text-muted-foreground">
@@ -178,8 +185,8 @@ export function MonitoringWorkspace({
             >
               {result.data.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.student_enrollment.student.user.name} · {item.host_establishment.name} ·{" "}
-                  {item.status}
+                  {studentName(item.student_enrollment.student.user)} ·{" "}
+                  {item.host_establishment.name} · {item.status}
                 </option>
               ))}
             </select>
@@ -259,7 +266,10 @@ function StudentInternshipSummary({
         if (active)
           setRating(
             submitted.length
-              ? `${(submitted.reduce((sum, item) => sum + Number(item.weighted_percentage), 0) / submitted.length).toFixed(1)}%`
+              ? formatRating(
+                  submitted.reduce((sum, item) => sum + Number(item.weighted_percentage), 0) /
+                    submitted.length,
+                )
               : "Not rated",
           );
       })
@@ -308,11 +318,13 @@ function StudentInternshipSummary({
   }).format(new Date());
   const moaStatus = !placement.moa
     ? "Not recorded"
-    : placement.moa.expires_on.slice(0, 10) < today
-      ? "expired"
-      : placement.moa.effective_on.slice(0, 10) > today
-        ? "Not yet effective"
-        : placement.moa.status;
+    : placement.moa.lifecycle_status
+      ? placement.moa.lifecycle_status
+      : placement.moa.expires_on.slice(0, 10) < today
+        ? "expired"
+        : placement.moa.effective_on.slice(0, 10) > today
+          ? "Not yet effective"
+          : placement.moa.status;
   return (
     <>
       <StatGrid>

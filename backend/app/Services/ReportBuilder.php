@@ -13,7 +13,7 @@ class ReportBuilder
     {
         $enrollments = StudentEnrollment::where('program_term_id', $term->id)->with('student.user')->orderBy('id')->get();
         $placements = Placement::whereIn('student_enrollment_id', $enrollments->pluck('id'))->with(['hostEstablishment', 'opportunity', 'supervisor'])->orderBy('id')->get();
-        $names = $enrollments->mapWithKeys(fn ($e) => [$e->id => $e->student->user->name]);
+        $names = $enrollments->mapWithKeys(fn ($e) => [$e->id => $e->student->user?->name ?? 'Archived student account']);
         $rows = [];
         switch ($kind) {
             case 'placement':

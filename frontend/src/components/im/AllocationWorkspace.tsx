@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, CardTitle, PageHeader, Pill } from "./ui";
+import { Button, Card, CardTitle, PageHeader, Pill, formatSimilarity } from "./ui";
 
 type Item = {
   id: number;
@@ -226,7 +226,7 @@ export function AllocationWorkspace() {
                       </p>
                       {item.similarity_score !== null && (
                         <p className="text-sm">
-                          {(Number(item.similarity_score) * 100).toFixed(1)}% similarity ·{" "}
+                          Similarity score {formatSimilarity(item.similarity_score)} ·{" "}
                           {item.distance_km === null
                             ? "Distance unavailable"
                             : `${Number(item.distance_km).toFixed(2)} km straight-line`}
@@ -324,13 +324,13 @@ export function AllocationWorkspace() {
               setError("");
             }
           }}
-          className="m-auto max-h-[90vh] w-[min(95vw,450px)] overflow-auto rounded-lg bg-card p-0 text-foreground backdrop:bg-black/30"
+          className="m-auto max-h-[90dvh] w-[min(95vw,450px)] overflow-auto rounded-lg bg-card p-0 text-foreground backdrop:bg-black/30"
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-label={review ? "Review placement" : "Academic eligibility"}
-            className="max-h-[90vh] w-full max-w-md overflow-auto rounded-lg border border-border bg-card p-5 shadow-xl"
+            className="max-h-[90dvh] w-full max-w-md overflow-auto rounded-lg border border-border bg-card p-5 shadow-xl"
           >
             <h2 className="text-lg font-semibold">{review?.student_name ?? assessment?.name}</h2>
             {assessment ? (

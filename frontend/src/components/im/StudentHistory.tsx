@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { Button } from "./ui";
+import { Button, studentName } from "./ui";
 
 type History = {
   student: {
@@ -57,7 +57,7 @@ export function StudentHistory({
       ref={dialog}
       onCancel={onClose}
       aria-label="Student profile and history"
-      className="m-auto max-h-[85vh] w-[min(95vw,800px)] overflow-y-auto rounded-xl border bg-card p-6 text-foreground backdrop:bg-black/40"
+      className="m-auto max-h-[90dvh] w-[min(95vw,800px)] overflow-y-auto rounded-xl border bg-card p-6 text-foreground backdrop:bg-black/40"
     >
       <div className="flex justify-between gap-4">
         <h2 className="text-xl font-semibold">Student profile and history</h2>
@@ -69,9 +69,9 @@ export function StudentHistory({
       {!data && !error && <p>Loading profile…</p>}
       {data && (
         <>
-          <h3 className="mt-5 text-lg font-semibold">{data.student.user.name}</h3>
+          <h3 className="mt-5 text-lg font-semibold">{studentName(data.student.user)}</h3>
           <p>Student ID: {data.student.student_number}</p>
-          <p>Email: {data.student.user.email || "Not provided"}</p>
+          <p>Email: {data.student.user?.email || "Not provided"}</p>
           <p>Contact: {data.student.user.profile?.contact_number || "Not provided"}</p>
           <p>Address: {data.student.user.profile?.address || "Not provided"}</p>
           {data.student.user.profile?.bio && <p>{data.student.user.profile.bio}</p>}

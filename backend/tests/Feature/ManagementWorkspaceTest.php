@@ -5,11 +5,13 @@ namespace Tests\Feature;
 use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Tests\Concerns\AcknowledgesPrivacyNotice;
 use Tests\TestCase;
 
 class ManagementWorkspaceTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use AcknowledgesPrivacyNotice;
 
     public function test_only_administrators_can_access_the_panel_and_embedded_workspaces(): void
     {

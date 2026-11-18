@@ -17,10 +17,10 @@ class CoordinatorImportController extends Controller
         $book = new \PhpOffice\PhpSpreadsheet\Spreadsheet;
         $sheet = $book->getActiveSheet();
         $sheet->setTitle('Students');
-        $sheet->fromArray([['Student ID', 'First Name', 'Middle Name', 'Last Name', 'Program', 'Academic Term', 'Year Level']]);
+        $sheet->fromArray([['Student ID', 'First Name', 'Middle Name', 'Last Name', 'Program', 'Academic Term', 'Year Level', 'Email']]);
         $sheet->getStyle('A2:A1001')->getNumberFormat()->setFormatCode('@');
-        $sheet->getStyle('A1:G1')->getFont()->setBold(true);
-        foreach (range('A', 'G') as $column) $sheet->getColumnDimension($column)->setAutoSize(true);
+        $sheet->getStyle('A1:H1')->getFont()->setBold(true);
+        foreach (range('A', 'H') as $column) $sheet->getColumnDimension($column)->setAutoSize(true);
         $sheet->freezePane('A2');
         return response()->streamDownload(function () use ($book) {
             (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($book))->save('php://output');
@@ -37,6 +37,19 @@ class CoordinatorImportController extends Controller
             ->orderByDesc('created_at')->paginate(20, ['id','filename','created_at','updated_at','result']);
         $batches->through(function ($batch) {
             $batch->result = $batch->result ? json_decode($batch->result, true) : null;
+            // Live activation state (link sent / activated / expired); "email failed" is kept from the import.
+            $numbers = collect($batch->result['rows'] ?? [])->filter(fn ($row) => isset($row['activation']))->pluck('student_id')->all();
+            if ($numbers) {
+                $users = \App\Models\Student::whereIn('student_number', $numbers)->pluck('user_id', 'student_number');
+                $states = \App\Services\AccountActivation::statusFor($users->values()->all());
+                foreach ($batch->result['rows'] as &$row) {
+                    if (! isset($row['activation'])) continue;
+                    $live = $states[$users[$row['student_id']] ?? 0] ?? null;
+                    // A failed e-mail stays visible until the student activates (a re-sent link shows as sent).
+                    if ($live === 'activated' || $row['activation'] !== 'email_failed') $row['activation'] = $live ?? $row['activation'];
+                }
+                unset($row);
+            }
             $batch->credentials_available = DB::table('import_credential_handoffs')->where('import_id', $batch->id)->whereNull('consumed_at')->where('expires_at', '>', now())->exists();
             return $batch;
         });
@@ -134,8 +147,9 @@ class CoordinatorImportController extends Controller
         // Serialize imports across programs: Student IDs and HTE identity are institution-wide.
         $lock = DB::selectOne("SELECT GET_LOCK('internmatch_excel_import', 10) AS acquired");
         abort_unless((int) $lock->acquired === 1, 409, 'Another import is saving. Please retry.');
+        $toActivate = [];
         try {
-            $result = DB::transaction(function () use ($request, $id, $data) {
+            $result = DB::transaction(function () use ($request, $id, $data, &$toActivate) {
                 $batch = DB::table('excel_imports')->where('id', $id)->where('user_id', $request->user()->id)->lockForUpdate()->first();
                 abort_unless($batch && $batch->revision === $data['revision'], 409, 'Preview changed. Validate again before confirming.');
                 $preview = json_decode($batch->preview, true);
@@ -171,10 +185,8 @@ class CoordinatorImportController extends Controller
                     $result[$status]++;
                     $result['rows'][] = ['source' => $entry['row']['source'], 'student_id' => $entry['row']['student_id'] ?? null, 'status' => $status, 'message' => $message];
                 }
-                if ($credentials) {
-                    DB::table('import_credential_handoffs')->insert(['import_id' => $id, 'user_id' => $request->user()->id,
-                        'encrypted_credentials' => \Illuminate\Support\Facades\Crypt::encryptString(json_encode($credentials, JSON_THROW_ON_ERROR)), 'expires_at' => now()->addMinutes(15)]);
-                }
+                // Spec §17A-B: no passwords are handed to anyone; links are e-mailed after the import commits.
+                $toActivate = $credentials;
                 $result['new_accounts'] = count($credentials);
                 DB::table('excel_imports')->where('id', $id)->update(['result' => json_encode($result, JSON_THROW_ON_ERROR), 'updated_at' => now()]);
                 DB::table('audit_logs')->insert(['actor_id' => $request->user()->id, 'program_id' => $preview['program_id'], 'action' => 'coordinator.excel_imported',
@@ -182,6 +194,23 @@ class CoordinatorImportController extends Controller
                 return $result;
             });
         } finally { DB::select("SELECT RELEASE_LOCK('internmatch_excel_import')"); }
+        if ($toActivate) {
+            $sent = [];
+            foreach ($toActivate as $item) {
+                try {
+                    \App\Services\AccountActivation::issue($request->user(), \App\Models\User::findOrFail($item['activate_user_id']));
+                    $sent[$item['student_id']] = 'link_sent';
+                } catch (\Throwable $error) {
+                    report($error);
+                    $sent[$item['student_id']] = 'email_failed';
+                }
+            }
+            foreach ($result['rows'] as &$row) if (isset($sent[$row['student_id'] ?? ''])) $row['activation'] = $sent[$row['student_id']];
+            unset($row);
+            $result['activation_links_sent'] = count(array_filter($sent, fn ($v) => $v === 'link_sent'));
+            $result['activation_email_failed'] = count($sent) - $result['activation_links_sent'];
+            DB::table('excel_imports')->where('id', $id)->update(['result' => json_encode($result, JSON_THROW_ON_ERROR), 'updated_at' => now()]);
+        }
         return response()->json($result, headers: ['Cache-Control' => 'no-store']);
     }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Button, Card, PageHeader, Pill, Row, Table } from "./ui";
+import { Button, Card, PageHeader, Pill, Row, Table, studentName } from "./ui";
 import { PlacementMonitoring, type Placement, type Monitoring } from "./MonitoringWorkspace";
 
 type Assessment = {
@@ -75,7 +75,7 @@ export function CoordinatorMonitoring({ mode }: { mode: "progress" | "evaluation
   }, [page, revision, mode]);
   const visible = (rows ?? []).filter(
     (row) =>
-      `${row.placement.student_enrollment.student.user.name} ${row.placement.student_enrollment.program_term.program.code} ${row.placement.host_establishment.name}`
+      `${studentName(row.placement.student_enrollment.student.user)} ${row.placement.student_enrollment.program_term.program.code} ${row.placement.host_establishment.name}`
         .toLowerCase()
         .includes(search.trim().toLowerCase()) &&
       (filter === "all" ||
@@ -175,7 +175,9 @@ export function CoordinatorMonitoring({ mode }: { mode: "progress" | "evaluation
                   return (
                     <Row key={row.placement.id}>
                       <td>
-                        <strong>{row.placement.student_enrollment.student.user.name}</strong>
+                        <strong>
+                          {studentName(row.placement.student_enrollment.student.user)}
+                        </strong>
                         <p>
                           {row.placement.student_enrollment.program_term.program.code} ·{" "}
                           {row.placement.status}
@@ -195,7 +197,7 @@ export function CoordinatorMonitoring({ mode }: { mode: "progress" | "evaluation
                             ) : (
                               <>
                                 <progress
-                                  aria-label={`${row.placement.student_enrollment.student.user.name} completion`}
+                                  aria-label={`${studentName(row.placement.student_enrollment.student.user)} completion`}
                                   max={100}
                                   value={percent}
                                   className="h-2 w-28 accent-emerald-700"

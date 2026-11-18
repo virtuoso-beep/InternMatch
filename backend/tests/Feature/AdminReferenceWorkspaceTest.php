@@ -11,6 +11,22 @@ class AdminReferenceWorkspaceTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
+    public function test_overview_flags_active_programs_without_an_active_coordinator(): void
+    {
+        $admin = User::factory()->withRole(Role::Admin)->create();
+        $covered = Program::factory()->create(['code' => 'COV']);
+        $uncovered = Program::factory()->create(['code' => 'UNC']);
+        $inactive = Program::factory()->create(['code' => 'OFF', 'is_active' => false]);
+        $active = User::factory()->withRole(Role::Coordinator)->create();
+        $active->programs()->attach($covered);
+        $disabled = User::factory()->withRole(Role::Coordinator)->create(['status' => 'disabled']);
+        $disabled->programs()->attach($uncovered);
+
+        $codes = collect($this->actingAs($admin)->getJson('/api/v1/admin/overview')->assertOk()->json('programs_without_coordinator'))->pluck('code')->all();
+
+        $this->assertSame(['UNC'], $codes); // disabled coordinator does not count; inactive programs are not flagged
+    }
+
     public function test_settings_and_term_changes_persist_are_audited_and_reject_non_admins(): void
     {
         $admin = User::factory()->withRole(Role::Admin)->create();
@@ -52,7 +68,7 @@ class AdminReferenceWorkspaceTest extends TestCase
         $this->getJson('/api/v1/coordinator-imports/reference')->assertOk();
         $id=(string) \Illuminate\Support\Str::uuid();
         DB::table('excel_imports')->insert(['id'=>$id,'user_id'=>$actor->id,'module'=>'student','filename'=>'synthetic.xlsx','workbook'=>'[]','created_at'=>now(),'updated_at'=>now()]);
-        $body=['program_id'=>$program->id,'academic_term_id'=>$term->id,'rows'=>[['kind'=>'student','student_id'=>'991234','first_name'=>'Synthetic','last_name'=>'Admin Import','program'=>'BSIT','year_level'=>'4']]];
+        $body=['program_id'=>$program->id,'academic_term_id'=>$term->id,'rows'=>[['kind'=>'student','student_id'=>'991234','first_name'=>'Synthetic','last_name'=>'Admin Import','program'=>'BSIT','year_level'=>'4','email'=>'synthetic.admin.import@example.test']]];
         $forbidden=$body;
         $forbidden['rows']=[['kind'=>'host','host_name'=>'Synthetic Forbidden']];
         $this->postJson("/api/v1/coordinator-imports/$id/preview",$forbidden)->assertUnprocessable()->assertJsonPath('message', 'Record type must match the module where you uploaded this workbook.');

@@ -15,7 +15,7 @@ class EditStudent extends EditRecord
 
     public function getHeading(): string
     {
-        return 'Edit enrollment — '.$this->getRecord()->student->user->name;
+        return 'Edit enrollment — '.($this->getRecord()->student->user?->name ?? 'archived student account');
     }
 
     protected function handleRecordUpdate(Model $record, array $data): Model

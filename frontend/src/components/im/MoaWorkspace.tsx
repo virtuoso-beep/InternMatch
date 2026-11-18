@@ -12,6 +12,8 @@ type Moa = {
   host_establishment: { name: string };
   reference_number: string;
   status: string;
+  /** Spec §5 status computed on the server from the dates: pending, active, expiring, expired, terminated. */
+  lifecycle_status?: string;
   effective_on: string | null;
   expires_on: string | null;
   is_institution_wide: boolean;
@@ -38,6 +40,7 @@ export function MoaWorkspace() {
     day: "2-digit",
   }).format(new Date());
   const dateState = (item: Moa) => {
+    if (item.lifecycle_status) return item.lifecycle_status;
     const expiry = item.expires_on?.slice(0, 10);
     if (expiry && expiry < today) return "expired";
     if (item.status !== "active") return item.status;
@@ -107,7 +110,7 @@ export function MoaWorkspace() {
               <label className="text-sm">
                 Find agreement
                 <input
-                  className="mt-1 block rounded border p-2"
+                  className="mt-1 block w-64 max-w-full rounded border p-2"
                   placeholder="Reference or establishment"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
@@ -125,7 +128,7 @@ export function MoaWorkspace() {
                   <option value="active">Active beyond 90 days</option>
                   <option value="expiring">Expiring within 90 days</option>
                   <option value="expired">Past expiry date</option>
-                  <option value="draft">Draft</option>
+                  <option value="pending">Pending</option>
                   <option value="missing-document">Missing document</option>
                 </select>
               </label>
@@ -160,7 +163,7 @@ export function MoaWorkspace() {
                       "Reference",
                       "Establishment",
                       "Effective / expiry",
-                      "Recorded status",
+                      "Status",
                       "Document",
                       "Action",
                     ].map((label) => (
@@ -186,7 +189,12 @@ export function MoaWorkspace() {
                         )}
                       </td>
                       <td className="p-3">
-                        <Pill tone={statusTone(item.status)}>{item.status}</Pill>
+                        <Pill tone={statusTone(dateState(item))}>{dateState(item)}</Pill>
+                        {item.status !== "active" && item.status !== dateState(item) && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Recorded: {item.status.replaceAll("_", " ")}
+                          </p>
+                        )}
                       </td>
                       <td className="p-3">{item.document ? "Uploaded" : "Missing"}</td>
                       <td className="p-3">
@@ -249,7 +257,7 @@ export function MoaWorkspace() {
                 <CardTitle>
                   {item.reference_number} · {item.host_establishment.name}
                 </CardTitle>
-                <Pill tone={statusTone(item.status)}>{item.status}</Pill>
+                <Pill tone={statusTone(dateState(item))}>{dateState(item)}</Pill>
               </div>
               <div className="my-5 grid gap-4 sm:grid-cols-2">
                 <div>

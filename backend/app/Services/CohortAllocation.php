@@ -12,6 +12,7 @@ use App\Models\Recommendation;
 use App\Models\StudentEnrollment;
 use App\Models\User;
 use App\Notifications\PortalNotification;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -101,7 +102,12 @@ class CohortAllocation
         return DB::transaction(function () use ($actor, $itemId, $term, $data) {
             ProgramTerm::whereKey($term->id)->lockForUpdate()->firstOrFail();
             $item = DB::table('placement_proposal_items')->where('id', $itemId)->lockForUpdate()->first();
-            abort_unless($item->review_status === 'pending', 409, 'This proposal item has already been reviewed.');
+            if ($item->review_status !== 'pending') {
+                // First save wins (spec §2): tell the second coordinator who decided and when.
+                $by = $item->reviewed_by ? (User::withTrashed()->find($item->reviewed_by)?->name ?? 'another coordinator') : 'another coordinator';
+                $when = $item->reviewed_at ? Carbon::parse($item->reviewed_at)->timezone('Asia/Manila')->format('M j, Y g:i A') : null;
+                abort(409, 'This case was already decided by '.$by.($when ? ', '.$when : '').'.');
+            }
             $enrollment = StudentEnrollment::whereKey($item->student_enrollment_id)->lockForUpdate()->firstOrFail();
             $imported = Placement::where('placement_proposal_item_id', $item->id)->where('status', 'pending')->lockForUpdate()->first();
             $placement = null;

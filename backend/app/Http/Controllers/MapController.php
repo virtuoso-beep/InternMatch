@@ -28,9 +28,9 @@ class MapController extends Controller
         $student = null;
         $eligibleOpportunities = [];
         if ($enrollment) {
-            $profile = $enrollment->student->user->profile;
+            $profile = $enrollment->student->user?->profile;
             if ($profile?->latitude !== null && $profile?->longitude !== null) {
-                $student = ['name' => $enrollment->student->user->name, 'latitude' => (float) $profile->latitude, 'longitude' => (float) $profile->longitude];
+                $student = ['name' => $enrollment->student->user?->name ?? 'Archived student account', 'latitude' => (float) $profile->latitude, 'longitude' => (float) $profile->longitude];
             }
             $hostIds = [];
             foreach (Opportunity::where('academic_term_id', $enrollment->programTerm->academic_term_id)->whereHas('programs', fn ($q) => $q->whereKey($enrollment->programTerm->program_id))->get() as $opportunity) {

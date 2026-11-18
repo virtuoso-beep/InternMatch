@@ -1,5 +1,42 @@
 import type { ReactNode } from "react";
+import {
+  ArrowRight,
+  Briefcase,
+  Building2,
+  CircleCheck,
+  ClipboardCheck,
+  ClipboardList,
+  Clock,
+  FileCheck,
+  Gauge,
+  GraduationCap,
+  Hourglass,
+  Sparkles,
+  TriangleAlert,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { Card, cx } from "./ui";
+
+/** Icon by meaning, not by card position. First matching keyword wins. */
+const METRIC_ICONS: [RegExp, LucideIcon][] = [
+  [/attention|flag/i, TriangleAlert],
+  [/hour|time log/i, Clock],
+  [/incomplete requirement|requirements to complete/i, ClipboardList],
+  [/requirement|submission/i, FileCheck],
+  [/evaluation/i, ClipboardCheck],
+  [/recommend/i, Sparkles],
+  [/slot/i, Gauge],
+  [/host/i, Building2],
+  [/completed/i, CircleCheck],
+  [/pending|awaiting/i, Hourglass],
+  [/placement/i, Briefcase],
+  [/enrollment|student/i, GraduationCap],
+  [/account|user/i, Users],
+];
+function metricIcon(label: string): LucideIcon {
+  return METRIC_ICONS.find(([pattern]) => pattern.test(label))?.[1] ?? Gauge;
+}
 
 export function DashboardLink({ href, children }: { href: string; children: ReactNode }) {
   return (
@@ -8,7 +45,7 @@ export function DashboardLink({ href, children }: { href: string; children: Reac
       className="inline-flex items-center gap-2 rounded text-sm font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
     >
       {children}
-      <span aria-hidden="true">→</span>
+      <ArrowRight size={14} aria-hidden="true" />
     </a>
   );
 }
@@ -17,21 +54,19 @@ export function DashboardMetric({
   label,
   value,
   hint,
-  index = 0,
   accent = false,
+  progress,
 }: {
   label: string;
   value: string;
   hint: string;
+  /** Kept for compatibility; icons are now chosen from the label. */
   index?: number;
   accent?: boolean;
+  /** Optional 0–100 completion shown as a thin bar under the value. */
+  progress?: number | null;
 }) {
-  const paths = [
-    "M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3M9 15l12-12M14 3h7v7",
-    "M12 3v18M3 12h18M5.6 5.6l12.8 12.8M5.6 18.4 18.4 5.6",
-    "M9 11l2 2 4-4M9 3H5v18h14V3h-4M9 2h6v4H9z",
-    "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",
-  ];
+  const Icon = metricIcon(label);
   return (
     <Card className="relative overflow-hidden !rounded-xl !p-5">
       <div className="flex items-start justify-between gap-3">
@@ -42,29 +77,22 @@ export function DashboardMetric({
             accent ? "bg-success-soft text-success" : "bg-brand-soft text-brand",
           )}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d={paths[index % paths.length]} />
-          </svg>
+          <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
         </span>
       </div>
       <p
         className={cx(
-          "mt-1 break-words text-3xl font-bold tracking-tight",
+          "mt-1 break-words text-3xl font-bold tracking-tight tabular-nums",
           accent ? "text-success" : "text-foreground",
         )}
       >
         {value}
       </p>
+      {progress !== undefined && progress !== null && (
+        <div className="mt-3">
+          <DashboardProgress value={progress} label={`${label} progress`} />
+        </div>
+      )}
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{hint}</p>
     </Card>
   );
@@ -116,5 +144,76 @@ export function DashboardProgress({ value, label }: { value: number; label: stri
         style={{ width: `${percent}%` }}
       />
     </div>
+  );
+}
+
+type Segment = { label: string; value: number; tone: "warn" | "info" | "success" | "muted" };
+const SEGMENT_FILL: Record<Segment["tone"], string> = {
+  warn: "bg-warn",
+  info: "bg-info",
+  success: "bg-success",
+  muted: "bg-muted-foreground/40",
+};
+
+/**
+ * One horizontal stacked bar for a status breakdown (e.g. placement pipeline).
+ * Status colours are reserved and always paired with a text label and count; a
+ * screen-reader table carries the same numbers.
+ */
+export function StatusBreakdown({ title, segments }: { title: string; segments: Segment[] }) {
+  const total = segments.reduce((sum, s) => sum + s.value, 0);
+  const pct = (value: number) => (total ? Math.round((value / total) * 100) : 0);
+  if (!total) {
+    return <DashboardEmpty>No records in this scope yet.</DashboardEmpty>;
+  }
+  return (
+    <figure>
+      <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
+        {segments
+          .filter((s) => s.value > 0)
+          .map((s) => (
+            <div
+              key={s.label}
+              title={`${s.label}: ${s.value.toLocaleString()} (${pct(s.value)}%)`}
+              className={cx(
+                "h-full first:rounded-l-full last:rounded-r-full",
+                SEGMENT_FILL[s.tone],
+              )}
+              style={{ width: `${(s.value / total) * 100}%` }}
+            />
+          ))}
+      </div>
+      <ul className="mt-4 grid gap-3 sm:grid-cols-3" aria-hidden="true">
+        {segments.map((s) => (
+          <li key={s.label} className="flex items-start gap-2 text-sm">
+            <span className={cx("mt-1.5 size-2.5 shrink-0 rounded-full", SEGMENT_FILL[s.tone])} />
+            <span>
+              <span className="block text-muted-foreground">{s.label}</span>
+              <span className="font-semibold tabular-nums">{s.value.toLocaleString()}</span>
+              <span className="ml-1 text-xs text-muted-foreground">{pct(s.value)}%</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <table className="sr-only">
+        <caption>{title}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Status</th>
+            <th scope="col">Count</th>
+            <th scope="col">Share</th>
+          </tr>
+        </thead>
+        <tbody>
+          {segments.map((s) => (
+            <tr key={s.label}>
+              <th scope="row">{s.label}</th>
+              <td>{s.value}</td>
+              <td>{pct(s.value)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </figure>
   );
 }

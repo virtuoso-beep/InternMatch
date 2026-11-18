@@ -1,4 +1,5 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { LayoutDashboard, Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ROLES, type RoleKey } from "@/lib/internmatch";
 import { api, logout } from "@/lib/api";
@@ -145,7 +146,7 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
             }
             className="rounded p-2 hover:bg-white/15"
           >
-            ☰
+            <Menu size={22} aria-hidden="true" />
           </button>
           <Link to="/" className="flex items-center gap-2 text-xl font-bold">
             <img
@@ -284,9 +285,7 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
             onFocus={showNavigation}
             className="flex w-full flex-col items-center gap-2 rounded-3xl bg-[#d2e3fc] px-1 py-4 text-xs font-semibold text-[#17385e]"
           >
-            <span aria-hidden="true" className="text-2xl">
-              ▦
-            </span>
+            <LayoutDashboard size={24} strokeWidth={1.7} aria-hidden="true" />
             Dashboard
           </Link>
           {role === "admin" && (

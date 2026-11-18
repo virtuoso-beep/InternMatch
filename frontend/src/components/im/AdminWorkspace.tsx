@@ -1,7 +1,15 @@
 import { AdminFormDialog } from "./AdminFormDialog";
 import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, CardTitle, PageHeader, Pill } from "./ui";
+import {
+  BookOpen,
+  GraduationCap,
+  TriangleAlert,
+  UserCog,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { Button, Card, CardTitle, PageHeader, Pill, formatAction, formatDateTime } from "./ui";
 
 type Term = {
   id: number;
@@ -16,6 +24,7 @@ type Overview = {
   total_users: number;
   users_by_role: { role: string | null; total: number }[];
   programs: { id: number; code: string; name: string; cluster: string; is_active: boolean }[];
+  programs_without_coordinator?: { id: number; code: string }[];
   terms: Term[];
   chat_enabled: boolean;
   recent_activity: { id: number; action: string; created_at: string }[];
@@ -61,20 +70,50 @@ export function AdminOverview() {
       {!data && !error && <p role="status">Loading overview…</p>}
       {data && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              ["Total Users", data.total_users],
-              ["Students", count("student")],
-              ["Coordinators", count("coordinator")],
-              ["Active Programs", data.programs.filter((p) => p.is_active).length],
-            ].map(([label, value]) => (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {(
+              [
+                ["Total Users", data.total_users, Users],
+                ["Students", count("student"), GraduationCap],
+                ["Coordinators", count("coordinator"), UserCog],
+                ["Active Programs", data.programs.filter((p) => p.is_active).length, BookOpen],
+              ] as [string, number, LucideIcon][]
+            ).map(([label, value, Icon]) => (
               <Card key={label}>
-                <p className="text-sm text-muted-foreground">{label}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm text-muted-foreground">{label}</p>
+                  <span className="flex size-8 items-center justify-center rounded-md bg-brand-soft text-brand">
+                    <Icon size={16} aria-hidden="true" />
+                  </span>
+                </div>
                 <p className="my-2 text-3xl font-bold">{value}</p>
                 <p className="text-xs text-muted-foreground">Current system records</p>
               </Card>
             ))}
           </div>
+          {!!data.programs_without_coordinator?.length && (
+            <div
+              role="status"
+              className="flex items-start gap-3 rounded-lg border border-warn/40 bg-warn-soft p-4 text-sm"
+            >
+              <TriangleAlert size={18} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
+              <div className="flex-1">
+                <p className="font-semibold">
+                  {data.programs_without_coordinator.map((p) => p.code).join(", ")}{" "}
+                  {data.programs_without_coordinator.length === 1 ? "has" : "have"} no active
+                  coordinator
+                </p>
+                <p className="text-muted-foreground">
+                  No one can review or place students in{" "}
+                  {data.programs_without_coordinator.length === 1
+                    ? "this program"
+                    : "these programs"}{" "}
+                  until a coordinator is assigned.
+                </p>
+              </div>
+              <AdminLink section="users">Assign coordinator</AdminLink>
+            </div>
+          )}
           <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
             <Card>
               <CardTitle>Users by Role</CardTitle>
@@ -126,8 +165,10 @@ export function AdminOverview() {
               <CardTitle>Recent Administrative Activity</CardTitle>
               {data.recent_activity.map((a) => (
                 <div className="border-b py-3 text-sm" key={a.id}>
-                  <p>{a.action.replaceAll("_", " ").replaceAll(".", " · ")}</p>
-                  <small className="text-muted-foreground">{a.created_at}</small>
+                  <p>{formatAction(a.action)}</p>
+                  <small className="text-muted-foreground" title={a.created_at}>
+                    {formatDateTime(a.created_at)}
+                  </small>
                 </div>
               ))}
               {!data.recent_activity.length && <p>No recorded activity.</p>}
@@ -251,7 +292,11 @@ export function AdminTerms() {
                     <td className="p-3">
                       {t.starts_on.slice(0, 10)} – {t.ends_on.slice(0, 10)}
                     </td>
-                    <td className="p-3">{t.is_active ? "Active" : "Inactive"}</td>
+                    <td className="p-3">
+                      <Pill tone={t.is_active ? "success" : "muted"}>
+                        {t.is_active ? "Active" : "Inactive"}
+                      </Pill>
+                    </td>
                     <td className="p-3">
                       <Button
                         disabled={busy}

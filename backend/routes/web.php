@@ -24,7 +24,13 @@ use App\Http\Controllers\StudentPortalController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/manage/admin-workspace/{section?}', \App\Http\Controllers\AdminWorkspaceController::class)
-    ->middleware(['auth', 'active', 'role:admin'])->name('admin.workspace');
+    ->middleware(['auth', 'active', 'role:admin', \App\Http\Middleware\RequirePrivacyConsent::class])->name('admin.workspace');
+
+Route::middleware(['auth', 'active'])->group(function (): void {
+    Route::get('/manage/privacy-notice', [\App\Http\Controllers\PrivacyController::class, 'managementNotice'])->name('manage.privacy');
+    Route::post('/manage/privacy-notice', [\App\Http\Controllers\PrivacyController::class, 'managementAcknowledge'])
+        ->middleware('throttle:10,1')->name('manage.privacy.acknowledge');
+});
 
 Route::get('/admin/{section?}', function (?string $section = null) {
     abort_unless($section === null || array_key_exists($section, \App\Filament\Pages\Administration::SECTIONS), 404);
@@ -40,9 +46,14 @@ Route::prefix('api/v1')->group(function (): void {
     Route::get('csrf', [AuthController::class, 'csrf']);
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('logout', [AuthController::class, 'logout']);
+    // Spec §17A-B one-time activation links (no sign-in required; rate-limited).
+    Route::get('activation/{token}', [\App\Http\Controllers\AccountActivationController::class, 'show'])->middleware('throttle:20,1');
+    Route::post('activation', [\App\Http\Controllers\AccountActivationController::class, 'complete'])->middleware('throttle:10,1');
     Route::get('session', [AuthController::class, 'show'])->middleware(['auth', 'active']);
     Route::middleware(['auth', 'active'])->group(function (): void {
         Route::post('first-password', [AuthController::class, 'firstPassword'])->middleware('throttle:10,1');
+        Route::get('privacy-notice', [\App\Http\Controllers\PrivacyController::class, 'notice']);
+        Route::post('privacy-consent', [\App\Http\Controllers\PrivacyController::class, 'acknowledge'])->middleware('throttle:10,1');
         Route::get('coordinator-students/{enrollment}/history', [StudentPortalController::class, 'studentHistory']);
         Route::get('coordinator-imports/history', [\App\Http\Controllers\CoordinatorImportController::class, 'history']);
         Route::get('coordinator-imports/student-template', [\App\Http\Controllers\CoordinatorImportController::class, 'template']);
@@ -93,6 +104,7 @@ Route::prefix('api/v1')->group(function (): void {
         Route::post('users', [AccountController::class, 'store']);
         Route::put('users/{user}/hosts', [AccountController::class, 'assignHosts']);
         Route::patch('users/{user}/access', AccountAccessController::class);
+        Route::post('users/{user}/activation', [\App\Http\Controllers\AccountActivationController::class, 'issue'])->middleware('throttle:10,1');
         Route::get('placement-reference', [AcademicController::class, 'reference']);
         Route::post('academic-terms', [AcademicController::class, 'storeTerm']);
         Route::post('enrollments', [AcademicController::class, 'enroll']);

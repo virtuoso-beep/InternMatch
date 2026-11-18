@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Button, Card, CardTitle } from "./ui";
+import { Button, Card, CardTitle, formatDateTime, formatStatus } from "./ui";
 
 type Backup = {
   id: string;
@@ -45,7 +45,7 @@ export function BackupHistory() {
       {data && (
         <p className="my-3 text-sm">
           {data.schedule
-            ? `${data.schedule.schedule} (${data.schedule.timezone}). ${data.schedule.requirements} Configuration recorded ${data.schedule.configured_at}; live task state is available in Windows Task Scheduler.`
+            ? `${data.schedule.schedule} (${data.schedule.timezone}). ${data.schedule.requirements} Configuration recorded ${formatDateTime(data.schedule.configured_at)}; live task state is available in Windows Task Scheduler.`
             : "No local schedule registered."}
         </p>
       )}
@@ -72,7 +72,7 @@ export function BackupHistory() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr>
-                  {["Created (UTC)", "Status", "Archive size", "Recovery drill"].map((label) => (
+                  {["Created", "Status", "Archive size", "Recovery drill"].map((label) => (
                     <th className="p-2" key={label}>
                       {label}
                     </th>
@@ -82,8 +82,10 @@ export function BackupHistory() {
               <tbody>
                 {data.data.map((item) => (
                   <tr className="border-t" key={item.id}>
-                    <td className="p-2">{item.created_at ?? "Unknown"}</td>
-                    <td className="p-2">{item.status}</td>
+                    <td className="p-2" title={item.created_at ?? undefined}>
+                      {item.created_at ? formatDateTime(item.created_at) : "Unknown"}
+                    </td>
+                    <td className="p-2">{formatStatus(item.status)}</td>
                     <td className="p-2">{(item.bytes / 1048576).toFixed(2)} MB</td>
                     <td className="p-2">
                       {item.verified_at ? `Verified ${item.verified_at}` : "Not verified"}

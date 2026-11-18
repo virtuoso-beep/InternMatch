@@ -15,15 +15,17 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Tests\Concerns\AcknowledgesPrivacyNotice;
 use Tests\TestCase;
 
 class FilamentHostTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use AcknowledgesPrivacyNotice;
 
     private function coordinator(Program $program): User
     {
-        $actor = User::factory()->withRole(Role::Coordinator)->create();
+        $actor = User::factory()->withRole(Role::Admin)->create();
         $actor->programs()->attach($program);
         $this->actingAs($actor);
         Filament::setCurrentPanel(Filament::getPanel('manage'));
@@ -46,10 +48,10 @@ class FilamentHostTest extends TestCase
         Livewire::test(CreateHost::class)->fillForm($payload)->call('create')->assertHasFormErrors(['code']);
         $this->assertDatabaseCount('host_establishments', 1);
         $outside = HostEstablishment::factory()->create();
-        Livewire::test(ListHosts::class)->assertCanSeeTableRecords([$host])->assertCanNotSeeTableRecords([$outside]);
-        $this->get('/manage/hosts/'.$outside->id.'/edit')->assertNotFound();
+        Livewire::test(ListHosts::class)->assertCanSeeTableRecords([$host, $outside]); // admin panel is not program-scoped
+        $this->get('/manage/hosts/'.$outside->id.'/edit')->assertOk();
         $payload['code'] = 'FORGED-HOST';
-        $payload['capacities'][0]['program_id'] = Program::factory()->create()->id;
+        $payload['capacities'][0]['program_id'] = 999999; // nonexistent program
         Livewire::test(CreateHost::class)->fillForm($payload)->call('create')->assertHasFormErrors();
         $this->assertDatabaseMissing('host_establishments', ['code' => 'FORGED-HOST']);
     }
@@ -65,9 +67,10 @@ class FilamentHostTest extends TestCase
         }
         $this->coordinator($program);
         $page = Livewire::test(EditHost::class, ['record' => $host->id]);
-        $this->assertCount(1, $page->get('data.capacities'));
+        $this->assertCount(2, $page->get('data.capacities')); // admin sees every program's capacity
         $page->fillForm(['name' => 'Updated native host', 'is_active' => false,
-            'capacities' => [['program_id' => $program->id, 'academic_term_id' => $term->id, 'capacity' => 2]]])
+            'capacities' => [['program_id' => $program->id, 'academic_term_id' => $term->id, 'capacity' => 2],
+                ['program_id' => $other->id, 'academic_term_id' => $term->id, 'capacity' => 4]]])
             ->call('save')->assertHasNoFormErrors();
         $this->assertDatabaseHas('host_establishments', ['id' => $host->id, 'name' => 'Updated native host', 'is_active' => false]);
         $this->assertDatabaseHas('host_program_capacity', ['host_establishment_id' => $host->id, 'program_id' => $other->id, 'capacity' => 4]);

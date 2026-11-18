@@ -30,6 +30,8 @@ class AdminWorkspaceController extends Controller
             'users_by_role' => User::selectRaw('role, COUNT(*) AS total')->groupBy('role')->get(),
             'total_users' => User::count(),
             'programs' => Program::orderBy('code')->get(['id','code','name','cluster','is_active']),
+            // Spec: flag any active program that has no active coordinator (nobody can act on its students).
+            'programs_without_coordinator' => Program::where('is_active', true)->whereDoesntHave('coordinators', fn ($query) => $query->where('status', 'active'))->orderBy('code')->get(['id', 'code']),
             'terms' => AcademicTerm::orderByDesc('starts_on')->get(),
             'chat_enabled' => ChatAccess::enabled(),
             'recent_activity' => DB::table('audit_logs')->orderByDesc('id')->limit(5)->get(['id','action','created_at']),

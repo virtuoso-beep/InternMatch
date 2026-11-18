@@ -15,11 +15,13 @@ use App\Services\CohortAllocation;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\AcknowledgesPrivacyNotice;
 use Tests\TestCase;
 
 class NativeWorkflowTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use AcknowledgesPrivacyNotice;
 
     private function actor(ProgramTerm $term): User
     {

@@ -57,6 +57,12 @@ class CohortAllocationTest extends TestCase
         $this->actingAs(User::factory()->withRole(Role::Coordinator)->create())->postJson('/api/v1/allocation-items/'.$item->id.'/decision', $decision)->assertForbidden();
         $this->actingAs($coordinator)->postJson('/api/v1/allocation-items/'.$item->id.'/decision', $decision)->assertOk()->assertJsonPath('data.status', 'approved');
         $this->postJson('/api/v1/allocation-items/'.$item->id.'/decision', $decision)->assertConflict();
+        // Spec §2: a second coordinator on the same program is told who decided first.
+        $colleague = User::factory()->withRole(Role::Coordinator)->create();
+        $colleague->programs()->attach($e->programTerm->program_id);
+        $message = $this->actingAs($colleague)->postJson('/api/v1/allocation-items/'.$item->id.'/decision', $decision)
+            ->assertConflict()->json('message');
+        $this->assertStringStartsWith('This case was already decided by '.$coordinator->name, $message);
         $this->assertDatabaseCount('placements', 1);
         $this->assertDatabaseCount('placement_decisions', 1);
         $this->assertDatabaseCount('notifications', 2);

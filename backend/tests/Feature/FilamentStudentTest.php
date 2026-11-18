@@ -14,67 +14,79 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\AcknowledgesPrivacyNotice;
 use Tests\TestCase;
 
 class FilamentStudentTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use AcknowledgesPrivacyNotice;
 
+    /** Coordinators work through the API/React portal; the Filament panel is admin-only (b097815). */
     private function coordinator(StudentEnrollment $record): User
     {
         $user = User::factory()->withRole(Role::Coordinator)->create();
         $user->programs()->attach($record->programTerm->program_id);
+        $this->actingAs($user);
+
+        return $user;
+    }
+
+    private function admin(): User
+    {
+        $user = User::factory()->withRole(Role::Admin)->create();
         $this->actingAs($user);
         Filament::setCurrentPanel(Filament::getPanel('manage'));
 
         return $user;
     }
 
-    public function test_native_list_search_and_direct_urls_enforce_program_scope(): void
+    public function test_panel_is_admin_only_and_api_enforces_coordinator_program_scope(): void
     {
         $own = StudentEnrollment::factory()->create();
         $outside = StudentEnrollment::factory()->create();
         // Same identity in another program must not expose that enrollment either.
         $otherTerm = StudentEnrollment::factory()->create(['student_id' => $own->student_id]);
+        $this->admin();
+        Livewire::test(ListStudents::class)->assertCanSeeTableRecords([$own, $outside, $otherTerm]);
         $coordinator = $this->coordinator($own);
-        Livewire::test(ListStudents::class)->assertCanSeeTableRecords([$own])
-            ->assertCanNotSeeTableRecords([$outside, $otherTerm])->assertActionHidden('create');
-        Livewire::test(ListStudents::class)->searchTable($outside->student->student_number)
-            ->assertCanNotSeeTableRecords([$outside]);
-        $this->get('/manage/students/'.$outside->id.'/edit')->assertNotFound();
+        $this->get('/manage/students')->assertForbidden();
         $this->get('/manage/students/create')->assertForbidden();
         $this->patchJson('/api/v1/enrollments/'.$outside->id, ['year_level' => 3, 'enrolled_on' => '2026-08-01'])->assertNotFound();
         $coordinator->programs()->detach();
         $this->patchJson('/api/v1/enrollments/'.$own->id, ['year_level' => 3, 'enrolled_on' => '2026-08-01'])->assertNotFound();
     }
 
-    public function test_coordinator_edit_persists_and_audits_without_mutating_protected_fields(): void
+    public function test_edit_persists_and_audits_without_mutating_protected_fields(): void
     {
         $record = StudentEnrollment::factory()->create();
-        $coordinator = $this->coordinator($record);
+        $admin = $this->admin();
         Livewire::test(EditStudent::class, ['record' => $record->id])
             ->fillForm(['year_level' => 4, 'enrolled_on' => '2026-08-01', 'target_completion_on' => '2026-12-31'])
             ->call('save')->assertHasNoFormErrors();
         $this->assertDatabaseHas('student_enrollments', ['id' => $record->id, 'year_level' => 4, 'target_completion_on' => '2026-12-31']);
-        $this->assertDatabaseHas('audit_logs', ['actor_id' => $coordinator->id, 'action' => 'student.enrollment_updated', 'program_id' => $record->programTerm->program_id]);
+        $this->assertDatabaseHas('audit_logs', ['actor_id' => $admin->id, 'action' => 'student.enrollment_updated', 'program_id' => $record->programTerm->program_id]);
         $original = $record->only(['student_id', 'program_term_id', 'required_minutes']);
+        $this->coordinator($record);
         $this->patchJson('/api/v1/enrollments/'.$record->id, [
             'year_level' => 3, 'enrolled_on' => '2026-08-01', 'status' => 'completed',
             'student_id' => 999999, 'program_term_id' => 999999, 'required_minutes' => 1,
         ])->assertOk()->assertJsonPath('data.status', 'enrolled');
         $this->assertSame($original, $record->fresh()->only(array_keys($original)));
+        $this->admin();
         Livewire::test(EditStudent::class, ['record' => $record->id])->assertFormSet(['year_level' => 3]);
     }
 
     public function test_invalid_dates_closed_enrollments_and_unauthorized_roles_cannot_edit(): void
     {
         $record = StudentEnrollment::factory()->create();
-        $this->coordinator($record);
+        $this->admin();
         Livewire::test(EditStudent::class, ['record' => $record->id])
             ->fillForm(['year_level' => 0, 'enrolled_on' => '2026-08-01', 'target_completion_on' => '2026-07-01'])
             ->call('save')->assertHasFormErrors(['year_level', 'target_completion_on']);
         $record->update(['status' => 'completed']);
         $payload = ['year_level' => 4, 'enrolled_on' => '2026-08-01'];
+        $this->coordinator($record);
         $this->patchJson('/api/v1/enrollments/'.$record->id, $payload)->assertUnprocessable();
         $this->actingAs($record->student->user)->patchJson('/api/v1/enrollments/'.$record->id, $payload)->assertForbidden();
         $dean = User::factory()->withRole(Role::Dean)->create();

@@ -58,6 +58,8 @@ class StudentAccountImport
                     else { $matched['user_id'] = $user->id; $action = 'existing_account'; }
                 }
             }
+            // Spec §17A-B: every new account is activated by an emailed link, so an e-mail address is required.
+            if (! $student && ! isset($matched['user_id']) && ! filled($row['email'] ?? null)) $errors[] = 'E-mail is required for a new student account; the activation link is sent there. Add it and validate again.';
             if (! $enrollment && ! $program->required_ojt_hours) $errors[] = 'Confirm program OJT hours before creating enrollments.';
             $id = $row['student_id'] ?? '';
             $identity = [CoordinatorExcelImport::norm($row['name'] ?? ''), CoordinatorExcelImport::norm($row['email'] ?? ''), (string) ($row['year_level'] ?? ''), (string) ($row['enrolled_on'] ?? '')];
@@ -97,10 +99,11 @@ class StudentAccountImport
         if (! $student) {
             $user = isset($m['user_id']) ? User::findOrFail($m['user_id']) : null;
             if (! $user) {
-                $password = 'Im!'.bin2hex(random_bytes(16));
-                $user = new User(['name' => $r['name'], 'email' => filled($r['email'] ?? null) ? strtolower($r['email']) : null, 'password' => $password]);
-                $user->forceFill(['role' => Role::Student, 'status' => AccountStatus::Active, 'must_change_password' => true])->save();
-                $credentials[] = ['student_id' => $r['student_id'], 'temporary_password' => $password];
+                // Spec §17A-B: no usable password. The account stays pending until the student opens the
+                // one-time activation link, sets their own password and acknowledges the privacy notice.
+                $user = new User(['name' => $r['name'], 'email' => strtolower($r['email']), 'password' => \Illuminate\Support\Str::random(64)]);
+                $user->forceFill(['role' => Role::Student, 'status' => AccountStatus::Pending, 'must_change_password' => false])->save();
+                $credentials[] = ['student_id' => $r['student_id'], 'activate_user_id' => $user->id];
             }
             $student = Student::create(['user_id' => $user->id, 'student_number' => $r['student_id']]);
             $user->profile()->firstOrCreate([], ['address' => $r['student_address'] ?? null]);

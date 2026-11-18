@@ -21,11 +21,16 @@ import { ProfileEditor } from "@/components/im/ProfileEditor";
 export function CoordinatorSection({ section }: { section: string }) {
   const [importRevision, setImportRevision] = useState(0);
   useEffect(() => {
-    const refresh = () => setImportRevision(value => value + 1);
-    const storage = (event: StorageEvent) => { if (event.key === "internmatch:records-imported") refresh(); };
+    const refresh = () => setImportRevision((value) => value + 1);
+    const storage = (event: StorageEvent) => {
+      if (event.key === "internmatch:records-imported") refresh();
+    };
     window.addEventListener("internmatch:records-imported", refresh);
     window.addEventListener("storage", storage);
-    return () => { window.removeEventListener("internmatch:records-imported", refresh); window.removeEventListener("storage", storage); };
+    return () => {
+      window.removeEventListener("internmatch:records-imported", refresh);
+      window.removeEventListener("storage", storage);
+    };
   }, []);
   switch (section) {
     case "inbox":
@@ -65,7 +70,10 @@ export function CoordinatorSection({ section }: { section: string }) {
             title="Accessibility map"
             subtitle="Placement distribution across host establishments in the Davao Region."
           />
-          <AccessibilityMap key={importRevision} note="Use the map to balance placements against student travel burden." />
+          <AccessibilityMap
+            key={importRevision}
+            note="Use the map to balance placements against student travel burden."
+          />
         </>
       );
     default:

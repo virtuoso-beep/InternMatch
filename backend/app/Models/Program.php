@@ -6,6 +6,7 @@ use Database\Factories\ProgramFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -23,6 +24,12 @@ class Program extends Model
         ];
     }
 
+    /** The program's current evaluation rubric version. */
+    public function evaluationRubric(): BelongsTo
+    {
+        return $this->belongsTo(EvaluationRubric::class);
+    }
+
     public function competencies(): BelongsToMany
     {
         return $this->belongsToMany(Competency::class, 'program_competencies')->withTimestamps();
@@ -30,7 +37,8 @@ class Program extends Model
 
     public function coordinators(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'coordinator_program')->withTimestamps();
+        return $this->belongsToMany(User::class, 'coordinator_program')->withTimestamps()
+            ->withPivot(['assigned_at', 'removed_at'])->wherePivotNull('removed_at');
     }
 
     /** @return HasMany<ProgramTerm, $this> */

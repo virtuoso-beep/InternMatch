@@ -34,7 +34,7 @@ class AuthenticationTest extends TestCase
         $response->assertOk()->assertExactJson(['data' => [
             'id' => $user->id, 'name' => $user->name, 'email' => $user->email,
             'role' => 'student', 'status' => 'active',
-            'must_change_password' => false, 'student_number' => null,
+            'must_change_password' => false, 'privacy_consent_required' => true, 'student_number' => null,
             'program_codes' => [], 'program_label' => 'No program assigned',
             'permissions' => ['manage_own_profile', 'manage_own_competencies', 'submit_own_requirements', 'view_own_placement'],
         ]]);

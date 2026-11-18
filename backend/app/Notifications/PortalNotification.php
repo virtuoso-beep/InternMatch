@@ -6,7 +6,8 @@ use Illuminate\Notifications\Notification;
 
 class PortalNotification extends Notification
 {
-    public function __construct(public string $title, public string $body) {}
+    /** @param array<string, scalar> $meta extra keys stored with the notification (e.g. for de-duplication) */
+    public function __construct(public string $title, public string $body, public array $meta = []) {}
 
     public function via(object $notifiable): array
     {
@@ -15,6 +16,6 @@ class PortalNotification extends Notification
 
     public function toDatabase(object $notifiable): array
     {
-        return ['title' => $this->title, 'body' => $this->body];
+        return ['title' => $this->title, 'body' => $this->body, ...$this->meta];
     }
 }

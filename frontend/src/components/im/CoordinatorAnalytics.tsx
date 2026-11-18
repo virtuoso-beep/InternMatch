@@ -133,7 +133,7 @@ export function CoordinatorAnalytics() {
           </p>
         </>
       )}
-      <ReportWorkspace title="Report snapshots" />
+      <ReportWorkspace title="Report snapshots" headingLevel={2} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { Button, Pill, statusTone } from "./ui";
+import { Button, Pill, formatRating, formatStatus, statusTone } from "./ui";
 import type { Monitoring } from "./MonitoringWorkspace";
 
 export function InternProgress({ placementId }: { placementId: number }) {
@@ -114,11 +114,11 @@ function EvaluationSummary({ placementId }: { placementId: number }) {
           {score.period}:{" "}
           {score.weighted_percentage === null
             ? "Score unavailable"
-            : `${Number(score.weighted_percentage).toFixed(1)}%`}
+            : formatRating(score.weighted_percentage)}
         </p>
       ))}
       <p className="text-xs text-muted-foreground">
-        Rubric-weighted percentages; draft scores are excluded.
+        Rubric-weighted ratings; draft scores are excluded.
       </p>
     </div>
   );
@@ -171,7 +171,7 @@ export function AttendanceTable({
           >
             {["all", "pending", "verified", "flagged"].map((value) => (
               <option key={value} value={value}>
-                {value === "all" ? "All statuses" : value}
+                {value === "all" ? "All statuses" : formatStatus(value)}
               </option>
             ))}
           </select>
@@ -216,7 +216,7 @@ export function AttendanceTable({
         onCancel={(event) => {
           if (batchBusy) event.preventDefault();
         }}
-        className="m-auto max-h-[85vh] w-[min(95vw,640px)] overflow-auto rounded-xl border bg-card p-6 text-foreground backdrop:bg-black/40"
+        className="m-auto max-h-[90dvh] w-[min(95vw,640px)] overflow-auto rounded-xl border bg-card p-6 text-foreground backdrop:bg-black/40"
       >
         <h2 id="batch-title" className="text-lg font-semibold">
           Certify pending hours

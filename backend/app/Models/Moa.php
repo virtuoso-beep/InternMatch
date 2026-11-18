@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Enums\MoaStatus;
+use Carbon\CarbonImmutable;
 use Database\Factories\MoaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,6 +29,36 @@ class Moa extends Model
             'signatories' => 'array',
             'is_institution_wide' => 'boolean',
         ];
+    }
+
+    /** Days of remaining validity at or below which an active agreement counts as expiring (spec §5). */
+    public const EXPIRING_DAYS = 90;
+
+    protected $appends = ['lifecycle_status'];
+
+    /**
+     * Spec §5 status computed from the dates: pending, active, expiring, expired.
+     * A terminated agreement stays terminated; drafts and unsigned agreements are pending.
+     */
+    public function statusOn(?\DateTimeInterface $on = null): string
+    {
+        $today = CarbonImmutable::instance($on ?? now())->startOfDay();
+        if ($this->status === MoaStatus::Terminated) {
+            return 'terminated';
+        }
+        if ($this->expires_on && $this->expires_on->lt($today)) {
+            return 'expired';
+        }
+        if ($this->status !== MoaStatus::Active || ! $this->effective_on || $this->effective_on->gt($today) || ! $this->expires_on) {
+            return 'pending';
+        }
+
+        return $today->diffInDays($this->expires_on) <= self::EXPIRING_DAYS ? 'expiring' : 'active';
+    }
+
+    protected function lifecycleStatus(): Attribute
+    {
+        return Attribute::get(fn () => $this->statusOn());
     }
 
     public function coversProgram(int $programId): bool

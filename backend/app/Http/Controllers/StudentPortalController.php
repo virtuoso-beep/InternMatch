@@ -6,6 +6,7 @@ use App\Enums\EnrollmentStatus;
 use App\Enums\Role;
 use App\Models\Opportunity;
 use App\Models\Recommendation;
+use App\Services\AccountActivation;
 use App\Services\GenerateRecommendations;
 use App\Services\Haversine;
 use App\Services\OpportunityEligibility;
@@ -22,6 +23,7 @@ class StudentPortalController extends Controller
         $history = StudentAccess::enrollments($request->user())->where('student_id', $record->student_id)
             ->with(['programTerm.program', 'programTerm.academicTerm', 'placements.hostEstablishment', 'placements.opportunity'])
             ->orderByDesc('enrolled_on')->get();
+
         return response()->json(['student' => $record->student, 'enrollments' => $history], headers: ['Cache-Control' => 'no-store']);
     }
 
@@ -50,9 +52,16 @@ class StudentPortalController extends Controller
     {
         abort_if($request->user()->role === Role::Dean, 403, 'Program chairs and deans access approved reports.');
 
-        return response()->json(['data' => StudentAccess::enrollments($request->user())
-            ->with(['student.user' => fn ($q) => $q->withTrashed()->select('id','name','email'), 'programTerm.program', 'programTerm.academicTerm', 'currentPlacement.hostEstablishment', 'currentPlacement.opportunity'])
-            ->orderByDesc('enrolled_on')->get()], headers: ['Cache-Control' => 'no-store']);
+        $rows = StudentAccess::enrollments($request->user())
+            ->with(['student.user' => fn ($q) => $q->withTrashed()->select('id', 'name', 'email', 'status'), 'programTerm.program', 'programTerm.academicTerm', 'currentPlacement.hostEstablishment', 'currentPlacement.opportunity'])
+            ->orderByDesc('enrolled_on')->get();
+        if (in_array($request->user()->role, [Role::Coordinator, Role::Admin], true)) {
+            // Spec §17A-B: coordinators see each account's activation state and can (re-)send the link.
+            $states = AccountActivation::statusFor($rows->pluck('student.user.id')->filter()->unique()->values()->all());
+            $rows->each(fn ($row) => $row->student?->user?->setAttribute('activation', $states[$row->student->user->id] ?? null));
+        }
+
+        return response()->json(['data' => $rows], headers: ['Cache-Control' => 'no-store']);
     }
 
     public function opportunities(Request $request, int $enrollment, OpportunityEligibility $eligibility)

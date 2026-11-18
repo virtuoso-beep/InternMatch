@@ -15,11 +15,13 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Tests\Concerns\AcknowledgesPrivacyNotice;
 use Tests\TestCase;
 
 class FilamentOpportunityTest extends TestCase
 {
     use LazilyRefreshDatabase;
+    use AcknowledgesPrivacyNotice;
 
     private function setupRecords(): array
     {
@@ -27,7 +29,7 @@ class FilamentOpportunityTest extends TestCase
         $host = $placement->hostEstablishment;
         $program = $placement->studentEnrollment->programTerm->program;
         $term = $placement->studentEnrollment->programTerm->academic_term_id;
-        $actor = User::factory()->withRole(Role::Coordinator)->create();
+        $actor = User::factory()->withRole(Role::Admin)->create();
         $actor->programs()->attach($program);
         DB::table('host_program_capacity')->insert(['host_establishment_id' => $host->id, 'program_id' => $program->id, 'academic_term_id' => $term, 'capacity' => 3]);
         $this->actingAs($actor);
@@ -74,11 +76,14 @@ class FilamentOpportunityTest extends TestCase
         $own = Opportunity::factory()->create(['host_establishment_id' => $host->id, 'academic_term_id' => $term]);
         $own->programs()->attach($program, ['capacity' => 2]);
         $outside = Opportunity::factory()->create();
-        Livewire::test(ListOpportunities::class)->assertCanSeeTableRecords([$own])->assertCanNotSeeTableRecords([$outside]);
-        $this->get('/manage/opportunities/'.$outside->id.'/edit')->assertNotFound();
+        Livewire::test(ListOpportunities::class)->assertCanSeeTableRecords([$own, $outside]); // admin panel is not program-scoped
+        $this->get('/manage/opportunities/'.$outside->id.'/edit')->assertOk();
         $other = Program::factory()->create();
         $own->programs()->attach($other, ['capacity' => 1]);
-        $this->get('/manage/opportunities/'.$own->id.'/edit')->assertForbidden();
+        // Coordinators work through the API and may not edit programs they do not own.
+        $coordinator = User::factory()->withRole(Role::Coordinator)->create();
+        $coordinator->programs()->attach($program);
+        $this->actingAs($coordinator);
         $this->putJson('/api/v1/opportunities/'.$own->id, ['host_establishment_id' => $host->id, 'academic_term_id' => $term,
             'title' => 'Attempt to remove outside program', 'description' => 'QA', 'tasks' => 'QA', 'status' => 'draft',
             'programs' => [['program_id' => $program->id, 'capacity' => 2]], 'competency_ids' => []])->assertForbidden();

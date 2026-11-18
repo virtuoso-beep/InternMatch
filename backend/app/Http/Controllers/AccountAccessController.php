@@ -26,6 +26,9 @@ class AccountAccessController extends Controller
                 if ($attributes['role'] === 'coordinator') {
                     $programIds = $record->programs()->pluck('programs.id')->all();
                     Program::whereIn('id', $programIds)->orderBy('id')->lockForUpdate()->get();
+                    if (count($programIds) > 1) {
+                        throw ValidationException::withMessages(['role' => 'A practicum coordinator can be assigned to exactly one program. Remove the extra programs first.']);
+                    }
                 }
                 $record->role = $attributes['role'];
             }

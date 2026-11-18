@@ -77,18 +77,22 @@ class MonitoringWorkflowTest extends TestCase
 
     public function test_risk_boundaries_use_current_program_hours_and_latest_document_revision(): void
     {
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-18 09:00', 'Asia/Manila'));
         [$placement] = $this->context();
         $term = $placement->studentEnrollment->programTerm;
-        $term->update(['monitoring_rules' => ['remaining_days_threshold' => 11, 'remaining_hours_threshold' => 100]]);
+        $quiet = ['behind_schedule_after_days' => 100000, 'max_daily_hours' => 100000, 'no_log_days' => 100000, 'uncertified_days' => 100000, 'weekly_report_grace_days' => 100000]; // isolate the legacy and requirement rules from the spec §13 pace rules
+        $term->update(['monitoring_rules' => ['remaining_days_threshold' => 11, 'remaining_hours_threshold' => 100] + $quiet]);
         $service = app(ProgressSummary::class);
         $this->assertCount(1, $service->forPlacement($placement)['flags']);
-        $term->update(['monitoring_rules' => ['remaining_days_threshold' => 10, 'remaining_hours_threshold' => 100]]);
+        $term->update(['monitoring_rules' => ['remaining_days_threshold' => 10, 'remaining_hours_threshold' => 100] + $quiet]);
         $this->assertCount(0, $service->forPlacement($placement)['flags']);
         $term->program->update(['required_ojt_hours' => null]);
         $this->assertNull($service->forPlacement($placement)['remaining_minutes']);
         $requirement = ProgramTermRequirement::factory()->create(['program_term_id' => $term->id, 'due_at' => now()]);
         $this->assertCount(0, $service->forPlacement($placement)['flags']);
         $this->travel(1)->seconds();
+        $this->assertCount(0, $service->forPlacement($placement)['flags']); // spec §13 rule 6: 2 working days' grace
+        $this->travel(7)->days();
         $this->assertCount(1, $service->forPlacement($placement)['flags']);
         RequirementSubmission::factory()->create(['program_term_id' => $term->id, 'program_term_requirement_id' => $requirement->id, 'student_enrollment_id' => $placement->student_enrollment_id, 'revision' => 1, 'status' => 'approved']);
         $this->assertCount(0, $service->forPlacement($placement)['flags']);

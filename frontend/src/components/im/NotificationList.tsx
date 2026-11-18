@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Bell, ClipboardList, MessageSquare } from "lucide-react";
 import { api, mutate } from "@/lib/api";
 import { Button, Card, cx, FilterChips, PageHeader } from "./ui";
 import { useSessionUser } from "./SessionGuard";
@@ -189,7 +190,12 @@ export function NotificationList() {
       {!result && !error && <p role="status">Loading notifications…</p>}
       {result?.data.length === 0 && (
         <Card className="py-16 text-center">
-          <div className="mb-4 text-5xl opacity-40">🔔</div>
+          <Bell
+            size={44}
+            strokeWidth={1.5}
+            className="mx-auto mb-4 text-muted-foreground/60"
+            aria-hidden="true"
+          />
           <p className="text-lg font-semibold">
             {filter === "All" ? "No notifications yet" : `No ${filter.toLowerCase()} notifications`}
           </p>
@@ -231,7 +237,11 @@ export function NotificationList() {
                   !item.read_at ? "bg-brand/10 text-brand" : "bg-muted text-muted-foreground",
                 )}
               >
-                {item.data.conversation_id ? "💬" : "📋"}
+                {item.data.conversation_id ? (
+                  <MessageSquare size={18} aria-hidden="true" />
+                ) : (
+                  <ClipboardList size={18} aria-hidden="true" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-start justify-between gap-3">

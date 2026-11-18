@@ -22,7 +22,10 @@ class ProgramSeeder extends Seeder
             // BSIT: 486 hours confirmed by the user against the department-approved data guide on 2026-09-24.
             // BSCS: 350 hours explicitly confirmed by the user on 2026-11-02.
             // Existing program settings are preserved; BSA hours are supplied by its source import.
+            // BSCS is outside the approved scope (BSIT, BSCRIM, BSA; confirmed 2026-11-16). It is kept as an
+            // inactive row so existing references and history stay valid; it is hidden from selectors/imports.
             $program = Program::firstOrCreate(['code' => $code], ['name' => $name, 'cluster' => $cluster,
+                'is_active' => $code !== 'BSCS',
                 'required_ojt_hours' => match ($code) { 'BSIT' => 486, 'BSCS' => 350, default => null }]);
             if ($program->cluster === null) {
                 $program->update(['cluster' => $cluster]);

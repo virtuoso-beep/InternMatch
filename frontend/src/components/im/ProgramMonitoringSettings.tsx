@@ -10,9 +10,10 @@ type Program = {
     id: number;
     academic_term: { code: string };
     monitoring_rules: {
-      remaining_days_threshold: number;
-      remaining_hours_threshold: number;
+      remaining_days_threshold?: number;
+      remaining_hours_threshold?: number;
       approval_reference: string;
+      [rule: string]: number | string | undefined;
     } | null;
   }[];
 };
@@ -79,6 +80,11 @@ export function ProgramMonitoringSettings() {
           ))}
         </select>
       </label>
+      {!program && config && (
+        <p className="mt-6 rounded-lg border border-dashed bg-card p-6 text-sm text-muted-foreground">
+          Choose a program to view or update its monitoring thresholds and evaluation rubric.
+        </p>
+      )}
       {program && (
         <Settings
           key={program.id}
@@ -92,6 +98,91 @@ export function ProgramMonitoringSettings() {
     </>
   );
 }
+
+/** Spec §13 adopted defaults (mirrors ProgressSummary::DEFAULTS on the server). */
+const SPEC_RULES: {
+  key: string;
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  value: number;
+}[] = [
+  {
+    key: "behind_schedule_percent",
+    label: "Behind schedule below % of expected pace",
+    unit: "%",
+    min: 1,
+    max: 100,
+    value: 85,
+  },
+  {
+    key: "behind_schedule_after_days",
+    label: "Start pace checks after",
+    unit: "working days",
+    min: 0,
+    max: 200,
+    value: 10,
+  },
+  {
+    key: "max_daily_hours",
+    label: "Maximum creditable hours per day",
+    unit: "hours",
+    min: 1,
+    max: 24,
+    value: 8,
+  },
+  {
+    key: "no_log_days",
+    label: "No hours logged for",
+    unit: "working days",
+    min: 1,
+    max: 60,
+    value: 5,
+  },
+  {
+    key: "uncertified_days",
+    label: "Time log waiting for certification over",
+    unit: "working days",
+    min: 1,
+    max: 60,
+    value: 5,
+  },
+  {
+    key: "weekly_report_grace_days",
+    label: "Weekly report grace after week ends",
+    unit: "working days",
+    min: 0,
+    max: 60,
+    value: 3,
+  },
+  {
+    key: "requirement_grace_days",
+    label: "Requirement grace after deadline",
+    unit: "working days",
+    min: 0,
+    max: 60,
+    value: 2,
+  },
+  {
+    key: "evaluation_window_days",
+    label: "Evaluation period stays open",
+    unit: "working days",
+    min: 1,
+    max: 60,
+    value: 10,
+  },
+  {
+    key: "evaluation_grace_days",
+    label: "Evaluation flag after period closes",
+    unit: "working days",
+    min: 0,
+    max: 60,
+    value: 5,
+  },
+];
+const ruleValues = (saved?: Record<string, unknown> | null) =>
+  Object.fromEntries(SPEC_RULES.map((rule) => [rule.key, String(saved?.[rule.key] ?? rule.value)]));
 
 function Settings({
   program,
@@ -109,15 +200,17 @@ function Settings({
   const [days, setDays] = useState("");
   const [hours, setHours] = useState("");
   const [ruleApproval, setRuleApproval] = useState("");
+  const [specRules, setSpecRules] = useState<Record<string, string>>(ruleValues());
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [rubric, setRubric] = useState(currentRubric);
   const [terms, setTerms] = useState(program.program_terms);
   const term = terms.find((item) => item.id === Number(termId));
   useEffect(() => {
-    setDays(term?.monitoring_rules ? String(term.monitoring_rules.remaining_days_threshold) : "");
-    setHours(term?.monitoring_rules ? String(term.monitoring_rules.remaining_hours_threshold) : "");
+    setDays(String(term?.monitoring_rules?.remaining_days_threshold ?? ""));
+    setHours(String(term?.monitoring_rules?.remaining_hours_threshold ?? ""));
     setRuleApproval(term?.monitoring_rules?.approval_reference ?? "");
+    setSpecRules(ruleValues(term?.monitoring_rules));
   }, [term]);
   return (
     <div className="space-y-5">
@@ -254,10 +347,11 @@ function Settings({
         </form>
       </Card>
       <Card>
-        <CardTitle>Hours-attention thresholds</CardTitle>
+        <CardTitle>Monitoring rules</CardTitle>
         <p className="mb-3 text-sm">
-          Flag when remaining days are at or below the days threshold and remaining hours are at or
-          above the hours threshold. Only certified time counts.
+          The adopted spec §13 rules are active by default for every program. Adjust a value for
+          this program term only when the department approves it; every change is logged. Only
+          certified time counts.
         </p>
         <form
           className="space-y-3"
@@ -267,8 +361,15 @@ function Settings({
             setMessage("");
             try {
               const rules = {
-                remaining_days_threshold: Number(days),
-                remaining_hours_threshold: Number(hours),
+                ...Object.fromEntries(
+                  SPEC_RULES.map((rule) => [rule.key, Number(specRules[rule.key])]),
+                ),
+                ...(days !== "" && hours !== ""
+                  ? {
+                      remaining_days_threshold: Number(days),
+                      remaining_hours_threshold: Number(hours),
+                    }
+                  : {}),
                 approval_reference: ruleApproval,
               };
               await mutate(`/program-terms/${termId}/monitoring-rules`, rules, "PUT");
@@ -277,7 +378,7 @@ function Settings({
                   item.id === Number(termId) ? { ...item, monitoring_rules: rules } : item,
                 ),
               );
-              setMessage("Monitoring thresholds saved.");
+              setMessage("Monitoring rules saved.");
               saved();
             } catch (cause) {
               setMessage(cause instanceof Error ? cause.message : "Unable to save rules.");
@@ -304,10 +405,33 @@ function Settings({
                 ))}
               </select>
             </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {SPEC_RULES.map((rule) => (
+                <label key={rule.key} className="block text-sm">
+                  {rule.label}
+                  <span className="mt-1 flex items-center gap-2">
+                    <input
+                      required
+                      type="number"
+                      min={rule.min}
+                      max={rule.max}
+                      value={specRules[rule.key]}
+                      onChange={(event) =>
+                        setSpecRules((current) => ({ ...current, [rule.key]: event.target.value }))
+                      }
+                      className="w-24 rounded border p-2"
+                    />
+                    <span className="text-xs text-muted-foreground">{rule.unit}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="pt-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Optional legacy hours threshold
+            </p>
             <label className="block text-sm">
               Remaining days threshold
               <input
-                required
                 type="number"
                 min="0"
                 max="365"
@@ -319,7 +443,6 @@ function Settings({
             <label className="block text-sm">
               Remaining hours threshold
               <input
-                required
                 type="number"
                 min="1"
                 max="10000"
@@ -341,34 +464,27 @@ function Settings({
               <p className="rounded-lg bg-muted p-3 text-sm" role="status">
                 {term.monitoring_rules
                   ? "Saved rules exist for this term."
-                  : "This term has no confirmed hours thresholds."}{" "}
+                  : "This term uses the spec §13 defaults."}{" "}
                 {days !== "" &&
                   hours !== "" &&
                   `Preview: flag when remaining days ≤ ${days} AND remaining certified-work hours needed ≥ ${hours}.`}
               </p>
             )}
             <Button type="submit" disabled={busy || !termId}>
-              Save thresholds
+              Save monitoring rules
             </Button>
             <Button
               variant="outline"
               disabled={!termId}
               onClick={() => {
-                setDays(
-                  term?.monitoring_rules
-                    ? String(term.monitoring_rules.remaining_days_threshold)
-                    : "",
-                );
-                setHours(
-                  term?.monitoring_rules
-                    ? String(term.monitoring_rules.remaining_hours_threshold)
-                    : "",
-                );
+                setDays(String(term?.monitoring_rules?.remaining_days_threshold ?? ""));
+                setHours(String(term?.monitoring_rules?.remaining_hours_threshold ?? ""));
                 setRuleApproval(term?.monitoring_rules?.approval_reference ?? "");
+                setSpecRules(ruleValues(term?.monitoring_rules));
                 setMessage("");
               }}
             >
-              Reset to saved thresholds
+              Reset to saved rules
             </Button>
           </fieldset>
         </form>

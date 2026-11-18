@@ -65,7 +65,9 @@ class User extends Authenticatable implements FilamentUser, \Filament\Models\Con
 
     public function programs(): BelongsToMany
     {
-        return $this->belongsToMany(Program::class, 'coordinator_program')->withTimestamps();
+        // Only active assignments grant access; ended rows (removed_at) are kept as history.
+        return $this->belongsToMany(Program::class, 'coordinator_program')->withTimestamps()
+            ->withPivot(['assigned_at', 'removed_at'])->wherePivotNull('removed_at');
     }
 
     public function isAssignedToHost(int $hostEstablishmentId): bool

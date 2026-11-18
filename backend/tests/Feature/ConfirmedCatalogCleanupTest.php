@@ -18,9 +18,9 @@ class ConfirmedCatalogCleanupTest extends TestCase
 
     public function test_cleanup_preserves_accounts_referenced_requirements_and_competency_evidence(): void
     {
-        $this->seed(DatabaseSeeder::class);
+        $this->seed([DatabaseSeeder::class, \Database\Seeders\ProgramSeeder::class]);
         $bsit = Program::where('code', 'BSIT')->firstOrFail();
-        $account = User::factory()->create(['email' => 'student@example.com']);
+        $account = User::where('email', 'student@example.com')->firstOrFail(); // created once by DatabaseSeeder
         $password = $account->password;
         $unused = RequirementType::factory()->create(['code' => 'medical-clearance']);
         $used = RequirementType::factory()->create(['code' => 'parental-consent']);
@@ -39,7 +39,7 @@ class ConfirmedCatalogCleanupTest extends TestCase
         $this->assertSame(4, $bsit->competencies()->count());
         $this->assertSame($otherCount, Program::where('code', 'BSCS')->firstOrFail()->competencies()->count());
         $this->assertSame($password, $account->fresh()->password);
-        $this->assertDatabaseCount('users', 2);
-        $this->assertDatabaseCount('programs', 17);
+        $this->assertDatabaseCount('users', 5); // four demo accounts + the student created by the competency factory
+        $this->assertDatabaseCount('programs', 5); // 4 seeded (BSA, BSCS inactive, BSIT, BSCRIM) + 1 from the factory
     }
 }

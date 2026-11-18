@@ -31,15 +31,19 @@ class RefreshMonitoringFlags extends Command
                         $flag->update(['resolved_at' => now(), 'resolved_automatically' => true, 'resolution' => 'The configured condition no longer applies.']);
                         $this->audit($flag, $program, 'monitoring.resolved');
                     }
-                    $recipients = User::where('role', Role::Coordinator)->where('status', 'active')->whereHas('programs', fn ($q) => $q->whereKey($program))->get();
-                    $recipients->push($placement->studentEnrollment->student->user);
-                    if ($placement->supervisor && $placement->supervisor->isAssignedToHost($placement->host_establishment_id)) { $recipients->push($placement->supervisor); }
+                    // Recipients by role; each condition's `notify` list (spec §13 rules table) picks who is told.
+                    $byRole = [
+                        'coordinator' => User::where('role', Role::Coordinator)->where('status', 'active')->whereHas('programs', fn ($q) => $q->whereKey($program))->get(),
+                        'student' => collect([$placement->studentEnrollment->student->user])->filter(), // archived accounts are not notified
+                        'supervisor' => collect($placement->supervisor && $placement->supervisor->isAssignedToHost($placement->host_establishment_id) ? [$placement->supervisor] : []),
+                    ];
                     $count = 0;
                     foreach ($current as $condition) {
                         $code = 'auto:'.$condition['code'];
                         if ($placement->monitoringFlags()->where('code', $code)->whereNull('resolved_at')->exists()) { continue; }
-                        $flag = $placement->monitoringFlags()->create(['code' => $code, 'severity' => 'warning', 'description' => $condition['description'], 'raised_at' => now()]);
+                        $flag = $placement->monitoringFlags()->create(['code' => $code, 'severity' => $condition['severity'] ?? 'warning', 'description' => $condition['description'], 'raised_at' => now()]);
                         $this->audit($flag, $program, 'monitoring.raised');
+                        $recipients = collect($condition['notify'] ?? array_keys($byRole))->flatMap(fn ($role) => $byRole[$role] ?? collect());
                         foreach ($recipients->unique('id') as $user) {
                             if ($user->status->value === 'active') {
                                 $user->notify(new PortalNotification('Internship progress needs attention', 'Placement #'.$placement->id.': '.$condition['description']));

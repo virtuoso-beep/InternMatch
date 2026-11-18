@@ -18,7 +18,7 @@ class RecommendationReviewController extends Controller
         $history = DB::table('placement_judgments')->whereIn('recommendation_id', $records->pluck('id'))
             ->orderByDesc('id')->get(['id', 'recommendation_id', 'judgment', 'reason', 'approved_at'])->groupBy('recommendation_id');
         $records->through(fn ($record) => [
-            'id' => $record->id, 'student_name' => $record->studentEnrollment->student->user->name,
+            'id' => $record->id, 'student_name' => $record->studentEnrollment->student->user?->name ?? 'Archived student account',
             'program' => $record->studentEnrollment->programTerm->program->code,
             'host_name' => $record->snapshot['host_name'] ?? null,
             'opportunity_title' => $record->snapshot['opportunity_title'] ?? null,

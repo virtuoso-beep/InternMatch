@@ -54,7 +54,11 @@ class ReportController extends Controller
     public function download(Request $request, int $report)
     {
         $record = $this->reports($request)->findOrFail($report);
-        Audit::record($request->user(), 'report.exported', $record, ['format' => 'csv', 'content_hash' => $record->content_hash], $record->programTerm->program_id);
+        $format = $request->validate(['format' => ['nullable', Rule::in(['csv', 'xlsx'])]])['format'] ?? 'csv';
+        Audit::record($request->user(), 'report.exported', $record, ['format' => $format, 'content_hash' => $record->content_hash], $record->programTerm->program_id);
+        if ($format === 'xlsx') {
+            return $this->xlsx($request, $record);
+        }
 
         return response()->streamDownload(function () use ($record) {
             $stream = fopen('php://output', 'w');
@@ -67,5 +71,56 @@ class ReportController extends Controller
             }
             fclose($stream);
         }, 'internmatch-'.$record->kind.'-'.$record->id.'.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * Spec §17A-C (FR-22): XLSX export of the same frozen, scope-checked report snapshot.
+     * Text is written as explicit string cells, so spreadsheet software never evaluates it as a formula.
+     */
+    private function xlsx(Request $request, GeneratedReport $record)
+    {
+        $record->loadMissing('programTerm.program', 'programTerm.academicTerm');
+        $book = new \PhpOffice\PhpSpreadsheet\Spreadsheet;
+        $sheet = $book->getActiveSheet();
+        $sheet->setTitle('Report');
+        $put = function ($sheet, int $col, int $row, $value): void {
+            $cell = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col).$row;
+            if (is_int($value) || is_float($value)) {
+                $sheet->setCellValue($cell, $value);
+            } else {
+                $sheet->setCellValueExplicit($cell, (string) ($value ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            }
+        };
+        foreach (array_values($record->payload['columns']) as $c => $column) {
+            $put($sheet, $c + 1, 1, $column);
+        }
+        $sheet->getStyle('1:1')->getFont()->setBold(true);
+        $sheet->freezePane('A2');
+        foreach ($record->payload['rows'] as $r => $row) {
+            foreach (array_values($row) as $c => $value) {
+                $put($sheet, $c + 1, $r + 2, $value);
+            }
+        }
+        $info = $book->createSheet()->setTitle('Export details');
+        $details = [
+            ['Report', $record->kind],
+            ['Program', $record->programTerm->program->code ?? ''],
+            ['Academic term', $record->programTerm->academicTerm->name ?? ''],
+            ['Report generated', (string) $record->created_at],
+            ['Approval', $record->approved_at ? 'Approved '.$record->approved_at : 'Not approved'],
+            ['Content hash', (string) $record->content_hash],
+            ['Exported at', now()->toDateTimeString()],
+            ['Exported by', $request->user()->name],
+        ];
+        foreach ($details as $i => [$label, $value]) {
+            $put($info, 1, $i + 1, $label);
+            $put($info, 2, $i + 1, $value);
+        }
+        $book->setActiveSheetIndex(0);
+
+        return response()->streamDownload(function () use ($book) {
+            (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($book))->save('php://output');
+            $book->disconnectWorksheets();
+        }, 'internmatch-'.$record->kind.'-'.$record->id.'.xlsx', ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Cache-Control' => 'no-store']);
     }
 }
