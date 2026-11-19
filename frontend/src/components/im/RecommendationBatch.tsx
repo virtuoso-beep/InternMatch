@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, downloadText, formatSimilarity, studentName, formatStatus } from "./ui";
+import { SYNTHETIC_LABEL, withSynthetic } from "@/lib/synthetic";
+import {
+  Button,
+  Card,
+  Pill,
+  downloadText,
+  formatSimilarity,
+  studentName,
+  formatStatus,
+} from "./ui";
+import { SyntheticToggle } from "./SyntheticToggle";
 type Student = {
   id: number;
   status: string;
+  is_synthetic?: boolean | number;
   student: { user: { name: string } };
   program_term: { program: { code: string } };
   current_placement: { status: string } | null;
@@ -26,6 +37,7 @@ type Result = {
   student: string;
   status: string;
   reason: string;
+  synthetic?: boolean;
 };
 export function RecommendationBatch({ done }: { done: () => void }) {
   const [students, setStudents] = useState<Student[]>([]),
@@ -34,6 +46,8 @@ export function RecommendationBatch({ done }: { done: () => void }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [results, setResults] = useState<Result[]>([]);
+  // Synthetic students are left out of runs and history unless "Include synthetic data" is on.
+  const [includeSynthetic, setIncludeSynthetic] = useState(false);
   const [search, setSearch] = useState("");
   const [resultFilter, setResultFilter] = useState("");
   const visibleResults = results.filter(
@@ -43,9 +57,9 @@ export function RecommendationBatch({ done }: { done: () => void }) {
         .toLowerCase()
         .includes(search.trim().toLowerCase()),
   );
-  const [history, setHistory] = useState<{ id: number; created_at: string; results: Result[] }[]>(
-    [],
-  );
+  const [history, setHistory] = useState<
+    { id: number; created_at: string; contains_synthetic?: boolean; results: Result[] }[]
+  >([]);
   const [historyPage, setHistoryPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [historyError, setHistoryError] = useState("");
@@ -53,7 +67,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
     async (page = historyPage) => {
       try {
         const response = await api<{ data: typeof history; last_page: number }>(
-          `/recommendation-batch-reports?page=${page}`,
+          withSynthetic(`/recommendation-batch-reports?page=${page}`, includeSynthetic),
         );
         setHistory(response.data);
         setLastPage(response.last_page);
@@ -62,7 +76,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
         setHistoryError(e instanceof Error ? e.message : "Cannot load history.");
       }
     },
-    [historyPage],
+    [historyPage, includeSynthetic],
   );
   useEffect(() => {
     void loadHistory(historyPage);
@@ -71,7 +85,9 @@ export function RecommendationBatch({ done }: { done: () => void }) {
   useEffect(() => {
     if (open) dialog.current?.showModal();
   }, [open]);
-  const scope = students.filter((s) => s.program_term.program.code === program);
+  const scope = students.filter(
+    (s) => s.program_term.program.code === program && (includeSynthetic || !s.is_synthetic),
+  );
   const protectedStudent = (s: Student) => !!s.current_placement || s.status !== "enrolled";
   async function preview() {
     setError("");
@@ -133,6 +149,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
         }
       }
       row.enrollment_id = student.id;
+      row.synthetic = !!student.is_synthetic;
       output.push(row);
       setResults([...output]);
       if (!protectedStudent(student) && output.length < scope.length)
@@ -154,9 +171,19 @@ export function RecommendationBatch({ done }: { done: () => void }) {
   }
   return (
     <div className="mb-5">
-      <Button disabled={busy} onClick={() => void preview()}>
-        Regenerate batch
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button disabled={busy} onClick={() => void preview()}>
+          Regenerate batch
+        </Button>
+        <SyntheticToggle
+          checked={includeSynthetic}
+          onChange={(value) => {
+            setIncludeSynthetic(value);
+            setHistoryPage(1);
+          }}
+          disabled={busy}
+        />
+      </div>
       {error && <p role="alert">{error}</p>}
       <details className="my-4 rounded-xl border bg-card p-4">
         <summary className="cursor-pointer font-semibold">Batch history</summary>
@@ -180,7 +207,8 @@ export function RecommendationBatch({ done }: { done: () => void }) {
                 {new Date(batch.created_at.replace(" ", "T") + "Z").toLocaleString("en-PH", {
                   timeZone: "Asia/Manila",
                 })}{" "}
-                · {batch.results.length} records
+                · {batch.results.length} records{" "}
+                {batch.contains_synthetic && <Pill tone="warn">{SYNTHETIC_LABEL}</Pill>}
               </span>
               <Button variant="outline" disabled={busy} onClick={() => setResults(batch.results)}>
                 View results
@@ -284,7 +312,9 @@ export function RecommendationBatch({ done }: { done: () => void }) {
             disabled={busy}
             onClick={() =>
               downloadText(
-                "recommendation-batch-results.json",
+                results.some((r) => r.synthetic)
+                  ? "recommendation-batch-results-contains-synthetic-data.json"
+                  : "recommendation-batch-results.json",
                 JSON.stringify(results, null, 2),
                 "application/json",
               )
@@ -344,7 +374,9 @@ export function RecommendationBatch({ done }: { done: () => void }) {
               <tbody>
                 {visibleResults.map((r, i) => (
                   <tr key={i} className="border-t">
-                    <td className="p-2">{r.student}</td>
+                    <td className="p-2">
+                      {r.student} {r.synthetic && <Pill tone="warn">Synthetic</Pill>}
+                    </td>
                     {[r.previous, r.current].map((match, index) => (
                       <td key={index} className="p-2">
                         {match ? (

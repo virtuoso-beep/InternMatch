@@ -1,0 +1,6 @@
+# Test-only dependencies. Not installed by the Dockerfile (production image uses requirements.txt only).
+# Usage: pip install -r requirements-dev.txt && python -m pytest tests
+-r requirements.txt
+pytest==8.3.5
+# Imported by ml/clean_data.py (offline training pipeline) and tests/test_ml_pipeline.py.
+pandas==2.2.3

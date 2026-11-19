@@ -13,7 +13,8 @@ class PlacementStatistics extends StatsOverviewWidget
 {
     protected function getStats(): array
     {
-        $enrollments = StudentAccess::enrollments(Filament::auth()->user());
+        // Synthetic test records are never counted on the management overview.
+        $enrollments = StudentAccess::enrollments(Filament::auth()->user())->where('student_enrollments.is_synthetic', false);
         $placements = Placement::whereIn('student_enrollment_id', (clone $enrollments)->select('id'));
 
         return [

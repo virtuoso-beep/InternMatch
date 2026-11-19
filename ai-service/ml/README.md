@@ -14,7 +14,7 @@ It requires real approved coordinator judgments to produce a valid model.
    ```bash
    php artisan ml:export-judgments
    ```
-   This exports to `storage/app/ml/judgment_export.csv`.
+   This exports to `backend/storage/app/private/ml/judgment_export.csv` (real coordinator judgments only by default; `--source=synthetic` or `--source=all` adds synthetic labels, each row flagged `is_synthetic`).
 
 2. **Clean Data**: Validates ranges and handles missing distances.
    ```bash

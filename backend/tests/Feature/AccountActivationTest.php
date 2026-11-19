@@ -37,6 +37,7 @@ class AccountActivationTest extends TestCase
     {
         $admin = User::factory()->withRole(Role::Admin)->create();
         $student = User::factory()->withRole(Role::Student)->create(['status' => AccountStatus::Pending]);
+        $student->forceFill(['email_verified_at' => null])->save();
         $token = $this->issue($admin, $student);
         $this->assertSame(64, strlen($token));
         $this->assertDatabaseMissing('account_activations', ['token_hash' => $token]); // raw token never stored
@@ -48,6 +49,7 @@ class AccountActivationTest extends TestCase
         $this->postJson('/api/v1/activation', ['token' => $token, 'password' => $password, 'password_confirmation' => $password])->assertOk();
         $this->assertSame(AccountStatus::Active, $student->fresh()->status);
         $this->assertTrue(\Hash::check($password, $student->fresh()->password));
+        $this->assertNotNull($student->fresh()->email_verified_at); // the link proves the address receives mail
         $this->assertDatabaseHas('audit_logs', ['action' => 'account.activated', 'subject_id' => $student->id]);
 
         // Single use.

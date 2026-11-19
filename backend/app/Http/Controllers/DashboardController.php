@@ -17,6 +17,7 @@ use App\Services\OpportunityEligibility;
 use App\Services\PlacementAccess;
 use App\Services\PlacementReadiness;
 use App\Services\StudentAccess;
+use App\Support\SyntheticData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +44,9 @@ class DashboardController extends Controller
         if ($user->role === Role::Supervisor) {
             $enrollments = StudentEnrollment::whereHas('placements', fn ($query) => $query->whereIn('id', PlacementAccess::query($user)->select('id')));
         }
-        $enrollments->when($filters['program_id'] ?? null, fn ($query, $id) => $query->whereHas('programTerm', fn ($query) => $query->where('program_id', $id)))
+        $hideSynthetic = SyntheticData::excluded($request);
+        $enrollments->when($hideSynthetic, fn ($query) => $query->where('student_enrollments.is_synthetic', false))
+            ->when($filters['program_id'] ?? null, fn ($query, $id) => $query->whereHas('programTerm', fn ($query) => $query->where('program_id', $id)))
             ->when($filters['academic_term_id'] ?? null, fn ($query, $id) => $query->whereHas('programTerm', fn ($query) => $query->where('academic_term_id', $id)))
             ->when($filters['year_level'] ?? null, fn ($query, $year) => $query->where('year_level', $year));
         $placements = ($user->role === Role::Dean ? Placement::query() : PlacementAccess::query($user))
@@ -66,23 +69,25 @@ class DashboardController extends Controller
             ['label' => 'Stored recommendation generations', 'value' => DB::table('recommendations')->whereIn('student_enrollment_id', (clone $enrollments)->select('id'))->distinct()->count('generation_id')],
         ];
         if ($user->role === Role::Admin) {
-            $stats[] = ['label' => 'Active accounts (system-wide)', 'value' => User::where('status', 'active')->count()];
-            $stats[] = ['label' => 'Active hosts (system-wide)', 'value' => HostEstablishment::where('is_active', true)->count()];
-            $stats[] = ['label' => 'Published opportunities (system-wide)', 'value' => Opportunity::where('status', 'published')->count()];
+            $real = fn ($query) => $query->when($hideSynthetic, fn ($q) => $q->where('is_synthetic', false));
+            $stats[] = ['label' => 'Active accounts (system-wide)', 'value' => $real(User::where('status', 'active'))->count()];
+            $stats[] = ['label' => 'Active hosts (system-wide)', 'value' => $real(HostEstablishment::where('is_active', true))->count()];
+            $stats[] = ['label' => 'Published opportunities (system-wide)', 'value' => $real(Opportunity::where('status', 'published'))->count()];
         } elseif (in_array($user->role, [Role::Coordinator, Role::Supervisor], true)) {
-            $stats[] = ['label' => 'Accessible active hosts (all assigned programs)', 'value' => HostAccess::query($user)->where('is_active', true)->count()];
+            $stats[] = ['label' => 'Accessible active hosts (all assigned programs)', 'value' => HostAccess::query($user)->where('is_active', true)
+                ->when($hideSynthetic, fn ($q) => $q->where('host_establishments.is_synthetic', false))->count()];
         }
         if ($user->role === Role::Coordinator) {
-            array_push($stats, ...$this->coordinatorTiles($enrollments));
+            array_push($stats, ...$this->coordinatorTiles($enrollments, $hideSynthetic));
         }
         $breakdown = (clone $enrollments)->join('program_terms', 'program_terms.id', '=', 'student_enrollments.program_term_id')
             ->join('programs', 'programs.id', '=', 'program_terms.program_id')->selectRaw('programs.code, COUNT(*) as enrollments')->groupBy('programs.id', 'programs.code')->orderBy('programs.code')->get();
 
-        return response()->json(['stats' => $stats, 'programs' => $availablePrograms, 'program_breakdown' => $breakdown, 'generated_at' => now()->toIso8601String()], headers: ['Cache-Control' => 'no-store']);
+        return response()->json(['stats' => $stats, 'programs' => $availablePrograms, 'program_breakdown' => $breakdown, 'synthetic' => SyntheticData::meta($request), 'generated_at' => now()->toIso8601String()], headers: ['Cache-Control' => 'no-store']);
     }
 
     /** Spec §11 coordinator tiles, built on the existing readiness, eligibility and monitoring-flag rules. */
-    private function coordinatorTiles(Builder $enrollments): array
+    private function coordinatorTiles(Builder $enrollments, bool $hideSynthetic = false): array
     {
         $enrolled = (clone $enrollments)->where('status', 'enrolled')->with('programTerm.program')->get();
         $awaiting = (clone $enrollments)->where('status', 'enrolled')
@@ -95,7 +100,8 @@ class DashboardController extends Controller
         $slots = 0;
         foreach ($enrolled->unique('program_term_id') as $enrollment) {
             $perHost = [];
-            Opportunity::where('academic_term_id', $enrollment->programTerm->academic_term_id)->where('status', 'published')->get()
+            Opportunity::where('academic_term_id', $enrollment->programTerm->academic_term_id)->where('status', 'published')
+                ->when($hideSynthetic, fn ($q) => $q->where('is_synthetic', false))->get()
                 ->each(function ($opportunity) use ($eligibility, $enrollment, &$perHost) {
                     if ($info = $eligibility->inspect($enrollment, $opportunity)) {
                         $host = $opportunity->host_establishment_id;

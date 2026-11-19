@@ -23,6 +23,12 @@ class ChatAccess
             ->where(fn ($q) => $q->whereNull('ends_on')->orWhereDate('ends_on', '>=', today(config('internmatch.timezone', 'Asia/Manila'))));
     }
 
+    /** Placements whose conversation the assigned supervisor may read: current or ended, not cancelled. */
+    public static function supervisedPlacement(Builder $query): Builder
+    {
+        return $query->whereIn('status', ['approved', 'active', 'completed']);
+    }
+
     public static function scope(Builder $query, ?User $user): Builder
     {
         if (! $user || $user->trashed() || $user->status->value !== 'active' || ! in_array($user->role, [Role::Student, Role::Coordinator, Role::Supervisor], true)) {
@@ -32,7 +38,9 @@ class ChatAccess
         return match ($user->role) {
             Role::Student => $query->whereHas('enrollment.student', fn ($q) => $q->where('user_id', $user->id)),
             Role::Coordinator => $query->whereHas('enrollment.programTerm', fn ($q) => $q->whereIn('program_id', $user->programs()->select('programs.id'))),
-            Role::Supervisor => $query->whereHas('placement', fn ($q) => self::activePlacement($q)->where('supervisor_id', $user->id)->whereIn('host_establishment_id', $user->hostEstablishments()->select('host_establishments.id'))),
+            // Spec §17A-A (confirmed 17 Nov 2026): after the deployment ends the conversation is read-only for all
+            // participants and its history stays visible to them; sending still requires an active deployment (writable()).
+            Role::Supervisor => $query->whereHas('placement', fn ($q) => self::supervisedPlacement($q)->where('supervisor_id', $user->id)->whereIn('host_establishment_id', $user->hostEstablishments()->select('host_establishments.id'))),
             default => $query->whereRaw('1=0'),
         };
     }
@@ -67,7 +75,7 @@ class ChatAccess
     public static function participants(Conversation $conversation): array
     {
         $users = [$conversation->enrollment->student->user, ...self::coordinators($conversation->enrollment)->all()];
-        if ($conversation->placement_id && self::activePlacement(Placement::whereKey($conversation->placement_id))->exists()) {
+        if ($conversation->placement_id && self::supervisedPlacement(Placement::whereKey($conversation->placement_id))->exists()) {
             $users[] = $conversation->placement->supervisor;
         }
 

@@ -72,6 +72,8 @@ class AccountActivation
             abort_if($user->status === AccountStatus::Disabled, 410, 'This account is disabled. Contact your coordinator.');
             $user->forceFill([
                 'password' => $password, 'must_change_password' => false, 'remember_token' => Str::random(60),
+                // Using the e-mailed link proves the address receives mail.
+                'email_verified_at' => $user->email_verified_at ?? now(),
                 'status' => $user->status === AccountStatus::Pending ? AccountStatus::Active : $user->status,
             ])->save();
             DB::table('account_activations')->where('id', $row->id)->update(['used_at' => now(), 'updated_at' => now()]);

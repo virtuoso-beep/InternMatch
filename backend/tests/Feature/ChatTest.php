@@ -94,20 +94,23 @@ class ChatTest extends TestCase
         $this->postJson($url.'/read', ['last_message_id' => 999999])->assertUnprocessable();
     }
 
-    public function test_completed_or_expired_placement_is_read_only_and_supervisor_loses_access(): void
+    public function test_completed_or_expired_placement_is_read_only_for_all_participants_including_supervisor(): void
     {
         [$e, $s, $c, $h, $p, $conversation] = $this->fixture();
         $url = '/api/v1/chat/conversations/'.$conversation->id;
         $this->actingAs($s)->postJson($url.'/messages', ['body' => 'Retained history', 'client_id' => (string) Str::uuid()])->assertOk();
         $p->update(['starts_on' => today()->subMonth(), 'ends_on' => today()->subDay()]);
-        $this->actingAs($h)->getJson($url)->assertNotFound();
-        $this->getJson('/api/v1/chat/conversations')->assertJsonCount(0, 'data');
-        foreach ([$s, $c] as $user) {
+        foreach ([$s, $c, $h] as $user) {
             $this->actingAs($user)->getJson($url)->assertOk()->assertJsonPath('conversation.writable', false)->assertJsonPath('messages.0.body', 'Retained history');
             $this->postJson($url.'/messages', ['body' => 'No', 'client_id' => (string) Str::uuid()])->assertForbidden();
         }
+        $this->actingAs($h)->getJson('/api/v1/chat/conversations')->assertJsonCount(1, 'data');
         $p->update(['ends_on' => today()->addMonth(), 'status' => 'completed', 'completed_at' => now()]);
-        $this->actingAs($h)->getJson($url)->assertNotFound();
+        $this->actingAs($h)->getJson($url)->assertOk()->assertJsonPath('conversation.writable', false);
+        $this->postJson($url.'/messages', ['body' => 'No', 'client_id' => (string) Str::uuid()])->assertForbidden();
+        $p->update(['status' => 'cancelled']); // a cancelled placement is not a supervised deployment
+        $this->getJson($url)->assertNotFound();
+        $p->update(['status' => 'completed']);
         $this->actingAs($c)->getJson($url)->assertJsonPath('conversation.writable', false);
         $c->programs()->detach();
         $this->getJson($url)->assertNotFound();

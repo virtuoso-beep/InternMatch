@@ -4,6 +4,8 @@ import { api } from "@/lib/api";
 import { ROLES } from "@/lib/internmatch";
 import { useSessionUser } from "./SessionGuard";
 import { Button, Card, Pill } from "./ui";
+import { withSynthetic } from "@/lib/synthetic";
+import { SyntheticToggle } from "./SyntheticToggle";
 import {
   DashboardEmpty,
   DashboardHeading,
@@ -132,11 +134,14 @@ export function LiveDashboard() {
   const [program, setProgram] = useState("");
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  const [includeSynthetic, setIncludeSynthetic] = useState(false);
   useEffect(() => {
     let active = true;
     setError("");
     setData(null);
-    api<Dashboard>(`/dashboard${program ? `?program_id=${program}` : ""}`)
+    api<Dashboard>(
+      withSynthetic(`/dashboard${program ? `?program_id=${program}` : ""}`, includeSynthetic),
+    )
       .then((value) => {
         if (active) setData(value);
       })
@@ -146,7 +151,7 @@ export function LiveDashboard() {
     return () => {
       active = false;
     };
-  }, [program, revision]);
+  }, [program, revision, includeSynthetic]);
   if (!layout) return null;
   const base = ROLES[user.role].base;
   const metric = (label: string) => data?.stats.find((s) => s.label === label)?.value;
@@ -188,6 +193,11 @@ export function LiveDashboard() {
             {!data && program && <option value={program}>Selected program</option>}
           </select>
         </label>
+        <SyntheticToggle
+          checked={includeSynthetic}
+          onChange={setIncludeSynthetic}
+          disabled={!data && !error}
+        />
         <p className="text-xs text-muted-foreground">
           {data
             ? `Updated ${new Date(data.generated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`

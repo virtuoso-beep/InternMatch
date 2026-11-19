@@ -12,6 +12,7 @@ use App\Models\Recommendation;
 use App\Services\EvaluationScoring;
 use App\Services\Haversine;
 use App\Services\StudentAccess;
+use App\Support\SyntheticData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -23,7 +24,9 @@ class ProgramAnalyticsController extends Controller
         abort_unless(in_array($user->role, [Role::Dean, Role::Coordinator], true), 403);
         $programs = $user->programs()->orderBy('code')->get();
         $programIds = $programs->pluck('id');
-        $enrollments = StudentAccess::enrollments($user)->with('programTerm.academicTerm')->get();
+        $hideSynthetic = SyntheticData::excluded($request);
+        $enrollments = StudentAccess::enrollments($user)->when($hideSynthetic, fn ($q) => $q->where('student_enrollments.is_synthetic', false))
+            ->with('programTerm.academicTerm')->get();
         $placements = Placement::whereIn('student_enrollment_id', $enrollments->pluck('id'))
             ->whereIn('status', ['approved', 'active', 'completed'])->with(['studentEnrollment.student.user.profile', 'hostEstablishment'])->get();
         $evaluations = Evaluation::whereIn('placement_id', $placements->pluck('id'))->where('status', 'submitted')
@@ -45,7 +48,7 @@ class ProgramAnalyticsController extends Controller
             return ['code' => $program->code, 'name' => $program->name, ...$summary($group),
                 'evaluation_percent' => $scores->isEmpty() ? null : round($scores->avg(), 2), 'evaluation_count' => $scores->count()];
         });
-        $hosts = HostEstablishment::where(function ($q) use ($programIds) {
+        $hosts = HostEstablishment::when($hideSynthetic, fn ($q) => $q->where('is_synthetic', false))->where(function ($q) use ($programIds) {
             $q->whereIn('id', DB::table('host_program_capacity')->whereIn('program_id', $programIds)->select('host_establishment_id'))
                 ->orWhereHas('opportunities.programs', fn ($p) => $p->whereIn('programs.id', $programIds))
                 ->orWhereHas('moas.programs', fn ($p) => $p->whereIn('programs.id', $programIds));
@@ -76,7 +79,7 @@ class ProgramAnalyticsController extends Controller
         foreach (Recommendation::whereIn('student_enrollment_id', $enrollments->pluck('id'))->pluck('similarity_score') as $score) {
             $similarityBands[$score >= .9 ? '90 to 100%' : ($score >= .8 ? '80 to under 90%' : ($score >= .7 ? '70 to under 80%' : 'Below 70%'))]++;
         }
-        $demand = Opportunity::where('status', 'published')->whereHas('programs', fn ($q) => $q->whereIn('programs.id', $programIds))->with('competencies')->get()
+        $demand = Opportunity::where('status', 'published')->when($hideSynthetic, fn ($q) => $q->where('is_synthetic', false))->whereHas('programs', fn ($q) => $q->whereIn('programs.id', $programIds))->with('competencies')->get()
             ->flatMap(fn ($o) => $o->competencies->pluck('name'))->countBy()->sortDesc();
         $bands = fn ($values) => collect($values)->map(fn ($value, $label) => ['label' => $label, 'value' => $value])->values();
 
@@ -85,7 +88,7 @@ class ProgramAnalyticsController extends Controller
             'equity' => ['median_km' => $distances->isEmpty() ? null : round($distances->median(), 2), 'measured_placements' => $distances->count(), 'missing_coordinates' => $missing, 'over_20_km' => $distances->filter(fn ($d) => $d > 20)->count(), 'bands' => $bands($distanceBands)],
             'similarity_bands' => $bands($similarityBands), 'competency_demand' => $bands($demand),
             'terms' => $enrollments->groupBy('programTerm.academic_term_id')->map(fn ($group) => ['term' => $group->first()->programTerm->academicTerm->name, ...$summary($group)])->values(),
-            'generated_at' => now()->toIso8601String(),
+            'synthetic' => SyntheticData::meta($request), 'generated_at' => now()->toIso8601String(),
         ], headers: ['Cache-Control' => 'no-store']);
     }
 }

@@ -2,6 +2,9 @@ import pandas as pd
 import os
 import argparse
 
+# Laravel's "local" disk root is storage/app/private (ml:export-judgments writes ml/judgment_export.csv there).
+DEFAULT_INPUT = "../../backend/storage/app/private/ml/judgment_export.csv"
+
 def clean_data(input_path: str, output_path: str):
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input file not found: {input_path}")
@@ -37,7 +40,7 @@ def clean_data(input_path: str, output_path: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="../../backend/storage/app/ml/judgment_export.csv")
+    parser.add_argument("--input", default=DEFAULT_INPUT)
     parser.add_argument("--output", default="cleaned_judgments.csv")
     args = parser.parse_args()
     clean_data(args.input, args.output)

@@ -79,3 +79,11 @@ def test_integration_fallback():
         data = response.json()
         assert "ranking_method" in data
         assert "cosine_fallback" in data["ranking_method"] or "logistic_regression" in data["ranking_method"]
+
+
+def test_default_input_points_at_laravel_local_disk():
+    """Regression: ml:export-judgments writes to Laravel's local disk root (storage/app/private)."""
+    from ml.clean_data import DEFAULT_INPUT
+    ml_dir = os.path.join(os.path.dirname(__file__), "..", "ml")
+    resolved = os.path.normpath(os.path.join(ml_dir, DEFAULT_INPUT)).replace("\\", "/")
+    assert resolved.endswith("backend/storage/app/private/ml/judgment_export.csv")

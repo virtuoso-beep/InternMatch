@@ -2,17 +2,20 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Button, Card, CardTitle, PageHeader } from "./ui";
 import { ReportWorkspace } from "./ReportWorkspace";
+import { withSynthetic } from "@/lib/synthetic";
+import { SyntheticToggle } from "./SyntheticToggle";
 import type { Data } from "./ProgramAnalytics";
 
 export function CoordinatorAnalytics() {
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  const [includeSynthetic, setIncludeSynthetic] = useState(false);
   useEffect(() => {
     let active = true;
     setError("");
     setData(null);
-    api<Data>("/program-analytics")
+    api<Data>(withSynthetic("/program-analytics", includeSynthetic))
       .then((result) => {
         if (active) setData(result);
       })
@@ -22,7 +25,7 @@ export function CoordinatorAnalytics() {
     return () => {
       active = false;
     };
-  }, [revision]);
+  }, [revision, includeSynthetic]);
   const total = data?.programs.reduce((sum, p) => sum + p.enrollments, 0) ?? 0;
   const placed = data?.programs.reduce((sum, p) => sum + p.placed, 0) ?? 0;
   const completed = data?.programs.reduce((sum, p) => sum + p.completed, 0) ?? 0;
@@ -32,9 +35,16 @@ export function CoordinatorAnalytics() {
         title="Analytics"
         subtitle="Placement outcomes and straight-line distance across all recorded terms in your assigned programs."
         action={
-          <Button variant="outline" onClick={() => setRevision((v) => v + 1)}>
-            Refresh analytics
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <SyntheticToggle
+              checked={includeSynthetic}
+              onChange={setIncludeSynthetic}
+              disabled={!data && !error}
+            />
+            <Button variant="outline" onClick={() => setRevision((v) => v + 1)}>
+              Refresh analytics
+            </Button>
+          </div>
         }
       />
       {error && <p role="alert">{error} Use Refresh analytics to retry.</p>}

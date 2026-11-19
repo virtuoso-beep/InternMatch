@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
 import { useSessionUser } from "./SessionGuard";
 import { Button, Card, CardTitle, PageHeader, Pill, Row, Table } from "./ui";
+import { SYNTHETIC_LABEL } from "@/lib/synthetic";
+import { SyntheticToggle } from "./SyntheticToggle";
 
 type Report = {
   id: number;
   kind: string;
   program_term_id: number;
+  contains_synthetic?: boolean;
   approved_at: string | null;
   created_at: string;
   content_hash: string;
@@ -48,7 +51,10 @@ export function ReportWorkspace({
     [selected, setSelected] = useState<Report | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [revision, setRevision] = useState(0);
+    [revision, setRevision] = useState(0),
+    [includeSynthetic, setIncludeSynthetic] = useState(false);
+  const syntheticPill = (report: Report) =>
+    report.contains_synthetic ? <Pill tone="warn">{SYNTHETIC_LABEL}</Pill> : null;
   useEffect(() => {
     let active = true;
     setError("");
@@ -133,14 +139,27 @@ export function ReportWorkspace({
           </select>
         </label>
         {user.role === "coordinator" && (
-          <Button
-            disabled={busy || !cohort}
-            onClick={() =>
-              void run(() => mutate("/reports", { program_term_id: Number(cohort), kind }))
-            }
-          >
-            Generate report
-          </Button>
+          <>
+            <SyntheticToggle
+              checked={includeSynthetic}
+              onChange={setIncludeSynthetic}
+              disabled={busy}
+            />
+            <Button
+              disabled={busy || !cohort}
+              onClick={() =>
+                void run(() =>
+                  mutate("/reports", {
+                    program_term_id: Number(cohort),
+                    kind,
+                    include_synthetic: includeSynthetic,
+                  }),
+                )
+              }
+            >
+              Generate report
+            </Button>
+          </>
         )}
         <Button
           variant="outline"
@@ -167,8 +186,8 @@ export function ReportWorkspace({
       </div>
       {user.role === "dean" && (
         <p className="my-4 text-sm text-muted-foreground">
-          Only coordinator-approved snapshots in your assigned programs are available. CSV is the
-          supported export format. Select a report to inspect its records before downloading.
+          Only coordinator-approved snapshots in your assigned programs are available, as CSV, Excel
+          or PDF. Select a report to inspect its records before downloading.
         </p>
       )}
       {presentation === "accreditation" && data && data.reports.data.length > 0 ? (
@@ -179,7 +198,7 @@ export function ReportWorkspace({
               return (
                 <Row key={report.id}>
                   <td className="font-semibold">
-                    {labels[report.kind]} · #{report.id}
+                    {labels[report.kind]} · #{report.id} {syntheticPill(report)}
                   </td>
                   <td>
                     {scope
@@ -226,7 +245,8 @@ export function ReportWorkspace({
                   )}
                   <Pill tone={report.approved_at ? "success" : "warn"}>
                     {report.approved_at ? "Approved" : "Draft"}
-                  </Pill>
+                  </Pill>{" "}
+                  {syntheticPill(report)}
                 </div>
                 <Button
                   variant="outline"
@@ -277,6 +297,12 @@ export function ReportWorkspace({
             {selected.payload.rows.length} records ·{" "}
             {selected.approved_at ? "Approved snapshot" : "Draft for coordinator review"}
           </p>
+          {selected.contains_synthetic && (
+            <p role="note" className="mb-3 text-sm font-semibold">
+              {SYNTHETIC_LABEL}: rows marked "yes" in the synthetic record column are synthetic test
+              records. The label is also printed on every export.
+            </p>
+          )}
           <div className="mb-4 flex flex-wrap gap-3">
             <a
               className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm font-semibold"
@@ -289,6 +315,12 @@ export function ReportWorkspace({
               href={`/api/v1/reports/${selected.id}/download?format=xlsx`}
             >
               Download Excel
+            </a>
+            <a
+              className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm font-semibold"
+              href={`/api/v1/reports/${selected.id}/download?format=pdf`}
+            >
+              Download PDF
             </a>
             {user.role === "coordinator" && !selected.approved_at && (
               <Button

@@ -1,0 +1,14 @@
+# Local development only. Docker Compose loads this file automatically for a plain `docker compose up`,
+# and ignores it whenever files are named with -f (production: -f docker-compose.yml -f docker-compose.production.yml,
+# as in deploy/deploy.sh), so Mailpit never runs in production.
+#
+# Mailpit catches every e-mail the app sends; nothing reaches real inboxes.
+#   Web inbox: http://localhost:8025    SMTP (inside Docker): mailpit:1025
+services:
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_MAX_MESSAGES: 500

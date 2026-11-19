@@ -20,3 +20,6 @@ Thumbs.db
 /.local/
 /backend/public/admin-ui/
 /frontend/dist-admin/
+
+# Source data set (kept outside Git)
+FINAL DATA/

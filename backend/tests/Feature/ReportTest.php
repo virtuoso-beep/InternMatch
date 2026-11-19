@@ -58,7 +58,14 @@ class ReportTest extends TestCase
         } finally {
             @unlink($path);
         }
-        $this->getJson('/api/v1/reports/'.$reports['progress']['id'].'/download?format=pdf')->assertUnprocessable(); // unsupported format rejected
+        // FR-22 PDF: same snapshot, audited with its format.
+        $pdf = $this->get('/api/v1/reports/'.$reports['progress']['id'].'/download?format=pdf')->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $pdf->getContent());
+        $this->assertDatabaseHas('audit_logs', ['action' => 'report.exported', 'changes->format' => 'pdf']);
+        $html = view('reports.pdf', ['title' => 'T', 'details' => [['Exported by', '<b>x</b>']], 'columns' => ['Name'], 'rows' => [['<script>alert(1)</script>']]])->render();
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringContainsString('&lt;script&gt;', $html);
+        $this->getJson('/api/v1/reports/'.$reports['progress']['id'].'/download?format=docx')->assertUnprocessable(); // unsupported format rejected
         $this->assertDatabaseHas('audit_logs', ['action' => 'report.exported']);
     }
 

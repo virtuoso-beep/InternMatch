@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AccessibilityMap } from "./AccessibilityMap";
+import { withSynthetic } from "@/lib/synthetic";
+import { SyntheticToggle } from "./SyntheticToggle";
 import { Button, Card, CardTitle, PageHeader, Row, StatCard, StatGrid, Table } from "./ui";
 
 type Band = { label: string; value: number };
@@ -49,12 +51,13 @@ export function ProgramAnalytics({
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState("");
   const [revision, setRevision] = useState(0),
-    [program, setProgram] = useState("");
+    [program, setProgram] = useState(""),
+    [includeSynthetic, setIncludeSynthetic] = useState(false);
   useEffect(() => {
     let active = true;
     setData(null);
     setError("");
-    api<Data>("/program-analytics")
+    api<Data>(withSynthetic("/program-analytics", includeSynthetic))
       .then((d) => {
         if (active) setData(d);
       })
@@ -64,7 +67,7 @@ export function ProgramAnalytics({
     return () => {
       active = false;
     };
-  }, [revision]);
+  }, [revision, includeSynthetic]);
   const [hostSearch, setHostSearch] = useState("");
   const [hostFilter, setHostFilter] = useState("all");
   const visibleHosts =
@@ -92,9 +95,16 @@ export function ProgramAnalytics({
         title={titles[section]}
         subtitle="Live records across recorded terms in your assigned programs."
         action={
-          <Button variant="outline" onClick={() => setRevision((v) => v + 1)}>
-            Refresh program records
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <SyntheticToggle
+              checked={includeSynthetic}
+              onChange={setIncludeSynthetic}
+              disabled={!data && !error}
+            />
+            <Button variant="outline" onClick={() => setRevision((v) => v + 1)}>
+              Refresh program records
+            </Button>
+          </div>
         }
       />
       {error && <p role="alert">{error}</p>}

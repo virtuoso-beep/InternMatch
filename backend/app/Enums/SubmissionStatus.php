@@ -9,4 +9,6 @@ enum SubmissionStatus: string
     case UnderReview = 'under_review';
     case Approved = 'approved';
     case Rejected = 'rejected';
+    // Weekly log that was never submitted (journal_entries only; imported historical/synthetic records).
+    case NotSubmitted = 'not_submitted';
 }

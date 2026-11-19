@@ -64,7 +64,7 @@ class GenerateRecommendations
                 $host = $opportunity->hostEstablishment;
                 $skills = $opportunity->competencies->map(fn ($skill) => [
                     'name' => $skill->name,
-                    'level' => $levels->has($skill->id) ? (int) $levels[$skill->id] : null,
+                    'level' => $levels->has($skill->id) && $levels[$skill->id] !== null ? (int) $levels[$skill->id] : null,
                     'minimum_level' => (int) $skill->pivot->minimum_level,
                 ])->values()->all();
                 $distance = $profile?->latitude !== null && $profile?->longitude !== null && $host->latitude !== null && $host->longitude !== null

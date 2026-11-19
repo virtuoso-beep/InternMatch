@@ -9,16 +9,23 @@ class ReportBuilder
 {
     public const KINDS = ['placement', 'progress', 'hours', 'requirements', 'evaluation', 'recommendation', 'summary'];
 
-    public function build(ProgramTerm $term, string $kind): array
+    /**
+     * Synthetic test records (student_enrollments.is_synthetic) are left out unless $includeSynthetic is true.
+     * When they are included and present, the payload is marked contains_synthetic and every row gains a
+     * trailing synthetic_record column (yes/no), so exports can never pass synthetic data off as real.
+     */
+    public function build(ProgramTerm $term, string $kind, bool $includeSynthetic = false): array
     {
-        $enrollments = StudentEnrollment::where('program_term_id', $term->id)->with('student.user')->orderBy('id')->get();
+        $enrollments = StudentEnrollment::where('program_term_id', $term->id)->when(! $includeSynthetic, fn ($q) => $q->where('is_synthetic', false))
+            ->with('student.user')->orderBy('id')->get();
         $placements = Placement::whereIn('student_enrollment_id', $enrollments->pluck('id'))->with(['hostEstablishment', 'opportunity', 'supervisor'])->orderBy('id')->get();
         $names = $enrollments->mapWithKeys(fn ($e) => [$e->id => $e->student->user?->name ?? 'Archived student account']);
         $rows = [];
+        $owners = []; // enrollment id behind each row (null = aggregate row)
         switch ($kind) {
             case 'placement':
                 $columns = ['placement_id', 'enrollment_id', 'student', 'host', 'opportunity', 'status', 'supervisor', 'starts_on', 'ends_on'];
-                foreach ($placements as $p) { $rows[] = [$p->id, $p->student_enrollment_id, $names[$p->student_enrollment_id], $p->hostEstablishment->name, $p->opportunity->title, $p->status->value, $p->supervisor?->name, $p->starts_on?->toDateString(), $p->ends_on?->toDateString()]; }
+                foreach ($placements as $p) { $rows[] = [$p->id, $p->student_enrollment_id, $names[$p->student_enrollment_id], $p->hostEstablishment->name, $p->opportunity->title, $p->status->value, $p->supervisor?->name, $p->starts_on?->toDateString(), $p->ends_on?->toDateString()]; $owners[] = $p->student_enrollment_id; }
                 break;
             case 'progress':
                 $columns = ['enrollment_id', 'student', 'enrollment_status', 'placement_status', 'required_hours', 'certified_hours', 'remaining_hours', 'attention_conditions'];
@@ -28,6 +35,7 @@ class ReportBuilder
                     $hours = $term->program->required_ojt_hours;
                     $flags = $p && in_array($p->status->value, ['approved', 'active'], true) ? app(ProgressSummary::class)->forPlacement($p)['flags'] : [];
                     $rows[] = [$e->id, $names[$e->id], $e->status->value, $p?->status->value ?? 'unplaced', $hours, round($minutes / 60, 2), $hours === null ? null : max(0, round($hours - $minutes / 60, 2)), implode('; ', array_column($flags, 'description'))];
+                    $owners[] = $e->id;
                 }
                 break;
             case 'hours':
@@ -35,6 +43,7 @@ class ReportBuilder
                 foreach (TimeLog::whereIn('placement_id', $placements->pluck('id'))->orderBy('work_date')->orderBy('id')->get() as $log) {
                     $p = $placements->firstWhere('id', $log->placement_id);
                     $rows[] = [$p->id, $names[$p->student_enrollment_id], $log->work_date->toDateString(), $log->time_in?->toIso8601String(), $log->time_out?->toIso8601String(), $log->status->value, $log->status->value === 'verified' ? $log->credited_minutes : null];
+                    $owners[] = $p->student_enrollment_id;
                 }
                 break;
             case 'requirements':
@@ -49,6 +58,7 @@ class ReportBuilder
                             $status = $s?->status->value ?? 'not_submitted'; $detail = $s?->revision;
                         }
                         $rows[] = [$e->id, $names[$e->id], $r->requirementType->name, $r->requirementType->kind, $r->is_required ? 'yes' : 'no', $status, $detail];
+                        $owners[] = $e->id;
                     }
                 }
                 break;
@@ -57,6 +67,7 @@ class ReportBuilder
                 foreach (Evaluation::whereIn('placement_id', $placements->pluck('id'))->where('status', 'submitted')->with(['evaluationRubric.criteria', 'scores'])->orderBy('id')->get() as $evaluation) {
                     $p = $placements->firstWhere('id', $evaluation->placement_id);
                     $rows[] = [$evaluation->id, $names[$p->student_enrollment_id], $p->hostEstablishment->name, $evaluation->period, $evaluation->evaluationRubric->name, $evaluation->evaluationRubric->version, app(EvaluationScoring::class)->percentage($evaluation), $evaluation->submitted_at?->toIso8601String()];
+                    $owners[] = $p->student_enrollment_id;
                 }
                 break;
             case 'recommendation':
@@ -66,16 +77,27 @@ class ReportBuilder
                     if (! $generation) { continue; }
                     foreach (Recommendation::where('generation_id', $generation)->where('student_enrollment_id', $e->id)->orderBy('rank')->get() as $r) {
                         $rows[] = [$r->id, $names[$e->id], $r->snapshot['host_name'] ?? null, $r->snapshot['opportunity_title'] ?? null, $r->similarity_score, $r->distance_km, $r->capacity_at_time, $r->moa_status_at_time, $r->snapshot['model_name'] ?? null, $r->snapshot['model_version'] ?? null, $r->generated_at->toIso8601String()];
+                        $owners[] = $e->id;
                     }
                 }
                 break;
             case 'summary':
                 $columns = ['program', 'term', 'enrollments', 'students_with_current_or_completed_placement', 'approved', 'active', 'completed', 'required_ojt_hours'];
                 $rows[] = [$term->program->code, $term->academicTerm->name, $enrollments->count(), $placements->whereIn('status', [\App\Enums\PlacementStatus::Approved, \App\Enums\PlacementStatus::Active, \App\Enums\PlacementStatus::Completed])->pluck('student_enrollment_id')->unique()->count(), $placements->where('status', \App\Enums\PlacementStatus::Approved)->count(), $placements->where('status', \App\Enums\PlacementStatus::Active)->count(), $placements->where('status', \App\Enums\PlacementStatus::Completed)->count(), $term->program->required_ojt_hours];
+                $owners[] = null;
                 break;
             default: abort(422, 'Unsupported report kind.');
         }
 
-        return ['program' => $term->program->code, 'term' => $term->academicTerm->name, 'generated_at' => now()->toIso8601String(), 'columns' => $columns, 'rows' => $rows];
+        $synthetic = $enrollments->pluck('is_synthetic', 'id')->map(fn ($v) => (bool) $v);
+        $containsSynthetic = $includeSynthetic && $synthetic->contains(true);
+        if ($containsSynthetic) {
+            $columns[] = 'synthetic_record';
+            foreach ($rows as $i => $row) {
+                $rows[$i][] = $owners[$i] === null ? 'includes synthetic' : ($synthetic[$owners[$i]] ? 'yes' : 'no');
+            }
+        }
+
+        return ['program' => $term->program->code, 'term' => $term->academicTerm->name, 'generated_at' => now()->toIso8601String(), 'contains_synthetic' => $containsSynthetic, 'columns' => $columns, 'rows' => $rows];
     }
 }
