@@ -5,11 +5,16 @@ import json
 import os
 import argparse
 
+try:
+    from ml.model_card import FEATURES, remove_card, write_card
+except ImportError:  # run as a script from ml/
+    from model_card import FEATURES, remove_card, write_card
+
 def evaluate_model(test_path: str, model_path: str, scaler_path: str, report_path: str, threshold: float = 0.7):
     df = pd.read_csv(test_path)
     
-    features = ['similarity_score', 'distance_km', 'capacity_at_time', 'moa_active', 'distance_km_missing']
-    X = df[features]
+    features = FEATURES
+    X = df[features].to_numpy(dtype=float)  # plain arrays, as at ranking time
     y = df['label']
     
     model = joblib.load(model_path)
@@ -42,8 +47,11 @@ def evaluate_model(test_path: str, model_path: str, scaler_path: str, report_pat
     print(f"Metrics: {metrics}")
     
     if metrics['f1'] < threshold:
+        # A failed model must never be activated by an older passing card.
+        remove_card(model_path)
         raise ValueError(f"Model failed to meet F1 threshold {threshold}. Current F1: {metrics['f1']}")
-    print(f"Model passed threshold checks (F1 >= {threshold}).")
+    write_card(model_path, scaler_path, metrics, threshold, df)
+    print(f"Model passed threshold checks (F1 >= {threshold}). Model card written.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

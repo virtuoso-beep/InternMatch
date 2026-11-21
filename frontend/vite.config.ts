@@ -27,6 +27,10 @@ export default defineConfig({
       },
     },
   },
+  // Production runs the built app as a Node server behind Nginx (docker-compose.production.yml):
+  // `node .output/server/index.mjs`. The package's default target is Cloudflare Workers, which this
+  // deployment does not use.
+  nitro: { preset: "node-server" },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

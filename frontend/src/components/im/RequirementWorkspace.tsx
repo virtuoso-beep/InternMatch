@@ -1,9 +1,25 @@
-import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Download, Plus, Upload } from "lucide-react";
+import { toast } from "sonner";
+import { ConfirmButton, ReasonButton } from "./actions";
 import { api, mutate, upload } from "@/lib/api";
-import { RequirementCompliance } from "./RequirementCompliance";
+import { RequirementCompliance, type ComplianceSummary } from "./RequirementCompliance";
+import { SyntheticToggle } from "./SyntheticToggle";
+import { withSynthetic } from "@/lib/synthetic";
 import { useSessionUser } from "./SessionGuard";
-import { Button, Card, CardTitle, cx, PageHeader, Pill } from "./ui";
+import {
+  Button,
+  Card,
+  CardTitle,
+  cx,
+  FormField,
+  FormGrid,
+  FormModal,
+  PageHeader,
+  Pill,
+  ViewModal,
+} from "./ui";
+import { inputClass, toFormError, type FormError } from "./formUtils";
 
 type Requirement = {
   id: number;
@@ -42,7 +58,9 @@ export function RequirementWorkspace() {
   const user = useSessionUser();
   const [enrollments, setEnrollments] = useState<Enrollment[] | null>(null);
   const [error, setError] = useState("");
+  const isStudent = user.role === "student";
   useEffect(() => {
+    if (!isStudent) return;
     let active = true;
     api<{ data: Enrollment[] }>("/enrollments")
       .then(({ data }) => {
@@ -54,7 +72,7 @@ export function RequirementWorkspace() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isStudent]);
   return (
     <>
       {user.role !== "student" && (
@@ -64,21 +82,20 @@ export function RequirementWorkspace() {
         />
       )}
       {["admin", "coordinator"].includes(user.role) && <RequirementConfiguration />}
-      {error && <p role="alert">{error}</p>}
-      {!enrollments && !error && <p role="status">Loading enrollments…</p>}
-      {enrollments?.length === 0 && <Card>No enrollment records are available.</Card>}
-      {user.role === "coordinator" && enrollments && (
-        <RequirementCompliance enrollments={enrollments} />
+      {user.role === "student" ? (
+        <>
+          {error && <p role="alert">{error}</p>}
+          {!enrollments && !error && <p role="status">Loading enrollments…</p>}
+          {enrollments?.length === 0 && <Card>No enrollment records are available.</Card>}
+          <div className="space-y-5">
+            {enrollments?.map((item) => (
+              <StudentRequirements key={item.id} enrollment={item} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <RequirementTracking />
       )}
-      <div className="space-y-5">
-        {enrollments?.map((item) =>
-          user.role === "student" ? (
-            <StudentRequirements key={item.id} enrollment={item} />
-          ) : (
-            <RequirementsForEnrollment key={item.id} enrollment={item} />
-          ),
-        )}
-      </div>
     </>
   );
 }
@@ -86,7 +103,6 @@ export function RequirementWorkspace() {
 function StudentRequirements({ enrollment }: { enrollment: Enrollment }) {
   const [data, setData] = useState<RequirementData | null>(null);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
@@ -144,7 +160,7 @@ function StudentRequirements({ enrollment }: { enrollment: Enrollment }) {
           <Button
             disabled={!data?.requirements.some((item) => item.requirement_type.kind === "document")}
             onClick={() => setModal({ kind: "upload" })}
-            className="bg-brand text-white hover:bg-brand/90 font-medium px-4 py-2 rounded-lg shadow-sm"
+            className="bg-brand text-brand-foreground hover:bg-brand/90 font-medium px-4 py-2 rounded-lg shadow-sm"
           >
             Upload document
           </Button>
@@ -157,11 +173,6 @@ function StudentRequirements({ enrollment }: { enrollment: Enrollment }) {
           <button className="ml-3 underline" onClick={() => setRevision((value) => value + 1)}>
             Retry
           </button>
-        </p>
-      )}
-      {notice && (
-        <p role="status" className="rounded-lg bg-success-soft p-3 text-sm text-success">
-          {notice}
         </p>
       )}
       {!data && !error && <p role="status">Loading requirements…</p>}
@@ -180,7 +191,7 @@ function StudentRequirements({ enrollment }: { enrollment: Enrollment }) {
                     className={cx(
                       "rounded-full px-3 py-1 text-xs font-medium transition-colors",
                       filter === value
-                        ? "bg-brand text-white shadow-xs"
+                        ? "bg-brand text-brand-foreground shadow-xs"
                         : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                   >
@@ -226,7 +237,7 @@ function StudentRequirements({ enrollment }: { enrollment: Enrollment }) {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[620px] text-left text-sm border-collapse">
                   <thead>
-                    <tr className="border-b border-border/60 text-xs font-semibold text-muted-foreground tracking-wider uppercase bg-muted/20">
+                    <tr className="border-b border-border/60 text-xs font-semibold text-muted-foreground bg-muted/20">
                       <th scope="col" className="py-3.5 px-6 font-semibold">
                         DOCUMENT
                       </th>
@@ -274,26 +285,10 @@ function StudentRequirements({ enrollment }: { enrollment: Enrollment }) {
                             {item.requirement_type.name}
                           </td>
                           <td className="py-4 px-6 whitespace-nowrap">
-                            {status === "Approved" && (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#DEF7EC] text-[#03543F]">
-                                Approved
-                              </span>
-                            )}
-                            {status === "Pending" && (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#FEF08A] text-[#92400E]">
-                                Pending
-                              </span>
-                            )}
-                            {status === "Missing" && (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#FEE2E2] text-[#991B1B]">
-                                Missing
-                              </span>
-                            )}
-                            {status === "Returned" && (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#FDE8E8] text-[#C81E1E]">
-                                Returned
-                              </span>
-                            )}
+                            {status === "Approved" && <Pill tone="success">Approved</Pill>}
+                            {status === "Pending" && <Pill tone="warn">Pending</Pill>}
+                            {status === "Missing" && <Pill tone="brand">Missing</Pill>}
+                            {status === "Returned" && <Pill tone="brand">Returned</Pill>}
                           </td>
                           <td className="py-4 px-6 text-muted-foreground whitespace-nowrap">
                             {dateLabel}
@@ -343,7 +338,6 @@ function StudentRequirements({ enrollment }: { enrollment: Enrollment }) {
               onSaved={() => {
                 setRevision((value) => value + 1);
                 setModal(null);
-                setNotice("Record submitted. Your coordinator will review it.");
               }}
             />
           )}
@@ -366,16 +360,11 @@ function RequirementDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [currentKind, setCurrentKind] = useState(mode.kind);
   const [selected, setSelected] = useState(String(mode.id ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
-  }, []);
   const requirement = data.requirements.find((item) => item.id === Number(selected));
   const history = data.submissions
     .filter((item) => item.program_term_requirement_id === Number(selected))
@@ -405,172 +394,147 @@ function RequirementDialog({
       setBusy(false);
     }
   }
+  if (currentKind === "upload") {
+    return (
+      <FormModal
+        open
+        onClose={onClose}
+        title="Upload document"
+        description="PDF, JPG, PNG or DOCX, up to 10 MB. Replacements create a new revision and keep earlier files."
+        submitLabel="Submit document"
+        busyLabel="Uploading…"
+        busy={busy}
+        error={error ? { message: error, fields: {} } : null}
+        onSubmit={async () => {
+          setError("");
+          if (!file || file.size === 0) {
+            setError("Choose a non-empty file.");
+            return;
+          }
+          if (file.size > 10 * 1024 * 1024) {
+            setError("Choose a file no larger than 10 MB.");
+            return;
+          }
+          if (!/\.(pdf|jpe?g|png|docx)$/i.test(file.name)) {
+            setError("Use PDF, JPG, PNG or DOCX.");
+            return;
+          }
+          const payload = new FormData();
+          payload.set("requirement_id", selected);
+          payload.set("file", file);
+          setBusy(true);
+          try {
+            await upload(`/enrollments/${enrollmentId}/requirements`, payload);
+            onSaved();
+            toast.success("Document submitted", {
+              description: "Your coordinator will review it.",
+            });
+          } catch (cause) {
+            setError(
+              cause instanceof Error
+                ? cause.message
+                : "Unable to upload. Your selection is retained.",
+            );
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <FormField label="Requirement" required>
+          <select
+            name="requirement_id"
+            required
+            disabled={busy}
+            value={selected}
+            onChange={(event) => setSelected(event.target.value)}
+            className={inputClass}
+          >
+            <option value="">Select a document requirement</option>
+            {data.requirements
+              .filter((item) => item.requirement_type.kind === "document")
+              .map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.requirement_type.name}
+                </option>
+              ))}
+          </select>
+        </FormField>
+        <FormField label="Document file" required helper="PDF, JPG, PNG or DOCX. Maximum 10 MB.">
+          <input
+            type="file"
+            name="file"
+            required
+            disabled={busy}
+            accept=".pdf,.jpg,.jpeg,.png,.docx"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            className={inputClass}
+          />
+        </FormField>
+      </FormModal>
+    );
+  }
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="requirement-dialog-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        if (!busy) onClose();
-      }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border bg-card p-6 text-foreground shadow-xl backdrop:bg-black/35"
+    <ViewModal
+      open
+      onClose={onClose}
+      title={requirement?.requirement_type.name ?? "Requirement details"}
+      size="md"
+      actions={
+        currentKind === "history" ? (
+          <Button variant="outline" disabled={busy} onClick={() => setCurrentKind("upload")}>
+            <Upload size={16} aria-hidden="true" />
+            Upload replacement revision
+          </Button>
+        ) : undefined
+      }
     >
-      <div className="flex items-center justify-between pb-3 border-b border-border">
-        <h2 id="requirement-dialog-title" className="text-xl font-semibold">
-          {currentKind === "upload"
-            ? "Upload document"
-            : (requirement?.requirement_type.name ?? "Requirement details")}
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={busy}
-          className="text-muted-foreground hover:text-foreground p-1 rounded-lg"
-          aria-label="Close dialog"
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
-      </div>
       {error && (
-        <p role="alert" className="mt-4 rounded-lg bg-brand-soft p-3 text-sm">
+        <p role="alert" className="mb-4 rounded-lg bg-brand-soft p-3 text-sm">
           {error}
         </p>
       )}
-      {currentKind === "upload" ? (
-        <form
-          className="mt-5 space-y-5"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            if (busy) return;
-            const payload = new FormData(event.currentTarget);
-            const file = payload.get("file");
-            setError("");
-            if (!(file instanceof File) || file.size === 0) {
-              setError("Choose a non-empty file.");
-              return;
-            }
-            if (file.size > 10 * 1024 * 1024) {
-              setError("Choose a file no larger than 10 MB.");
-              return;
-            }
-            if (!/\.(pdf|jpe?g|png|docx)$/i.test(file.name)) {
-              setError("Use PDF, JPG, PNG or DOCX.");
-              return;
-            }
-            setBusy(true);
-            try {
-              await upload(`/enrollments/${enrollmentId}/requirements`, payload);
-              onSaved();
-            } catch (cause) {
-              setError(
-                cause instanceof Error
-                  ? cause.message
-                  : "Unable to upload. Your selection is retained.",
-              );
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <label className="block text-sm font-medium">
-            Requirement
-            <select
-              name="requirement_id"
-              required
-              disabled={busy}
-              value={selected}
-              onChange={(event) => setSelected(event.target.value)}
-              className="mt-2 block w-full rounded-lg border bg-background p-3"
-            >
-              <option value="">Select a document requirement</option>
-              {data.requirements
-                .filter((item) => item.requirement_type.kind === "document")
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.requirement_type.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="block text-sm font-medium">
-            Document file
-            <input
-              type="file"
-              name="file"
-              required
-              disabled={busy}
-              accept=".pdf,.jpg,.jpeg,.png,.docx"
-              className="mt-2 block w-full rounded-lg border p-3 text-sm"
-            />
-          </label>
-          <p className="text-xs text-muted-foreground">
-            PDF, JPG, PNG or DOCX · Maximum 10 MB. Replacements create a new revision for review and
-            preserve earlier files.
-          </p>
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" disabled={busy} onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={busy}>
-              {busy ? "Uploading…" : "Submit document"}
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <>
-          {mode.kind === "event" && requirement && (
-            <EventRequirement
-              requirement={requirement}
-              enrollmentId={enrollmentId}
-              attendance={data.attendances.find(
-                (item) => item.program_term_requirement_id === requirement.id,
-              )}
-              onSaved={onSaved}
-            />
+      {mode.kind === "event" && requirement && (
+        <EventRequirement
+          requirement={requirement}
+          enrollmentId={enrollmentId}
+          attendance={data.attendances.find(
+            (item) => item.program_term_requirement_id === requirement.id,
           )}
-          {mode.kind === "history" && (
-            <div className="mt-5 space-y-4">
-              {history.map((item) => (
-                <section key={item.id} className="rounded-lg border p-4">
-                  <p className="break-words font-medium">
-                    Revision {item.revision}: {item.document.original_name}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {item.status.replaceAll("_", " ")}
-                  </p>
-                  {item.reviews.map(
-                    (review, index) =>
-                      review.comments && (
-                        <p key={index} className="mt-2 whitespace-pre-wrap text-sm">
-                          {review.comments}
-                        </p>
-                      ),
-                  )}
-                  <Button
-                    className="mt-3"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => download(item)}
-                  >
-                    Download revision {item.revision}
-                  </Button>
-                </section>
-              ))}
-            </div>
-          )}
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-            {currentKind === "history" && (
-              <Button variant="outline" disabled={busy} onClick={() => setCurrentKind("upload")}>
-                Upload replacement revision
-              </Button>
-            )}
-            <Button disabled={busy} onClick={onClose} className="ml-auto">
-              Close
-            </Button>
-          </div>
-        </>
+          onSaved={onSaved}
+        />
       )}
-    </dialog>
+      {mode.kind === "history" && (
+        <div className="space-y-4">
+          {history.map((item) => (
+            <section key={item.id} className="rounded-lg border p-4">
+              <p className="break-words font-medium">
+                Revision {item.revision}: {item.document.original_name}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {item.status.replaceAll("_", " ")}
+              </p>
+              {item.reviews.map(
+                (review, index) =>
+                  review.comments && (
+                    <p key={index} className="mt-2 whitespace-pre-wrap text-sm">
+                      {review.comments}
+                    </p>
+                  ),
+              )}
+              <Button
+                className="mt-3"
+                variant="outline"
+                disabled={busy}
+                onClick={() => download(item)}
+              >
+                <Download size={16} aria-hidden="true" />
+                Download revision {item.revision}
+              </Button>
+            </section>
+          ))}
+        </div>
+      )}
+    </ViewModal>
   );
 }
 
@@ -596,6 +560,8 @@ export function RequirementConfiguration() {
   const [scheduled, setScheduled] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [formError, setFormError] = useState<FormError | null>(null);
   useEffect(() => {
     let active = true;
     api<Config>("/requirement-configuration")
@@ -630,12 +596,28 @@ export function RequirementConfiguration() {
       <p className="mb-3 text-sm">
         Select an enrolled program and term. Existing requirements are updated when saved.
       </p>
-      <form
-        className="grid gap-3 sm:grid-cols-2"
-        onSubmit={async (event) => {
-          event.preventDefault();
+      <Button
+        disabled={!config}
+        onClick={() => {
+          setFormError(null);
+          setOpen(true);
+        }}
+      >
+        <Plus size={16} aria-hidden="true" />
+        Configure requirement
+      </Button>
+      <FormModal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Configure requirement"
+        description="Saving updates the requirement if it already exists for this program and term."
+        submitLabel="Save requirement"
+        busy={busy}
+        submitDisabled={!config}
+        error={formError}
+        onSubmit={async () => {
           setBusy(true);
-          setMessage("");
+          setFormError(null);
           try {
             await mutate(`/program-terms/${term}/requirements`, {
               requirement_type_id: Number(type),
@@ -648,88 +630,90 @@ export function RequirementConfiguration() {
                   : null,
             });
             setConfig(await api<Config>("/requirement-configuration"));
-            setMessage("Requirement configuration saved.");
+            setOpen(false);
+            toast.success("Requirement saved");
           } catch (cause) {
-            setMessage(cause instanceof Error ? cause.message : "Unable to save requirement.");
+            setFormError(toFormError(cause, "Unable to save requirement."));
           } finally {
             setBusy(false);
           }
         }}
       >
-        <label className="text-sm">
-          Program and term
-          <select
-            required
-            value={term}
-            onChange={(event) => setTerm(event.target.value)}
-            className="mt-1 block w-full rounded border p-2"
-          >
-            <option value="">Select program and term</option>
-            {config?.program_terms.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.program.code} · {item.academic_term.code}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm">
-          Requirement type
-          <select
-            required
-            value={type}
-            onChange={(event) => setType(event.target.value)}
-            className="mt-1 block w-full rounded border p-2"
-          >
-            <option value="">Select requirement</option>
-            {config?.types.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm">
-          Due date and time (local)
-          <input
-            type="datetime-local"
-            value={due}
-            onChange={(event) => setDue(event.target.value)}
-            className="mt-1 block w-full rounded border p-2"
-          />
-        </label>
-        {config?.types.find((item) => item.id === Number(type))?.kind === "event" && (
-          <label className="text-sm">
-            Event date (leave empty until announced)
+        <FormGrid>
+          <FormField label="Program and term" required>
+            <select
+              required
+              name="program_term_id"
+              value={term}
+              onChange={(event) => setTerm(event.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select program and term</option>
+              {config?.program_terms.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.program.code} · {item.academic_term.code}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Requirement type" required>
+            <select
+              required
+              name="requirement_type_id"
+              value={type}
+              onChange={(event) => setType(event.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select requirement</option>
+              {config?.types.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Due date and time (local)">
             <input
-              type="date"
-              value={scheduled}
-              onChange={(event) => setScheduled(event.target.value)}
-              className="mt-1 block w-full rounded border p-2"
+              type="datetime-local"
+              name="due_at"
+              value={due}
+              onChange={(event) => setDue(event.target.value)}
+              className={inputClass}
             />
-          </label>
-        )}
+          </FormField>
+          {config?.types.find((item) => item.id === Number(type))?.kind === "event" && (
+            <FormField label="Event date" helper="Leave empty until the date is announced.">
+              <input
+                type="date"
+                name="scheduled_on"
+                value={scheduled}
+                onChange={(event) => setScheduled(event.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+          )}
+        </FormGrid>
         <div className="space-y-2 text-sm">
-          <label className="block">
+          <label className="flex items-center gap-2">
             <input
               type="checkbox"
+              name="is_required"
               checked={required}
               onChange={(event) => setRequired(event.target.checked)}
-            />{" "}
+            />
             Required for completion
           </label>
-          <label className="block">
+          <label className="flex items-center gap-2">
             <input
               type="checkbox"
+              name="required_before_deployment"
               checked={deployment}
               onChange={(event) => setDeployment(event.target.checked)}
-            />{" "}
+            />
             Required before deployment
           </label>
         </div>
-        <Button type="submit" disabled={busy || !config}>
-          Save requirement
-        </Button>
-      </form>
+      </FormModal>
       {selected && (
         <ul className="mt-3 text-sm">
           {selected.requirements.map((item) => (
@@ -753,37 +737,130 @@ export function RequirementConfiguration() {
   );
 }
 
-function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
-  const user = useSessionUser();
-  const [data, setData] = useState<RequirementData | null>(null);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+type TrackingRow = Enrollment & RequirementData & { is_synthetic?: boolean };
+type TrackingPage = {
+  data: TrackingRow[];
+  current_page: number;
+  last_page: number;
+  total: number;
+  summary: ComplianceSummary;
+};
+
+/**
+ * Coordinator and admin view: one request per page of 20 enrollments (GET /requirement-tracking), with the
+ * compliance summary computed on the server. Replaces one request per enrollment.
+ */
+function RequirementTracking() {
+  const [data, setData] = useState<TrackingPage | null>(null);
+  const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [includeSynthetic, setIncludeSynthetic] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [comments, setComments] = useState<Record<number, string>>({});
   useEffect(() => {
     let active = true;
-    api<RequirementData>(`/enrollments/${enrollment.id}/requirements`)
+    setError("");
+    const params = new URLSearchParams({ page: String(page) });
+    if (search) params.set("search", search);
+    api<TrackingPage>(withSynthetic(`/requirement-tracking?${params}`, includeSynthetic))
       .then((value) => {
         if (active) setData(value);
       })
       .catch((cause: Error) => {
-        if (active) setMessage(cause.message);
+        if (active) setError(cause.message);
       });
     return () => {
       active = false;
     };
-  }, [enrollment.id, revision]);
+  }, [page, search, includeSynthetic, revision]);
+  const refresh = () => setRevision((value) => value + 1);
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setPage(1);
+            setSearch(query.trim());
+          }}
+        >
+          <label className="text-sm">
+            Find student
+            <input
+              type="search"
+              className="mt-1 block rounded-lg border border-input bg-card px-3 py-2 text-sm"
+              placeholder="Name or student ID"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <Button type="submit" variant="outline">
+            Search
+          </Button>
+        </form>
+        <SyntheticToggle
+          checked={includeSynthetic}
+          onChange={(value) => {
+            setPage(1);
+            setIncludeSynthetic(value);
+          }}
+        />
+      </div>
+      {error && (
+        <p role="alert">
+          {error}{" "}
+          <button className="underline" onClick={refresh}>
+            Retry
+          </button>
+        </p>
+      )}
+      {!data && !error && <p role="status">Loading requirement tracking…</p>}
+      {data && <RequirementCompliance summary={data.summary} onRefresh={refresh} />}
+      {data?.data.length === 0 && <Card>No enrollment records match.</Card>}
+      <div className="space-y-5">
+        {data?.data.map((row) => (
+          <RequirementsForEnrollment key={row.id} record={row} onChanged={refresh} />
+        ))}
+      </div>
+      {data && data.last_page > 1 && (
+        <div className="mt-4 flex items-center gap-3">
+          <Button variant="outline" disabled={page === 1} onClick={() => setPage((v) => v - 1)}>
+            Previous
+          </Button>
+          <span className="text-sm">
+            Page {data.current_page} of {data.last_page} · {data.total} enrollments
+          </span>
+          <Button
+            variant="outline"
+            disabled={page === data.last_page}
+            onClick={() => setPage((v) => v + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function RequirementsForEnrollment({
+  record,
+  onChanged,
+}: {
+  record: TrackingRow;
+  onChanged: () => void;
+}) {
+  const user = useSessionUser();
+  const enrollment = record;
+  const data: RequirementData = record;
   return (
     <Card>
       <CardTitle>
         {enrollment.student?.user?.name ?? enrollment.program_term.program.code} ·{" "}
         {enrollment.program_term.academic_term.name}
       </CardTitle>
-      {message && (
-        <p role="status" className="my-3">
-          {message}
-        </p>
-      )}
       {data?.requirements.length === 0 && (
         <p>No requirements have been configured for this program and term.</p>
       )}
@@ -798,7 +875,7 @@ function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
                 attendance={data.attendances.find(
                   (item) => item.program_term_requirement_id === requirement.id,
                 )}
-                onSaved={() => setRevision((value) => value + 1)}
+                onSaved={onChanged}
               />
             );
           }
@@ -818,42 +895,6 @@ function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
                   ? ` · Due ${new Date(requirement.due_at).toLocaleString()}`
                   : ""}
               </p>
-              {user.role === "student" && (
-                <form
-                  className="my-3 flex flex-wrap gap-3"
-                  onSubmit={async (event) => {
-                    event.preventDefault();
-                    const form = event.currentTarget;
-                    const payload = new FormData(form);
-                    payload.set("requirement_id", String(requirement.id));
-                    setBusy(true);
-                    setMessage("");
-                    try {
-                      await upload(`/enrollments/${enrollment.id}/requirements`, payload);
-                      form.reset();
-                      setRevision((value) => value + 1);
-                      setMessage("Document submitted for review.");
-                    } catch (cause) {
-                      setMessage(
-                        cause instanceof Error ? cause.message : "Unable to submit document.",
-                      );
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  <input
-                    aria-label={`${requirement.requirement_type.name} document`}
-                    type="file"
-                    name="file"
-                    required
-                    accept=".pdf,.jpg,.jpeg,.png,.docx"
-                  />
-                  <Button type="submit" disabled={busy}>
-                    Submit document
-                  </Button>
-                </form>
-              )}
               <ul className="space-y-2 text-sm">
                 {submissions.map((item) => (
                   <li key={item.id}>
@@ -873,53 +914,59 @@ function RequirementsForEnrollment({ enrollment }: { enrollment: Enrollment }) {
               {user.role === "coordinator" &&
                 latest &&
                 ["submitted", "under_review"].includes(latest.status) && (
-                  <div className="mt-3 space-y-3">
-                    <label className="block text-sm">
-                      Review comments
-                      <textarea
-                        className="mt-1 block w-full rounded border p-2"
-                        value={comments[latest.id] ?? ""}
-                        onChange={(event) =>
-                          setComments((current) => ({
-                            ...current,
-                            [latest.id]: event.target.value,
-                          }))
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {latest.status === "submitted" && (
+                      <ConfirmButton
+                        size="sm"
+                        title={`Start reviewing ${requirement.requirement_type.name}?`}
+                        description={`Mark revision ${latest.revision} (${latest.document.original_name}) as under review. The student sees the new status.`}
+                        confirmLabel="Start review"
+                        success="Review started"
+                        onConfirm={() =>
+                          mutate(`/submissions/${latest.id}/review`, {
+                            status: "under_review",
+                            comments: null,
+                          })
                         }
-                      />
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        ["under_review", "Start review"],
-                        ["approved", "Approve"],
-                        ["rejected", "Reject"],
-                      ].map(([status, label]) => (
-                        <Button
-                          key={status}
-                          disabled={busy}
-                          variant="outline"
-                          onClick={async () => {
-                            setBusy(true);
-                            setMessage("");
-                            try {
-                              await mutate(`/submissions/${latest.id}/review`, {
-                                status,
-                                comments: comments[latest.id] || null,
-                              });
-                              setRevision((value) => value + 1);
-                              setMessage("Review saved.");
-                            } catch (cause) {
-                              setMessage(
-                                cause instanceof Error ? cause.message : "Unable to save review.",
-                              );
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          {label}
-                        </Button>
-                      ))}
-                    </div>
+                        onDone={onChanged}
+                      >
+                        Start review
+                      </ConfirmButton>
+                    )}
+                    <ConfirmButton
+                      size="sm"
+                      variant="primary"
+                      title={`Approve ${requirement.requirement_type.name}?`}
+                      description={`Approve revision ${latest.revision} (${latest.document.original_name}) for ${enrollment.student?.user?.name ?? "this student"}. The student is notified.`}
+                      confirmLabel="Approve"
+                      success="Requirement approved"
+                      onConfirm={() =>
+                        mutate(`/submissions/${latest.id}/review`, {
+                          status: "approved",
+                          comments: null,
+                        })
+                      }
+                      onDone={onChanged}
+                    >
+                      Approve
+                    </ConfirmButton>
+                    <ReasonButton
+                      size="sm"
+                      title={`Return ${requirement.requirement_type.name} for correction`}
+                      description="The student sees this reason and can upload a corrected revision."
+                      submitLabel="Return document"
+                      field="comments"
+                      success="Document returned to the student"
+                      onSubmit={(reason) =>
+                        mutate(`/submissions/${latest.id}/review`, {
+                          status: "rejected",
+                          comments: reason,
+                        })
+                      }
+                      onDone={onChanged}
+                    >
+                      Return for correction
+                    </ReasonButton>
                   </div>
                 )}
             </section>
@@ -989,32 +1036,42 @@ function EventRequirement({
       </p>
       {user.role === "student" && !attendance?.confirmed_at && (
         <form
-          className="my-3 flex flex-wrap items-end gap-3"
+          className="my-3 space-y-3"
           onSubmit={(event) => {
             event.preventDefault();
             void save(false);
           }}
         >
-          <label className="text-sm">
-            Attendance date
+          <FormField label="Attendance date" required>
             <input
               aria-label={`${requirement.requirement_type.name} attendance date`}
-              className="mt-1 block rounded border p-2"
+              name="attended_on"
+              className={inputClass}
               type="date"
               required
               value={date}
               onChange={(event) => setDate(event.target.value)}
             />
-          </label>
+          </FormField>
           <Button type="submit" disabled={busy}>
-            Record attendance
+            {busy ? "Saving…" : "Record attendance"}
           </Button>
         </form>
       )}
       {user.role === "coordinator" && attendance && !attendance.confirmed_at && (
-        <Button variant="outline" className="mt-3" disabled={busy} onClick={() => void save(true)}>
+        <ConfirmButton
+          className="mt-3"
+          title={`Confirm attendance at ${requirement.requirement_type.name}?`}
+          description={`The student recorded attendance on ${attendance.attended_on}. Confirming completes this requirement.`}
+          confirmLabel="Confirm attendance"
+          success="Attendance confirmed"
+          onConfirm={() =>
+            mutate(`/enrollments/${enrollmentId}/event-attendances/${attendance.id}/confirm`, {})
+          }
+          onDone={onSaved}
+        >
           Confirm attendance
-        </Button>
+        </ConfirmButton>
       )}
       {message && (
         <p role="status" className="mt-2 text-sm">

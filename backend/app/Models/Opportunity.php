@@ -30,6 +30,7 @@ class Opportunity extends Model
             'status' => OpportunityStatus::class,
             'starts_on' => 'immutable_date',
             'ends_on' => 'immutable_date',
+            'archived_at' => 'immutable_datetime',
         ];
     }
 

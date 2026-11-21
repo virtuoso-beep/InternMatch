@@ -12,7 +12,7 @@ class OpportunityController extends Controller
     {
         abort_unless(in_array($request->user()->role, [Role::Admin, Role::Coordinator, Role::Supervisor], true), 403);
 
-        return response()->json(OpportunityManagement::query($request->user())->with(['programs', 'competencies', 'hostEstablishment'])->orderByDesc('id')->paginate(50));
+        return response()->json(OpportunityManagement::query($request->user())->when(! $request->boolean('include_archived'), fn ($query) => $query->whereNull('archived_at'))->with(['programs', 'competencies', 'hostEstablishment'])->orderByDesc('id')->paginate(50));
     }
 
     public function store(Request $request)

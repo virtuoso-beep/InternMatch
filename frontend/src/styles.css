@@ -1,6 +1,9 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+/* Self-hosted fonts (no render-blocking request to Google Fonts; each subset loads only when used). */
+@import "@fontsource-variable/public-sans/wght.css";
+@import "@fontsource-variable/newsreader/opsz.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -19,8 +22,8 @@
  */
 
 @theme inline {
-  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Public Sans Variable", "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Public Sans Variable", "Public Sans", ui-sans-serif, system-ui, sans-serif;
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
@@ -171,7 +174,9 @@
   html {
     font-family: var(--font-sans);
   }
-  h1, h2, h3 {
+  h1,
+  h2,
+  h3 {
     letter-spacing: -0.015em;
   }
 }
@@ -186,8 +191,13 @@
 }
 
 /* Retain wheel, touch and keyboard scrolling without a visible menu scrollbar. */
-.im-hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
-.im-hide-scrollbar::-webkit-scrollbar { display: none; }
+.im-hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.im-hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 
 /* Native <progress> bars use the design tokens instead of browser green/grey. */
 @layer base {
@@ -212,4 +222,242 @@
     background-color: var(--success);
     border-radius: 9999px;
   }
+}
+
+/* Loading placeholders (uses the existing muted/secondary colours). */
+@keyframes im-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.im-skeleton {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--border) 37%, var(--muted) 63%);
+  background-size: 400% 100%;
+  animation: im-shimmer 1.4s ease infinite;
+}
+
+/* Native dialogs never exceed the viewport and scroll inside. */
+@layer base {
+  dialog[open] {
+    max-height: calc(100dvh - 2rem);
+    max-width: calc(100vw - 2rem);
+    overflow: auto;
+  }
+}
+
+/* Respect reduced-motion preferences (transitions, shimmer, chart animation). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Header bar tokens. The header keeps the same maroon bar with white text in light and dark mode.
+ */
+@theme inline {
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
+}
+:root {
+  --header: var(--brand);
+  --header-foreground: oklch(0.99 0.005 60);
+}
+
+/*
+ * Dark mode only: lighter brand and status colours so text, links and badges stay readable on the
+ * dark surfaces. Light mode values above are unchanged.
+ */
+.dark {
+  --header: oklch(0.35 0.11 18);
+  --brand: oklch(0.78 0.1 18);
+  --brand-foreground: oklch(0.2 0.04 18);
+  --brand-soft: oklch(0.3 0.06 18);
+  --success: oklch(0.74 0.14 165);
+  --success-soft: oklch(0.3 0.06 165);
+  --warn: oklch(0.8 0.13 80);
+  --warn-soft: oklch(0.32 0.06 80);
+  --info: oklch(0.76 0.12 250);
+  --info-soft: oklch(0.3 0.06 250);
+  --ring: oklch(0.78 0.1 18);
+  --chart-1: oklch(0.78 0.1 18);
+  --chart-2: oklch(0.74 0.14 165);
+  --chart-3: oklch(0.8 0.13 80);
+  --chart-4: oklch(0.76 0.12 250);
+  --chart-5: oklch(0.7 0.05 260);
+}
+
+/* Dark mode surfaces: warm charcoal with a slight maroon tint instead of the template's navy. */
+.dark {
+  --background: oklch(0.175 0.008 20);
+  --surface: oklch(0.175 0.008 20);
+  --foreground: oklch(0.95 0.004 20);
+  --card: oklch(0.215 0.009 20);
+  --card-foreground: oklch(0.95 0.004 20);
+  --popover: oklch(0.245 0.01 20);
+  --popover-foreground: oklch(0.95 0.004 20);
+  --secondary: oklch(0.27 0.01 20);
+  --secondary-foreground: oklch(0.95 0.004 20);
+  --muted: oklch(0.27 0.01 20);
+  --muted-foreground: oklch(0.74 0.01 20);
+  --accent: oklch(0.3 0.05 18);
+  --accent-foreground: oklch(0.92 0.03 18);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 16%);
+  --destructive: oklch(0.7 0.17 25);
+  --destructive-foreground: oklch(0.2 0.03 25);
+}
+
+/*
+ * Landing page tokens. Colours are the existing palette only: --header (maroon, stays maroon in dark
+ * mode), --warn (gold), --brand-foreground and the neutrals, with tints via opacity and color-mix.
+ */
+@theme inline {
+  --font-serif: "Newsreader Variable", ui-serif, Georgia, serif;
+  /* Type scale (fluid display sizes; body sizes use the Tailwind defaults). */
+  --text-display: clamp(2.75rem, 1.4rem + 5.4vw, 6rem);
+  --text-display--line-height: 1.02;
+  --text-headline: clamp(2rem, 1.3rem + 2.6vw, 3.5rem);
+  --text-headline--line-height: 1.08;
+  --text-title: clamp(1.5rem, 1.2rem + 1vw, 2rem);
+  --text-title--line-height: 1.2;
+  --text-eyebrow: 0.75rem;
+  --text-eyebrow--line-height: 1rem;
+  --text-eyebrow--letter-spacing: 0.18em;
+  /* Motion: 150 to 600 ms with a soft ease-out; the Ken Burns zoom is deliberately slow. */
+  --ease-cinematic: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-base: 300ms;
+  --duration-slow: 600ms;
+  --duration-kenburns: 24s;
+  /* Shades of the existing gold for small text: on light surfaces and on maroon. */
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-light: var(--warn-light);
+  /* Measure for reading text. */
+  --container-prose: 38rem;
+}
+
+:root {
+  --warn-ink: color-mix(in oklab, var(--warn) 62%, black);
+  --warn-light: color-mix(in oklab, var(--warn) 55%, white);
+}
+.dark {
+  --warn-ink: var(--warn);
+}
+
+/* Maroon gradient on --header, which stays maroon in dark mode (unlike --brand). */
+@utility header-gradient {
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--header) 75%, black) 0%,
+    var(--header) 45%,
+    color-mix(in oklab, var(--header) 60%, black) 100%
+  );
+}
+
+/* Gradient over campus photos so overlaid text keeps WCAG AA contrast. */
+@utility photo-scrim {
+  background: linear-gradient(
+    to top right,
+    color-mix(in oklab, var(--header) 92%, black) 0%,
+    color-mix(in oklab, var(--header) 70%, transparent) 45%,
+    color-mix(in oklab, var(--header) 15%, transparent) 100%
+  );
+}
+
+/* Placeholder field shown until a real campus photo is supplied. */
+@utility photo-placeholder {
+  background-color: color-mix(in oklab, var(--header) 8%, var(--card));
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--warn) 18%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--warn) 18%, transparent) 1px, transparent 1px);
+  background-size: 2rem 2rem;
+}
+@utility photo-placeholder-dark {
+  background-color: color-mix(in oklab, var(--header) 85%, black);
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--warn) 14%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--warn) 14%, transparent) 1px, transparent 1px);
+  background-size: 2rem 2rem;
+}
+
+@keyframes im-kenburns {
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1.12);
+  }
+}
+.im-kenburns {
+  animation: im-kenburns var(--duration-kenburns) var(--ease-cinematic) both alternate infinite;
+  will-change: transform;
+}
+
+@keyframes im-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Load-time stagger for hero elements; --stagger is the item index. */
+.im-rise {
+  animation: im-rise var(--duration-slow) var(--ease-cinematic) both;
+  animation-delay: calc(var(--stagger, 0) * 120ms);
+}
+
+/* Scroll reveal. Elements already on screen at load are never hidden (no flash, no layout shift). */
+.im-reveal[data-reveal="pending"] {
+  opacity: 0;
+  transform: translateY(1.5rem);
+}
+.im-reveal {
+  transition:
+    opacity var(--duration-slow) var(--ease-cinematic),
+    transform var(--duration-slow) var(--ease-cinematic);
+  transition-delay: calc(var(--stagger, 0) * 90ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .im-kenburns,
+  .im-rise {
+    animation: none;
+  }
+  .im-reveal[data-reveal="pending"] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Landing page only: no visible page scrollbar over the full-bleed hero. Wheel, touch, keyboard and the
+   header links still scroll; the portals keep their normal scrollbar. */
+html.im-no-scrollbar {
+  scrollbar-width: none;
+}
+html.im-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Password fields have their own show/hide button; hide Edge's built-in reveal and clear buttons. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+/* Dark mode maps: darken the OpenStreetMap tiles to match the dark surfaces. Markers and popups sit in
+   other panes and keep their colours. */
+.dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
 }

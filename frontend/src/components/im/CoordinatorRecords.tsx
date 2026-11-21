@@ -1,9 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { ConfirmButton, ReasonButton } from "./actions";
 import { api, mutate } from "@/lib/api";
 import { activationLabel } from "@/lib/activation";
 import {
   Button,
   Card,
+  FormField,
+  FormGrid,
+  FormModal,
+  FormSection,
   PageHeader,
   Row,
   Table,
@@ -12,7 +18,9 @@ import {
   formatSimilarity,
   studentName,
 } from "./ui";
+import { inputClass, toFormError, type FormError } from "./formUtils";
 import { RecommendationBatch } from "./RecommendationBatch";
+import { RankingStatus } from "./RankingStatus";
 import { ExcelImportButton } from "./ExcelImportButton";
 
 import { ImportHistory } from "./ImportHistory";
@@ -21,6 +29,9 @@ import { StudentHistory } from "./StudentHistory";
 type Enrollment = {
   id: number;
   status: string;
+  year_level?: number | null;
+  enrolled_on?: string | null;
+  target_completion_on?: string | null;
   student: {
     student_number: string;
     user: {
@@ -60,21 +71,7 @@ export function CoordinatorStudents() {
   const [term, setTerm] = useState("");
   const [enrollmentStatus, setEnrollmentStatus] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
-  const [sending, setSending] = useState<number | null>(null);
-  const [notice, setNotice] = useState("");
-  const sendActivation = async (user: Enrollment["student"]["user"]) => {
-    setSending(user.id);
-    setNotice("");
-    try {
-      await mutate(`/users/${user.id}/activation`, {}, "POST");
-      setNotice(`Activation link sent to ${user.email}. Any earlier link no longer works.`);
-      setRevision((v) => v + 1);
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "The activation link could not be sent.");
-    } finally {
-      setSending(null);
-    }
-  };
+  const [editing, setEditing] = useState<Enrollment | null>(null);
   const [program, setProgram] = useState("");
   const [sort, setSort] = useState("name");
   const [page, setPage] = useState(1);
@@ -170,7 +167,7 @@ export function CoordinatorStudents() {
                   setFilter(option);
                   setPage(1);
                 }}
-                className={`rounded-full border px-4 py-2 text-sm ${filter === option ? "bg-brand text-white border-brand" : "bg-card hover:bg-muted"}`}
+                className={`rounded-full border px-4 py-2 text-sm ${filter === option ? "bg-brand text-brand-foreground border-brand" : "bg-card hover:bg-muted"}`}
               >
                 {option}
               </button>
@@ -261,11 +258,6 @@ export function CoordinatorStudents() {
               Clear filters
             </Button>
           </div>
-          {notice && (
-            <p className="mb-3 rounded border p-3 text-sm" role="status">
-              {notice}
-            </p>
-          )}
           <p className="mb-3 text-sm text-muted-foreground" role="status">
             {filtered.length} of {rows.length} enrollment records. A student may have multiple
             academic terms.
@@ -286,6 +278,7 @@ export function CoordinatorStudents() {
                   "Enrollment",
                   "Placement",
                   "Host establishment",
+                  "Actions",
                 ]}
               >
                 {visible.map((r) => (
@@ -308,15 +301,23 @@ export function CoordinatorStudents() {
                               : "Not activated"}
                           </Pill>
                           {r.student.user.email && (
-                            <Button
-                              variant="outline"
-                              disabled={sending === r.student.user.id}
-                              onClick={() => void sendActivation(r.student.user)}
+                            <ConfirmButton
+                              size="sm"
+                              title={`${r.student.user.activation ? "Re-send" : "Send"} the activation link to ${studentName(r.student.user)}?`}
+                              description={`An email with a one-time activation link goes to ${r.student.user.email}. Any earlier link stops working.`}
+                              confirmLabel={
+                                r.student.user.activation ? "Re-send link" : "Send link"
+                              }
+                              success="Activation link sent"
+                              onConfirm={() =>
+                                mutate(`/users/${r.student.user.id}/activation`, {}, "POST")
+                              }
+                              onDone={() => setRevision((v) => v + 1)}
                             >
                               {r.student.user.activation
                                 ? "Re-send activation link"
                                 : "Send activation link"}
-                            </Button>
+                            </ConfirmButton>
                           )}
                         </span>
                       )}
@@ -332,11 +333,45 @@ export function CoordinatorStudents() {
                       <Pill tone={statusTone(r.current_placement?.status ?? "")}>{label(r)}</Pill>
                     </td>
                     <td>{r.current_placement?.host_establishment.name ?? "Not assigned"}</td>
+                    <td>
+                      {r.status === "enrolled" && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setEditing(r)}>
+                            Edit enrollment
+                          </Button>
+                          {!r.current_placement && (
+                            <ReasonButton
+                              size="sm"
+                              title={`Withdraw ${studentName(r.student.user)} from ${r.program_term.program.code} · ${r.program_term.academic_term.name}`}
+                              description="The enrollment becomes withdrawn. Its records and audit history are kept. Only students with no placement history can be withdrawn."
+                              submitLabel="Withdraw"
+                              success="Enrollment withdrawn"
+                              onSubmit={(reason) =>
+                                mutate(`/enrollments/${r.id}/withdraw`, { reason })
+                              }
+                              onDone={() => setRevision((v) => v + 1)}
+                            >
+                              Withdraw
+                            </ReasonButton>
+                          )}
+                        </div>
+                      )}
+                    </td>
                   </Row>
                 ))}
               </Table>
             )}
           </Card>
+          {editing && (
+            <EnrollmentEditor
+              record={editing}
+              onClose={() => setEditing(null)}
+              onSaved={() => {
+                setEditing(null);
+                setRevision((v) => v + 1);
+              }}
+            />
+          )}
           <p className="mt-3 text-xs text-muted-foreground">
             Approved placements await deployment. Not Placed can include completed or closed
             enrollments; check the enrollment status.
@@ -415,6 +450,7 @@ export function CoordinatorRecommendations() {
       >
         Go to pending approvals →
       </a>
+      <RankingStatus />
       {error && (
         <p role="alert">
           {error} <Button onClick={() => setRevision((v) => v + 1)}>Try again</Button>
@@ -425,7 +461,7 @@ export function CoordinatorRecommendations() {
       {notice && (
         <p
           role="status"
-          className="mb-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+          className="mb-4 rounded border border-success/30 bg-success-soft p-3 text-sm text-success"
         >
           {notice}
         </p>
@@ -463,7 +499,7 @@ export function CoordinatorRecommendations() {
                   key={value}
                   type="button"
                   aria-pressed={reviewStatus === value}
-                  className={`rounded-full px-4 py-2 text-sm font-medium ${reviewStatus === value ? "bg-brand text-white" : "bg-muted text-muted-foreground"}`}
+                  className={`rounded-full px-4 py-2 text-sm font-medium ${reviewStatus === value ? "bg-brand text-brand-foreground" : "bg-muted text-muted-foreground"}`}
                   onClick={() => setReviewStatus(value ?? "")}
                 >
                   {label}
@@ -552,7 +588,7 @@ export function CoordinatorRecommendations() {
                     </td>
                     <td>
                       <span
-                        className={`rounded-full px-3 py-1 text-xs ${r.history.length ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}
+                        className={`rounded-full px-3 py-1 text-xs ${r.history.length ? "bg-success-soft text-success" : "bg-warn-soft text-warn"}`}
                       >
                         {r.history.length ? "Previously reviewed" : "Awaiting review"}
                       </span>
@@ -616,16 +652,6 @@ function RecommendationReview({
   saved: () => void;
   close: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const element = dialog.current;
-    const previous = document.activeElement as HTMLElement | null;
-    element?.showModal();
-    return () => {
-      element?.close();
-      previous?.focus();
-    };
-  }, []);
   const fields = record.explanation
     .split("\n")
     .map((line) => {
@@ -647,30 +673,39 @@ function RecommendationReview({
     [reason, setReason] = useState(""),
     [confirm, setConfirm] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState<FormError | null>(null);
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="review-panel-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        if (!busy) close();
+    <FormModal
+      open
+      size="lg"
+      onClose={close}
+      title={`Review recommendation for ${record.student_name}`}
+      description={record.program}
+      submitLabel="Save judgment"
+      busy={busy}
+      submitDisabled={!confirm || reason.trim().length < 10}
+      error={error}
+      onSubmit={async () => {
+        setBusy(true);
+        setError(null);
+        try {
+          await mutate(`/recommendation-reviews/${record.id}`, {
+            judgment,
+            reason: reason.trim(),
+            confirm,
+          });
+          saved();
+          toast.success("Judgment saved");
+        } catch (cause) {
+          setError(toFormError(cause, "Unable to save judgment."));
+        } finally {
+          setBusy(false);
+        }
       }}
-      className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-full max-w-2xl overflow-y-auto border-l border-border bg-card p-0 text-foreground shadow-2xl backdrop:bg-black/40"
     >
-      <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b bg-card p-5">
-        <div>
-          <p className="text-xs uppercase text-muted-foreground">Recommendation review</p>
-          <h2 id="review-panel-title" className="mt-1 text-xl font-semibold">
-            {record.student_name}
-          </h2>
-          <p className="text-sm text-muted-foreground">{record.program}</p>
-        </div>
-      </div>
-      <div className="p-5">
-        <h3 className="font-semibold">Recommended placement</h3>
+      <FormSection title="Recommended placement">
         {keyFields.length > 0 && (
-          <dl className="mt-3 grid gap-4 rounded-xl bg-muted/40 p-4 sm:grid-cols-2">
+          <dl className="grid gap-4 rounded-xl bg-muted/40 p-4 sm:grid-cols-2">
             {keyFields.map(([key, value]) => (
               <div key={key} className={key === "Tasks" ? "sm:col-span-2" : ""}>
                 <dt className="text-xs text-muted-foreground">
@@ -685,109 +720,170 @@ function RecommendationReview({
             ))}
           </dl>
         )}
-        <details className="mt-3 rounded-lg border p-3">
+        <details className="rounded-lg border p-3">
           <summary className="cursor-pointer text-sm font-medium">Full match explanation</summary>
           <p className="mt-3 whitespace-pre-wrap break-words text-sm text-muted-foreground">
             {record.explanation || "No explanation recorded."}
           </p>
         </details>
-        <p className="mt-3 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           These are saved recommendation details. Check current capacity and MOA coverage before
           approving a placement.
         </p>
-        <form
-          className="mt-4 space-y-3"
-          aria-label={`Review recommendation ${record.id}`}
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setBusy(true);
-            setError("");
-            try {
-              await mutate(`/recommendation-reviews/${record.id}`, {
-                judgment,
-                reason: reason.trim(),
-                confirm,
-              });
-              saved();
-            } catch (cause) {
-              setError(cause instanceof Error ? cause.message : "Unable to save judgment.");
-            } finally {
-              setBusy(false);
-            }
-          }}
+      </FormSection>
+      <FormSection title="Your judgment">
+        <FormField label="Suitability judgment" required>
+          <select
+            aria-label="Suitability judgment"
+            name="judgment"
+            disabled={busy}
+            className={inputClass}
+            value={judgment}
+            onChange={(e) => setJudgment(e.target.value)}
+          >
+            <option value="uncertain">Uncertain</option>
+            <option value="suitable">Suitable</option>
+            <option value="unsuitable">Unsuitable</option>
+          </select>
+        </FormField>
+        <FormField
+          label="Supporting reason"
+          required
+          helper={`${reason.trim().length} / 5000 characters. Minimum 10.`}
         >
-          <fieldset disabled={busy} className="space-y-3">
-            <label className="block text-sm">
-              Suitability judgment
-              <select
-                aria-label="Suitability judgment"
-                className="mt-1 block rounded border p-2"
-                value={judgment}
-                onChange={(e) => setJudgment(e.target.value)}
-              >
-                <option value="uncertain">Uncertain</option>
-                <option value="suitable">Suitable</option>
-                <option value="unsuitable">Unsuitable</option>
-              </select>
-            </label>
-            <label className="block text-sm">
-              Supporting reason
-              <textarea
-                required
-                minLength={10}
-                maxLength={5000}
-                className="mt-1 block w-full rounded border p-2"
-                rows={4}
-                placeholder="Explain why this recommendation is suitable, unsuitable, or needs more information."
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-              />
-            </label>
-            <p className="text-xs text-muted-foreground">
-              {reason.trim().length} / 5000 characters · minimum 10
-            </p>
-            <label className="block text-sm">
-              <input
-                type="checkbox"
-                required
-                checked={confirm}
-                onChange={(e) => setConfirm(e.target.checked)}
-              />{" "}
-              I confirm this judgment and its supporting reason.
-            </label>
-            {error && <p role="alert">{error}</p>}
-            <div className="flex flex-wrap gap-3 pt-2">
-              <Button type="submit" disabled={busy || !confirm || reason.trim().length < 10}>
-                {busy ? "Saving…" : "Save judgment"}
-              </Button>
-              <Button variant="outline" disabled={busy} onClick={close}>
-                Cancel
-              </Button>
-            </div>
-          </fieldset>
-        </form>
-        <details className="mt-5 border-t pt-4">
-          <summary className="cursor-pointer text-sm font-semibold">
-            Previous reviews ({record.history.length})
-          </summary>
-          {record.history.length === 0 ? (
-            <p className="text-sm">No judgments recorded.</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {record.history.map((h) => (
-                <li key={h.id}>
-                  <span className="font-semibold capitalize">{h.judgment}</span>
-                  <p className="whitespace-pre-wrap break-words">{h.reason}</p>
-                  <time className="text-xs text-muted-foreground">
-                    {new Date(h.approved_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })} ·
-                    Manila time
-                  </time>
-                </li>
-              ))}
-            </ul>
-          )}
-        </details>
-      </div>
-    </dialog>
+          <textarea
+            required
+            name="reason"
+            disabled={busy}
+            minLength={10}
+            maxLength={5000}
+            className={inputClass}
+            rows={4}
+            placeholder="Explain why this recommendation is suitable, unsuitable, or needs more information."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </FormField>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="confirm"
+            required
+            disabled={busy}
+            className="mt-1"
+            checked={confirm}
+            onChange={(e) => setConfirm(e.target.checked)}
+          />
+          I confirm this judgment and its supporting reason.
+        </label>
+      </FormSection>
+      <details className="border-t pt-4">
+        <summary className="cursor-pointer text-sm font-semibold">
+          Previous reviews ({record.history.length})
+        </summary>
+        {record.history.length === 0 ? (
+          <p className="mt-2 text-sm">No judgments recorded.</p>
+        ) : (
+          <ul className="mt-2 space-y-2 text-sm">
+            {record.history.map((h) => (
+              <li key={h.id}>
+                <span className="font-semibold capitalize">{h.judgment}</span>
+                <p className="whitespace-pre-wrap break-words">{h.reason}</p>
+                <time className="text-xs text-muted-foreground">
+                  {new Date(h.approved_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })} ·
+                  Manila time
+                </time>
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
+    </FormModal>
+  );
+}
+
+function EnrollmentEditor({
+  record,
+  onClose,
+  onSaved,
+}: {
+  record: Enrollment;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState({
+    year_level: String(record.year_level ?? ""),
+    enrolled_on: record.enrolled_on?.slice(0, 10) ?? "",
+    target_completion_on: record.target_completion_on?.slice(0, 10) ?? "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<FormError | null>(null);
+  return (
+    <FormModal
+      open
+      onClose={onClose}
+      title={`Edit enrollment: ${studentName(record.student.user)}`}
+      description={`${record.program_term.program.code} · ${record.program_term.academic_term.name}. Identity, program and placement are not changed here.`}
+      submitLabel="Save changes"
+      busy={busy}
+      error={error}
+      onSubmit={async () => {
+        setBusy(true);
+        setError(null);
+        try {
+          await mutate(
+            `/enrollments/${record.id}`,
+            {
+              year_level: Number(value.year_level),
+              enrolled_on: value.enrolled_on,
+              target_completion_on: value.target_completion_on || null,
+            },
+            "PATCH",
+          );
+          onSaved();
+          toast.success("Enrollment updated");
+        } catch (cause) {
+          setError(toFormError(cause, "Unable to update the enrollment."));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <FormGrid>
+        <FormField label="Year level" required>
+          <input
+            type="number"
+            name="year_level"
+            min="1"
+            max="10"
+            required
+            className={inputClass}
+            value={value.year_level}
+            onChange={(event) => setValue((v) => ({ ...v, year_level: event.target.value }))}
+          />
+        </FormField>
+        <FormField label="Enrolled on" required>
+          <input
+            type="date"
+            name="enrolled_on"
+            required
+            className={inputClass}
+            value={value.enrolled_on}
+            onChange={(event) => setValue((v) => ({ ...v, enrolled_on: event.target.value }))}
+          />
+        </FormField>
+        <FormField label="Target completion">
+          <input
+            type="date"
+            name="target_completion_on"
+            className={inputClass}
+            value={value.target_completion_on}
+            onChange={(event) =>
+              setValue((v) => ({ ...v, target_completion_on: event.target.value }))
+            }
+          />
+        </FormField>
+      </FormGrid>
+    </FormModal>
   );
 }

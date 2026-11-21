@@ -170,7 +170,7 @@ export function NotificationList() {
         </p>
       </div>
       {notice && (
-        <p role="status" className="mb-3 text-sm text-emerald-700">
+        <p role="status" className="mb-3 text-sm text-success">
           {notice}
         </p>
       )}

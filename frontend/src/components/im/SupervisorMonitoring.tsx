@@ -1,13 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { Button, Pill, formatRating, formatStatus, statusTone } from "./ui";
+import { Button, Modal, Pill, formatRating, formatStatus, statusTone } from "./ui";
 import type { Monitoring } from "./MonitoringWorkspace";
+import { ConfirmButton, ReasonButton } from "./actions";
 
-export function InternProgress({ placementId }: { placementId: number }) {
-  const [data, setData] = useState<Monitoring | null>(null);
+type Score = { period: string; status: string; weighted_percentage: number | null };
+
+/** Lists pass `progress` and `evaluations` from GET /placements?include=…; otherwise the card loads them. */
+export function InternProgress({
+  placementId,
+  progress,
+  evaluations,
+}: {
+  placementId: number;
+  progress?: Monitoring["progress"] | undefined;
+  evaluations?: Score[] | undefined;
+}) {
+  const [data, setData] = useState<Pick<Monitoring, "progress"> | null>(
+    progress ? { progress } : null,
+  );
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   useEffect(() => {
+    if (progress && retry === 0) return;
     let active = true;
     setError("");
     api<Monitoring>(`/placements/${placementId}/monitoring`)
@@ -20,7 +36,7 @@ export function InternProgress({ placementId }: { placementId: number }) {
     return () => {
       active = false;
     };
-  }, [placementId, retry]);
+  }, [placementId, retry, progress]);
   if (error)
     return (
       <p role="alert">
@@ -46,7 +62,7 @@ export function InternProgress({ placementId }: { placementId: number }) {
       </p>
       {percent !== null && (
         <progress
-          className="h-2 w-full accent-emerald-700"
+          className="h-2 w-full accent-success"
           aria-label="Certified hours progress"
           max={100}
           value={percent}
@@ -67,18 +83,23 @@ export function InternProgress({ placementId }: { placementId: number }) {
           {flag.description}
         </p>
       ))}
-      <EvaluationSummary placementId={placementId} />
+      <EvaluationSummary placementId={placementId} initial={evaluations} />
     </div>
   );
 }
 
-function EvaluationSummary({ placementId }: { placementId: number }) {
-  const [scores, setScores] = useState<
-    { period: string; status: string; weighted_percentage: number | null }[] | null
-  >(null);
+function EvaluationSummary({
+  placementId,
+  initial,
+}: {
+  placementId: number;
+  initial?: Score[] | undefined;
+}) {
+  const [scores, setScores] = useState<Score[] | null>(initial ?? null);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   useEffect(() => {
+    if (initial && retry === 0) return;
     let active = true;
     setError("");
     api<{ data: { period: string; status: string; weighted_percentage: number | null }[] }>(
@@ -93,7 +114,7 @@ function EvaluationSummary({ placementId }: { placementId: number }) {
     return () => {
       active = false;
     };
-  }, [placementId, retry]);
+  }, [placementId, retry, initial]);
   if (error)
     return (
       <p role="alert">
@@ -135,12 +156,12 @@ export function AttendanceTable({
 }) {
   const [status, setStatus] = useState("all");
   const [date, setDate] = useState("");
-  const [notes, setNotes] = useState<Record<number, string>>({});
-  const [error, setError] = useState("");
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [notes] = useState<Record<number, string>>({});
+  const [batchOpen, setBatchOpen] = useState(false);
   const [batch, setBatch] = useState<Monitoring["time_logs"]>([]);
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchResult, setBatchResult] = useState("");
+  const [page, setPage] = useState(1);
   const locked = busy || batchBusy;
   const day = (value: string) =>
     new Intl.DateTimeFormat("en-CA", {
@@ -159,6 +180,11 @@ export function AttendanceTable({
     (log) => (status === "all" || log.status === status) && (!date || day(log.time_in) === date),
   );
   const pending = rows.filter((log) => log.status === "pending");
+  // 20 logs per page; filters and bulk review still cover every matching log.
+  const PAGE_SIZE = 20;
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const current = Math.min(page, pages);
+  const pageRows = rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
@@ -167,7 +193,10 @@ export function AttendanceTable({
           <select
             className="ml-2 rounded border p-2"
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
           >
             {["all", "pending", "verified", "flagged"].map((value) => (
               <option key={value} value={value}>
@@ -182,7 +211,10 @@ export function AttendanceTable({
             className="ml-2 rounded border p-2"
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => {
+              setDate(e.target.value);
+              setPage(1);
+            }}
           />
         </label>
         <Button
@@ -190,6 +222,7 @@ export function AttendanceTable({
           onClick={() => {
             setStatus("all");
             setDate("");
+            setPage(1);
           }}
         >
           Clear filters
@@ -204,73 +237,64 @@ export function AttendanceTable({
         onClick={() => {
           setBatch([...pending]);
           setBatchResult("");
-          dialog.current?.showModal();
+          setBatchOpen(true);
         }}
       >
         Review pending logs ({pending.length})
       </Button>
       {batchResult && <p role="status">{batchResult}</p>}
-      <dialog
-        ref={dialog}
-        aria-labelledby="batch-title"
-        onCancel={(event) => {
-          if (batchBusy) event.preventDefault();
-        }}
-        className="m-auto max-h-[90dvh] w-[min(95vw,640px)] overflow-auto rounded-xl border bg-card p-6 text-foreground backdrop:bg-black/40"
+      <Modal
+        open={batchOpen}
+        onClose={() => setBatchOpen(false)}
+        size="md"
+        dismissible={!batchBusy}
+        title="Certify pending hours"
+        description={`Review these ${batch.length} pending logs for the selected intern and current filters. Flagged and already certified logs are excluded.`}
+        footer={
+          <>
+            <Button variant="outline" disabled={batchBusy} onClick={() => setBatchOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={batchBusy}
+              onClick={async () => {
+                setBatchBusy(true);
+                let completed = 0;
+                try {
+                  for (const log of batch) {
+                    if (!(await review(log.id, "verified", (notes[log.id] ?? "").trim()))) break;
+                    completed++;
+                  }
+                  setBatchResult(
+                    completed === batch.length
+                      ? `Certified ${completed} logs.`
+                      : `Certified ${completed} of ${batch.length} logs. Stopped after a failed review; remaining logs were not processed. Refresh and review the remaining records.`,
+                  );
+                  if (completed === batch.length) toast.success(`Certified ${completed} logs`);
+                } finally {
+                  setBatchBusy(false);
+                  setBatchOpen(false);
+                }
+              }}
+            >
+              {batchBusy ? "Certifying…" : `Confirm certification (${batch.length})`}
+            </Button>
+          </>
+        }
       >
-        <h2 id="batch-title" className="text-lg font-semibold">
-          Certify pending hours
-        </h2>
-        <p className="my-3 text-sm">
-          Review these {batch.length} pending logs for the selected intern and current filters.
-          Flagged and already certified logs are excluded.
-        </p>
-        <ul className="my-4 space-y-2 text-sm">
+        <ul className="space-y-2 text-sm">
           {batch.map((log) => (
-            <li key={log.id}>
+            <li key={log.id} className="rounded-lg border p-3">
               Log #{log.id} · {day(log.time_in)} · {clock(log.time_in)}–{clock(log.time_out)} ·
               break {log.break_minutes} min
             </li>
           ))}
         </ul>
-        <div className="flex gap-3">
-          <Button
-            disabled={batchBusy}
-            onClick={async () => {
-              setBatchBusy(true);
-              let completed = 0;
-              try {
-                for (const log of batch) {
-                  if (!(await review(log.id, "verified", (notes[log.id] ?? "").trim()))) break;
-                  completed++;
-                }
-                setBatchResult(
-                  completed === batch.length
-                    ? `Certified ${completed} logs.`
-                    : `Certified ${completed} of ${batch.length} logs. Stopped after a failed review; remaining logs were not processed. Refresh and review the remaining records.`,
-                );
-              } finally {
-                setBatchBusy(false);
-                dialog.current?.close();
-              }
-            }}
-          >
-            {batchBusy ? "Certifying…" : `Confirm certification (${batch.length})`}
-          </Button>
-          <Button variant="outline" disabled={batchBusy} onClick={() => dialog.current?.close()}>
-            Cancel
-          </Button>
-        </div>
-      </dialog>
-      {error && (
-        <p role="alert" className="text-brand">
-          {error}
-        </p>
-      )}
+      </Modal>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead>
-            <tr className="border-b text-xs uppercase text-muted-foreground">
+            <tr className="border-b text-xs text-muted-foreground">
               {["Date", "Time in", "Time out", "Break", "Certified hours", "Status", "Review"].map(
                 (label) => (
                   <th key={label} className="p-3">
@@ -281,7 +305,7 @@ export function AttendanceTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((log) => (
+            {pageRows.map((log) => (
               <tr key={log.id} className="border-b align-top">
                 <td className="p-3">{day(log.time_in)}</td>
                 <td className="p-3">{clock(log.time_in)}</td>
@@ -301,40 +325,40 @@ export function AttendanceTable({
                   )}
                   {log.status !== "verified" && (
                     <>
-                      <label className="block">
-                        Review note
-                        <input
-                          className="mt-1 block w-full rounded border p-2"
-                          aria-label={`Review note for ${day(log.time_in)} log ${log.id}`}
-                          value={notes[log.id] ?? ""}
-                          maxLength={5000}
+                      <div className="flex flex-wrap gap-2">
+                        <ConfirmButton
+                          size="sm"
                           disabled={locked}
-                          onChange={(e) =>
-                            setNotes((current) => ({ ...current, [log.id]: e.target.value }))
-                          }
-                        />
-                      </label>
-                      <div className="flex gap-2">
-                        {["verified", "flagged"].map((next) => (
-                          <Button
-                            key={next}
-                            variant="outline"
-                            disabled={locked}
-                            onClick={async () => {
-                              setError("");
-                              const note = (notes[log.id] ?? "").trim();
-                              if (next === "flagged" && !note) {
-                                setError(
-                                  "Enter a review note before flagging a log for correction.",
-                                );
-                                return;
-                              }
-                              await review(log.id, next, note);
-                            }}
-                          >
-                            {next === "verified" ? "Certify hours" : "Flag for correction"}
-                          </Button>
-                        ))}
+                          title={`Certify hours for ${day(log.time_in)}?`}
+                          description={`Certify the ${clock(log.time_in)}–${clock(log.time_out)} log (break ${log.break_minutes} min). Certified hours count toward the intern's progress and cannot be changed afterwards.`}
+                          confirmLabel="Certify hours"
+                          success="Hours certified"
+                          onConfirm={async () => {
+                            if (!(await review(log.id, "verified", "")))
+                              throw new Error(
+                                "The log could not be certified. Refresh and try again.",
+                              );
+                          }}
+                        >
+                          Certify hours
+                        </ConfirmButton>
+                        <ReasonButton
+                          size="sm"
+                          disabled={locked}
+                          title={`Return the ${day(log.time_in)} log for correction`}
+                          description="The intern sees this reason and can correct and resubmit the log."
+                          submitLabel="Return log"
+                          field="notes"
+                          success="Log returned for correction"
+                          onSubmit={async (reason) => {
+                            if (!(await review(log.id, "flagged", reason)))
+                              throw new Error(
+                                "The log could not be returned. Refresh and try again.",
+                              );
+                          }}
+                        >
+                          Return for correction
+                        </ReasonButton>
                       </div>
                     </>
                   )}
@@ -351,6 +375,38 @@ export function AttendanceTable({
           </tbody>
         </table>
       </div>
+      {pages > 1 && (
+        <nav
+          aria-label="Time log pages"
+          className="flex flex-wrap items-center justify-between gap-3 text-sm"
+        >
+          <p className="text-muted-foreground">
+            Showing {(current - 1) * PAGE_SIZE + 1}–{Math.min(rows.length, current * PAGE_SIZE)} of{" "}
+            {rows.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={current <= 1}
+              onClick={() => setPage(current - 1)}
+            >
+              Previous
+            </Button>
+            <span aria-live="polite">
+              Page {current} of {pages}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={current >= pages}
+              onClick={() => setPage(current + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

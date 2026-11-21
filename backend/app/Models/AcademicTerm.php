@@ -20,6 +20,7 @@ class AcademicTerm extends Model
             'starts_on' => 'immutable_date',
             'ends_on' => 'immutable_date',
             'is_active' => 'boolean',
+            'archived_at' => 'immutable_datetime',
         ];
     }
 

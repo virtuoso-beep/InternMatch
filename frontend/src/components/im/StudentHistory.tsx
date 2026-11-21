@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Button, studentName } from "./ui";
+import { ViewModal, studentName } from "./ui";
 
 type History = {
   student: {
@@ -35,11 +35,9 @@ export function StudentHistory({
   enrollment: number;
   onClose: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const [data, setData] = useState<History | null>(null),
     [error, setError] = useState("");
   useEffect(() => {
-    dialog.current?.showModal();
     let active = true;
     api<History>(`/coordinator-students/${enrollment}/history`)
       .then((value) => {
@@ -53,24 +51,21 @@ export function StudentHistory({
     };
   }, [enrollment]);
   return (
-    <dialog
-      ref={dialog}
-      onCancel={onClose}
-      aria-label="Student profile and history"
-      className="m-auto max-h-[90dvh] w-[min(95vw,800px)] overflow-y-auto rounded-xl border bg-card p-6 text-foreground backdrop:bg-black/40"
+    <ViewModal
+      open
+      onClose={onClose}
+      size="lg"
+      title={
+        data
+          ? `Profile and history: ${studentName(data.student.user)}`
+          : "Student profile and history"
+      }
+      description={data ? `Student ID ${data.student.student_number}` : undefined}
     >
-      <div className="flex justify-between gap-4">
-        <h2 className="text-xl font-semibold">Student profile and history</h2>
-        <Button variant="outline" onClick={onClose}>
-          Close
-        </Button>
-      </div>
       {error && <p role="alert">{error}</p>}
       {!data && !error && <p>Loading profile…</p>}
       {data && (
         <>
-          <h3 className="mt-5 text-lg font-semibold">{studentName(data.student.user)}</h3>
-          <p>Student ID: {data.student.student_number}</p>
           <p>Email: {data.student.user?.email || "Not provided"}</p>
           <p>Contact: {data.student.user.profile?.contact_number || "Not provided"}</p>
           <p>Address: {data.student.user.profile?.address || "Not provided"}</p>
@@ -106,6 +101,6 @@ export function StudentHistory({
           ))}
         </>
       )}
-    </dialog>
+    </ViewModal>
   );
 }

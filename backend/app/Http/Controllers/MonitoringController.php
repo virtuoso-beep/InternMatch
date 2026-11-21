@@ -24,8 +24,26 @@ class MonitoringController extends Controller
     public function index(Request $request)
     {
         abort_if($request->user()->role === Role::Dean, 403);
+        $request->validate(['include' => ['nullable', 'string', 'regex:/^(progress|evaluations)(,(progress|evaluations))?$/']]);
+        $include = array_filter(explode(',', (string) $request->query('include')));
+        $page = PlacementAccess::query($request->user())->with(['studentEnrollment.student.user:id,name', 'studentEnrollment.programTerm.program:id,code', 'hostEstablishment:id,name', 'opportunity:id,title', 'supervisor:id,name', 'moa:id,status,effective_on,expires_on'])
+            ->when(in_array('progress', $include, true), fn ($query) => $query->with(['studentEnrollment.programTerm.requirements.requirementType', 'studentEnrollment.programTerm.program']))
+            ->when(in_array('evaluations', $include, true), fn ($query) => $query->with([
+                'evaluations' => fn ($evaluations) => $evaluations->where('status', 'submitted')->orderBy('period'),
+                'evaluations.evaluationRubric.criteria', 'evaluations.scores', 'evaluations.evaluator:id,name',
+            ]))
+            ->latest()->paginate(30);
+        // Lists that show progress or evaluations get them in this one response instead of one request per row.
+        if (in_array('progress', $include, true)) {
+            $summary = app(ProgressSummary::class);
+            $page->getCollection()->each(fn (Placement $placement) => $placement->setAttribute('progress', $summary->forPlacement($placement)));
+        }
+        if (in_array('evaluations', $include, true)) {
+            $scoring = app(\App\Services\EvaluationScoring::class);
+            $page->getCollection()->each(fn (Placement $placement) => $placement->evaluations->each(fn ($evaluation) => $evaluation->setAttribute('weighted_percentage', $scoring->percentage($evaluation))));
+        }
 
-        return response()->json(PlacementAccess::query($request->user())->with(['studentEnrollment.student.user:id,name', 'studentEnrollment.programTerm.program:id,code', 'hostEstablishment:id,name', 'opportunity:id,title', 'supervisor:id,name', 'moa:id,status,effective_on,expires_on'])->latest()->paginate(30), headers: ['Cache-Control' => 'no-store']);
+        return response()->json($page, headers: ['Cache-Control' => 'no-store']);
     }
 
     public function show(Request $request, int $placement, ProgressSummary $progress)
@@ -39,6 +57,7 @@ class MonitoringController extends Controller
     {
         $record = PlacementAccess::query($request->user())->findOrFail($placement);
         abort_unless($request->user()->role === Role::Student && $record->status === PlacementStatus::Active, 403, 'An active internship is required for submissions.');
+        abort_if($record->hours_certified_at !== null, 409, 'Hours for this deployment are certified. Logs can no longer be added or changed.');
 
         return $record;
     }
@@ -84,6 +103,7 @@ class MonitoringController extends Controller
             $log = TimeLog::whereKey($timeLog->id)->lockForUpdate()->firstOrFail();
             Gate::authorize('verify', $log);
             abort_if($log->status->value === 'verified', 409, 'This time log has already been certified.');
+            abort_if($log->placement->hours_certified_at !== null, 409, 'Hours for this deployment are already certified by the coordinator.');
             abort_unless($log->time_out, 422, 'A complete time interval is required.');
             $minutes = (int) $log->time_in->diffInMinutes($log->time_out) - $log->break_minutes;
             abort_if($minutes <= 0 || $minutes > 1440, 422, 'The recorded work duration is invalid.');
@@ -122,7 +142,7 @@ class MonitoringController extends Controller
             StudentEnrollment::whereKey($journal->placement->student_enrollment_id)->lockForUpdate()->firstOrFail();
             $entry = JournalEntry::whereKey($journal->id)->lockForUpdate()->firstOrFail();
             abort_unless($entry->status->value === 'submitted', 409);
-            $entry->update(['status' => $data['status']]);
+            $entry->update(['status' => $data['status'], 'review_comments' => $data['comments'] ?? null]);
             Audit::record($request->user(), 'journal.reviewed', $entry, $data, $journal->placement->studentEnrollment->programTerm->program_id);
             $journal->placement->studentEnrollment->student->user->notify(new PortalNotification('Journal review saved', 'Journal for '.$entry->week_starts_on->toDateString().': '.$data['status'].'. '.($data['comments'] ?? '')));
         });

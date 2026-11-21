@@ -9,7 +9,7 @@ import { NotificationList } from "@/components/im/NotificationList";
 import { AllocationWorkspace } from "@/components/im/AllocationWorkspace";
 import { CoordinatorAnalytics } from "@/components/im/CoordinatorAnalytics";
 import { MoaWorkspace } from "@/components/im/MoaWorkspace";
-import { LiveDashboard } from "@/components/im/LiveDashboard";
+import { CoordinatorDashboard } from "@/components/im/CoordinatorDashboard";
 import { CoordinatorMonitoring } from "@/components/im/CoordinatorMonitoring";
 import { ProgramMonitoringSettings } from "@/components/im/ProgramMonitoringSettings";
 import { OpportunityWorkspace } from "@/components/im/OpportunityWorkspace";
@@ -42,7 +42,7 @@ export function CoordinatorSection({ section }: { section: string }) {
     case "profile":
       return <ProfileEditor role="coordinator" />;
     case "":
-      return <LiveDashboard key={importRevision} />;
+      return <CoordinatorDashboard key={importRevision} />;
     case "recommendations":
       return <CoordinatorRecommendations />;
     case "approvals":

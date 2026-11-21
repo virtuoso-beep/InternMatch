@@ -37,8 +37,9 @@ class CohortAllocation
             $selected = [];
             $hostReserved = [];
             $opportunityReserved = [];
+            $readiness = $this->readiness->reasonsForMany($enrollments);
             foreach ($enrollments as $enrollment) {
-                $reasons[$enrollment->id] = $this->readiness->reasons($enrollment);
+                $reasons[$enrollment->id] = $readiness[$enrollment->id];
                 if ($reasons[$enrollment->id]) {
                     continue;
                 }
@@ -131,7 +132,9 @@ class CohortAllocation
                 $enrollment->student->user->notify(new PortalNotification('Placement approved', 'Your coordinator approved your placement at '.$opportunity->hostEstablishment->name.'.'));
                 $supervisor->notify(new PortalNotification('Intern assigned', 'A coordinator assigned an intern to your host establishment.'));
             }
-            if ($imported && ! $placement) $imported->update(['status' => 'rejected']);
+            if ($imported && ! $placement) {
+                $imported->update(['status' => 'rejected']);
+            }
             DB::table('placement_proposal_items')->where('id', $itemId)->update(['review_status' => $placement ? 'approved' : 'rejected', 'review_reason' => $data['reason'], 'reviewed_by' => $actor->id, 'reviewed_at' => now(), 'updated_at' => now()]);
             $items = DB::table('placement_proposal_items')->where('placement_proposal_id', $item->placement_proposal_id);
             if (! (clone $items)->where('review_status', 'pending')->exists()) {

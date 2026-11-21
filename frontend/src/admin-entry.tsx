@@ -4,7 +4,9 @@ import { createRoot } from "react-dom/client";
 import { currentUser, ApiError, type SessionUser } from "@/lib/api";
 import { SessionUserProvider } from "@/components/im/SessionGuard";
 import { AdminSection } from "@/pages/admin";
+import { Toaster } from "@/components/ui/sonner";
 import { managementPath } from "@/lib/management";
+import { readThemePreference, resolveTheme } from "@/lib/theme";
 import "./styles.css";
 
 const mount = document.getElementById("admin-workspace");
@@ -33,6 +35,22 @@ function AdminWorkspace() {
       });
     return () => {
       active = false;
+    };
+  }, []);
+  // Follow the light/dark choice made in the administration shell (same origin, shared storage).
+  useEffect(() => {
+    const sync = () =>
+      document.documentElement.classList.toggle(
+        "dark",
+        resolveTheme(readThemePreference()) === "dark",
+      );
+    sync();
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    window.addEventListener("storage", sync);
+    query.addEventListener("change", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      query.removeEventListener("change", sync);
     };
   }, []);
   useEffect(() => {
@@ -93,6 +111,7 @@ function AdminWorkspace() {
         )}
         <AdminSection section={section === "dashboard" ? "" : section} />
       </main>
+      <Toaster />
     </SessionUserProvider>
   );
 }

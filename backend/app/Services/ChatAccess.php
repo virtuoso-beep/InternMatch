@@ -51,13 +51,22 @@ class ChatAccess
             ->filter(fn ($user) => $user->role === Role::Coordinator && $user->status->value === 'active');
     }
 
-    public static function writable(Conversation $conversation): bool
+    /** Same rule as activePlacement(), checked on an already loaded placement (lists avoid one query per row). */
+    private static function isActivePlacement(Placement $placement): bool
     {
-        if (! self::enabled() || self::coordinators($conversation->enrollment)->isEmpty()) {
+        return in_array($placement->status->value, ['approved', 'active'], true) && $placement->completed_at === null
+            && ($placement->ends_on === null || $placement->ends_on->toDateString() >= today(config('internmatch.timezone', 'Asia/Manila'))->toDateString());
+    }
+
+    public static function writable(Conversation $conversation, ?bool $enabled = null): bool
+    {
+        if (! ($enabled ?? self::enabled()) || self::coordinators($conversation->enrollment)->isEmpty()) {
             return false;
         }
         if ($conversation->placement_id) {
-            return self::activePlacement(Placement::whereKey($conversation->placement_id))->exists();
+            return $conversation->relationLoaded('placement') && $conversation->placement
+                ? self::isActivePlacement($conversation->placement)
+                : self::activePlacement(Placement::whereKey($conversation->placement_id))->exists();
         }
 
         return $conversation->enrollment->status->value === 'enrolled';
@@ -75,7 +84,10 @@ class ChatAccess
     public static function participants(Conversation $conversation): array
     {
         $users = [$conversation->enrollment->student->user, ...self::coordinators($conversation->enrollment)->all()];
-        if ($conversation->placement_id && self::supervisedPlacement(Placement::whereKey($conversation->placement_id))->exists()) {
+        $supervised = $conversation->relationLoaded('placement') && $conversation->placement
+            ? in_array($conversation->placement->status->value, ['approved', 'active', 'completed'], true)
+            : ($conversation->placement_id && self::supervisedPlacement(Placement::whereKey($conversation->placement_id))->exists());
+        if ($conversation->placement_id && $supervised) {
             $users[] = $conversation->placement->supervisor;
         }
 

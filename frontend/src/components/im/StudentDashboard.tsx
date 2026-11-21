@@ -1,14 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { Briefcase, ClipboardCheck, Clock, ListOrdered, RotateCw } from "lucide-react";
 import { api } from "@/lib/api";
-import { useSessionUser } from "./SessionGuard";
-import { Button, Card, Pill, formatSimilarity } from "./ui";
+import { TONE_COLOR } from "@/lib/status";
+import { Button, Card, PageHeader, Pill, formatSimilarity, statusTone } from "./ui";
+import { inputClass } from "./formUtils";
 import {
-  DashboardEmpty,
-  DashboardHeading,
-  DashboardLink,
-  DashboardMetric,
-  DashboardProgress,
-} from "./DashboardUI";
+  ActionList,
+  EmptyState,
+  ErrorState,
+  KpiCard,
+  LoadingBlock,
+  SectionHeading,
+  type ActionItem,
+} from "./ds";
+import { ChartCard, DonutChartView } from "./charts";
 
 type Enrollment = {
   id: number;
@@ -24,6 +30,13 @@ type Enrollment = {
     host_establishment: { name: string };
     opportunity: { title: string };
   } | null;
+};
+type PastPlacement = {
+  id: number;
+  status: string;
+  student_enrollment_id: number;
+  host_establishment: { name: string };
+  opportunity: { title: string };
 };
 type Recommendation = {
   id: number;
@@ -52,8 +65,12 @@ type Monitoring = {
   };
 };
 
+const linkClass = "text-sm font-semibold text-brand hover:underline";
+const number = (value: number) => value.toLocaleString("en-PH", { maximumFractionDigits: 2 });
+const manila = (value: string) =>
+  new Date(value).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium" });
+
 export function StudentDashboard() {
-  const user = useSessionUser();
   const [enrollments, setEnrollments] = useState<Enrollment[] | null>(null);
   const [selected, setSelected] = useState("");
   const [revision, setRevision] = useState(0);
@@ -83,62 +100,57 @@ export function StudentDashboard() {
   }, [revision]);
   const enrollment = enrollments?.find((e) => String(e.id) === selected);
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand">
-            Your internship overview
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Welcome back, {user.name.split(" ")[0]}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {enrollment
-              ? `${enrollment.program_term.program.name}${enrollment.year_level ? ` · Year ${enrollment.year_level}` : ""} · ${enrollment.program_term.academic_term.academic_year}`
-              : "Your next steps, requirements, and internship progress in one place."}
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => setRevision((v) => v + 1)}>
-          Refresh dashboard
-        </Button>
-      </div>
-      {error && (
-        <p
-          role="alert"
-          className="rounded-lg border border-brand/20 bg-brand-soft p-4 text-sm text-brand"
-        >
-          Unable to load your dashboard. {error}
-        </p>
-      )}
-      {!enrollments && !error && (
-        <p role="status" className="py-8 text-muted-foreground">
-          Loading your internship overview…
-        </p>
-      )}
-      {enrollments?.length === 0 && (
-        <DashboardEmpty>
-          No enrollment is linked to your account yet. Contact your practicum coordinator to get
-          started.
-        </DashboardEmpty>
-      )}
-      {!!enrollments?.length && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="min-w-0 max-w-full text-sm font-medium">
-            Enrollment
-            <select
-              className="mt-2 block w-full max-w-full rounded-lg border border-input bg-card p-2 text-sm sm:ml-3 sm:mt-0 sm:inline-block sm:w-auto"
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
+    <div className="space-y-8">
+      <PageHeader
+        title="Dashboard"
+        subtitle={
+          enrollment
+            ? `${enrollment.program_term.program.name}${enrollment.year_level ? `, year ${enrollment.year_level}` : ""} · ${enrollment.program_term.academic_term.name} ${enrollment.program_term.academic_term.academic_year}`
+            : "Your requirements, recommendations and internship progress"
+        }
+        action={
+          <>
+            {enrollments && enrollments.length > 1 && (
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <span className="whitespace-nowrap">Enrollment</span>
+                <select
+                  className={`${inputClass} w-auto`}
+                  value={selected}
+                  onChange={(e) => setSelected(e.target.value)}
+                >
+                  {enrollments.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.program_term.program.code} · {e.program_term.academic_term.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRevision((v) => v + 1)}
+              disabled={!enrollments && !error}
             >
-              {enrollments.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.program_term.program.code} · {e.program_term.academic_term.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <DashboardLink href="/student/profile">View my profile</DashboardLink>
-        </div>
+              <RotateCw size={14} aria-hidden="true" />
+              Refresh
+            </Button>
+          </>
+        }
+      />
+      {error && (
+        <ErrorState
+          title="Could not load your enrollment"
+          message={error}
+          onRetry={() => setRevision((v) => v + 1)}
+        />
+      )}
+      {!enrollments && !error && <LoadingBlock label="Loading your enrollment" rows={4} />}
+      {enrollments?.length === 0 && (
+        <EmptyState
+          title="No enrollment is linked to your account yet"
+          description="Your practicum coordinator links your enrollment after the class roster is imported. Contact them if this persists."
+        />
       )}
       {enrollment && (
         <EnrollmentDashboard key={`${enrollment.id}-${revision}`} enrollment={enrollment} />
@@ -151,12 +163,30 @@ function EnrollmentDashboard({ enrollment }: { enrollment: Enrollment }) {
   const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null);
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [monitoring, setMonitoring] = useState<Monitoring | null>(null);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [failed, setFailed] = useState<{ matches: string; requirements: string; progress: string }>(
+    { matches: "", requirements: "", progress: "" },
+  );
   const [loading, setLoading] = useState(true);
-  const placement = enrollment.current_placement;
+  const [retry, setRetry] = useState(0);
+  // A completed or ended placement is not "current"; fall back to the student's latest own placement.
+  const [past, setPast] = useState<PastPlacement | null>(null);
+  useEffect(() => {
+    if (enrollment.current_placement) return;
+    let active = true;
+    api<{ data: PastPlacement[] }>("/placements")
+      .then(({ data }) => {
+        if (active) setPast(data.find((p) => p.student_enrollment_id === enrollment.id) ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [enrollment.id, enrollment.current_placement]);
+  const placement = enrollment.current_placement ?? past;
   const placementId = placement?.id;
   useEffect(() => {
     let active = true;
+    setLoading(true);
     Promise.allSettled([
       api<{ data: Recommendation[] }>(`/enrollments/${enrollment.id}/recommendations`),
       api<Checklist>(`/enrollments/${enrollment.id}/requirements`),
@@ -165,40 +195,55 @@ function EnrollmentDashboard({ enrollment }: { enrollment: Enrollment }) {
         : Promise.resolve(null),
     ]).then(([matches, requirements, progress]) => {
       if (!active) return;
-      const failed: string[] = [];
+      const message = (r: PromiseSettledResult<unknown>) =>
+        r.status === "rejected"
+          ? r.reason instanceof Error
+            ? r.reason.message
+            : "Request failed."
+          : "";
       if (matches.status === "fulfilled") setRecommendations(matches.value.data);
-      else failed.push("Recommendations could not be loaded.");
       if (requirements.status === "fulfilled") setChecklist(requirements.value);
-      else failed.push("Requirements could not be loaded.");
       if (progress.status === "fulfilled") setMonitoring(progress.value);
-      else failed.push("Certified hours could not be loaded.");
-      setErrors(failed);
+      setFailed({
+        matches: message(matches),
+        requirements: message(requirements),
+        progress: message(progress),
+      });
       setLoading(false);
     });
     return () => {
       active = false;
     };
-  }, [enrollment.id, placementId]);
-  const rows = checklist?.requirements.map((requirement) => {
-    const submission = checklist.submissions
-      .filter((s) => s.program_term_requirement_id === requirement.id)
-      .sort((a, b) => b.revision - a.revision)[0];
-    const attendance = checklist.attendances.find(
-      (a) => a.program_term_requirement_id === requirement.id,
-    );
-    const status =
-      requirement.requirement_type.kind === "event"
-        ? attendance?.confirmed_at
-          ? "confirmed"
-          : attendance
-            ? "awaiting confirmation"
-            : "not attended"
-        : (submission?.status ?? "not submitted");
-    return { ...requirement, status, done: ["approved", "confirmed"].includes(status) };
-  });
+  }, [enrollment.id, placementId, retry]);
+
+  const rows = useMemo(
+    () =>
+      checklist?.requirements.map((requirement) => {
+        const submission = checklist.submissions
+          .filter((s) => s.program_term_requirement_id === requirement.id)
+          .sort((a, b) => b.revision - a.revision)[0];
+        const attendance = checklist.attendances.find(
+          (a) => a.program_term_requirement_id === requirement.id,
+        );
+        const status =
+          requirement.requirement_type.kind === "event"
+            ? attendance?.confirmed_at
+              ? "confirmed"
+              : attendance
+                ? "awaiting confirmation"
+                : "not attended"
+            : (submission?.status ?? "not submitted");
+        const done = ["approved", "confirmed"].includes(status);
+        const waiting = ["submitted", "under_review", "awaiting confirmation"].includes(status);
+        return { ...requirement, status, done, waiting };
+      }),
+    [checklist],
+  );
   const required = rows?.filter((r) => r.is_required);
-  const pending = required?.filter((r) => !r.done).length;
-  const finished = required?.filter((r) => r.done).length;
+  const finished = required?.filter((r) => r.done).length ?? 0;
+  const waiting = required?.filter((r) => r.waiting).length ?? 0;
+  const todo = (required?.length ?? 0) - finished - waiting;
+  const returned = rows?.filter((r) => r.status === "rejected").length ?? 0;
   const progress = monitoring?.progress;
   const hours = progress ? progress.completed_minutes / 60 : null;
   const target = progress?.required_hours ?? enrollment.program_term.program.required_ojt_hours;
@@ -208,221 +253,313 @@ function EnrollmentDashboard({ enrollment }: { enrollment: Enrollment }) {
       (a, b) => Number(a.done) - Number(b.done) || Number(b.is_required) - Number(a.is_required),
     )
     .slice(0, 6);
-  const number = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+  const actions: ActionItem[] = [];
+  progress?.flags.forEach((flag) =>
+    actions.push({
+      id: `flag-${flag.code}`,
+      tone: "danger",
+      to: "/student/internship",
+      title: flag.description,
+    }),
+  );
+  if (returned)
+    actions.push({
+      id: "returned",
+      tone: "danger",
+      to: "/student/requirements",
+      title: `${returned} ${returned === 1 ? "document was" : "documents were"} returned for correction`,
+    });
+  if (todo > 0)
+    actions.push({
+      id: "todo",
+      tone: "warn",
+      to: "/student/requirements",
+      title: `${todo} required ${todo === 1 ? "item is" : "items are"} not yet submitted or attended`,
+    });
+  if (placement?.status === "approved")
+    actions.push({
+      id: "approved",
+      tone: "info",
+      to: "/student/internship",
+      title: "Your placement is approved",
+      detail: "Time logs open when your coordinator marks the internship active.",
+    });
+  if (!placement && recommendations?.length === 0)
+    actions.push({
+      id: "recommend",
+      tone: "info",
+      to: "/student/recommendations",
+      title: "No saved recommendations yet",
+      detail: "Update your competencies, then generate recommendations.",
+    });
+
+  const requirementSlices = [
+    { label: "Done", value: finished, color: TONE_COLOR.success },
+    { label: "Waiting for review", value: waiting, color: TONE_COLOR.warn },
+    { label: "To do", value: Math.max(0, todo), color: TONE_COLOR.brand },
+  ];
+
   return (
     <>
-      {errors.length > 0 && (
-        <p role="alert" className="rounded-lg bg-brand-soft p-4 text-sm text-brand">
-          {errors.join(" ")} Use Refresh dashboard to retry.
-        </p>
-      )}
-      {loading && (
-        <span role="status" className="sr-only">
-          Loading dashboard details…
-        </span>
-      )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <DashboardMetric
-          label="Requirements completed"
-          value={required ? `${finished} / ${required.length}` : "—"}
-          hint="Approved documents and confirmed events"
-          accent
-          progress={required?.length ? ((finished ?? 0) / required.length) * 100 : null}
+      <section aria-labelledby="student-attention">
+        <SectionHeading id="student-attention" title="Needs your attention" />
+        <ActionList
+          items={actions}
+          loading={loading}
+          emptyText="Nothing needs your attention right now."
         />
-        <DashboardMetric
-          label="Recommended opportunities"
-          value={recommendations ? String(recommendations.length) : "—"}
-          hint="Your latest saved recommendation results"
-          index={1}
-        />
-        <DashboardMetric
-          label="Requirements to complete"
-          value={pending === undefined ? "—" : String(pending)}
-          hint="Required items still awaiting completion"
-          index={2}
-        />
-        <DashboardMetric
-          label="Certified internship hours"
-          progress={percent}
-          value={
-            hours === null ? "—" : `${number(hours)} / ${target === null ? "—" : number(target)}`
-          }
-          hint={
-            placement
-              ? "Only supervisor-certified time counts"
-              : "Available once a placement is recorded"
-          }
-          index={3}
-          accent
-        />
-      </div>
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Card className="!rounded-xl !p-6">
-          <DashboardHeading
-            title="Top recommendations for you"
-            description="Based on your saved competency matches"
-            action={<DashboardLink href="/student/recommendations">View all</DashboardLink>}
-          />
-          {recommendations === null ? (
-            <DashboardEmpty>
-              {loading
-                ? "Loading recommendations…"
-                : "Recommendations are unavailable. Please retry."}
-            </DashboardEmpty>
-          ) : recommendations.length === 0 ? (
-            <DashboardEmpty>
-              No saved recommendations yet. Complete your competencies, then{" "}
-              <DashboardLink href="/student/recommendations">
-                generate recommendations
-              </DashboardLink>
-              .
-            </DashboardEmpty>
-          ) : (
-            <div className="space-y-3">
-              {recommendations.slice(0, 3).map((item, index) => (
-                <a
-                  key={item.id}
-                  href="/student/recommendations"
-                  className="group flex items-start gap-3 rounded-lg border border-border p-4 transition-colors hover:border-brand/30 hover:bg-brand-soft/30 focus-visible:outline-2 focus-visible:outline-brand"
-                >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-sm font-bold text-brand">
-                    {index + 1}
+      </section>
+
+      <section aria-labelledby="student-kpis">
+        <SectionHeading id="student-kpis" title="Your internship at a glance" />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="p-4 sm:col-span-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-muted-foreground">
+                Certified internship hours
+              </p>
+              <span className="rounded-lg bg-success-soft p-1.5 text-success">
+                <Clock size={16} strokeWidth={1.9} aria-hidden="true" />
+              </span>
+            </div>
+            {loading ? (
+              <LoadingBlock label="Loading certified hours" rows={2} />
+            ) : failed.progress ? (
+              <p className="mt-2 text-sm text-brand">Certified hours could not be loaded.</p>
+            ) : !placement ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Hours are counted once a placement is recorded.
+              </p>
+            ) : (
+              <>
+                <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
+                  {hours === null ? "—" : number(hours)}
+                  <span className="ml-1.5 text-base font-normal text-muted-foreground">
+                    of {target === null ? "—" : number(target)} hours
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="font-semibold group-hover:text-brand">
-                        {item.snapshot.host_name ?? "Host not recorded"}
-                      </h3>
-                      <Pill tone="muted">
-                        Rank {item.rank} · Similarity score{" "}
-                        {formatSimilarity(item.similarity_score)}
-                      </Pill>
+                </p>
+                {percent !== null && (
+                  <div className="mt-3">
+                    <div
+                      role="progressbar"
+                      aria-label="Certified internship hours"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round(percent)}
+                      className="h-2.5 overflow-hidden rounded-full bg-muted"
+                    >
+                      <div
+                        className="h-full rounded-full bg-success transition-[width] duration-300"
+                        style={{ width: `${percent}%` }}
+                      />
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {item.snapshot.opportunity_title ?? "Internship opportunity"}
-                    </p>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      {item.snapshot.city ? `${item.snapshot.city} · ` : ""}
-                      {item.distance_km === null
-                        ? "Distance not recorded"
-                        : `${Number(item.distance_km).toFixed(2)} km straight-line`}
+                      {Math.round(percent)}% of required hours certified
+                      {progress?.remaining_minutes !== null &&
+                      progress?.remaining_minutes !== undefined
+                        ? ` · ${number(progress.remaining_minutes / 60)} hours remaining`
+                        : ""}
+                      . Pending time logs are not included.
                     </p>
                   </div>
-                </a>
-              ))}
-            </div>
-          )}
-          {recommendations?.[0] && (
-            <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-              Saved {new Date(recommendations[0].generated_at).toLocaleDateString()}. Availability
-              may have changed. Similarity is not a placement guarantee.
-            </p>
+                )}
+                {target === null && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Required hours are awaiting department confirmation.
+                  </p>
+                )}
+              </>
+            )}
+          </Card>
+          <KpiCard
+            label="Required items completed"
+            value={required ? `${finished} of ${required.length}` : null}
+            icon={ClipboardCheck}
+            tone="success"
+            loading={loading}
+            to="/student/requirements"
+            hint="Approved documents and confirmed events"
+          />
+          <KpiCard
+            label="Placement"
+            value={
+              placement
+                ? placement.status.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase())
+                : "Not placed"
+            }
+            icon={Briefcase}
+            tone={placement ? statusTone(placement.status) : "muted"}
+            loading={loading}
+            to="/student/internship"
+            hint={
+              placement ? placement.host_establishment.name : "Your coordinator records placements"
+            }
+          />
+        </div>
+      </section>
+
+      <section aria-labelledby="student-detail" className="grid items-start gap-4 xl:grid-cols-5">
+        <h2 id="student-detail" className="sr-only">
+          Requirements and recommendations
+        </h2>
+        <ChartCard
+          className="xl:col-span-2"
+          title="Required items by status"
+          description="Required documents and events for this enrollment"
+          loading={loading}
+          error={failed.requirements}
+          onRetry={() => setRetry((v) => v + 1)}
+          isEmpty={!required?.length}
+          emptyTitle="No required items configured yet"
+          emptyDescription="Your coordinator sets the requirements for this cohort."
+        >
+          <DonutChartView
+            title="Required items by status"
+            slices={requirementSlices}
+            totalLabel="required"
+            unit="items"
+          />
+        </ChartCard>
+
+        <Card className="xl:col-span-3">
+          <SectionHeading
+            title="Requirement checklist"
+            description="Outstanding required items first"
+            action={
+              <Link
+                to="/student/$section"
+                params={{ section: "requirements" }}
+                className={linkClass}
+              >
+                Open requirements
+              </Link>
+            }
+          />
+          {failed.requirements ? (
+            <ErrorState
+              title="Could not load requirements"
+              message={failed.requirements}
+              onRetry={() => setRetry((v) => v + 1)}
+            />
+          ) : loading ? (
+            <LoadingBlock label="Loading requirements" rows={4} />
+          ) : !rows?.length ? (
+            <EmptyState compact title="No requirements configured for this cohort yet" />
+          ) : (
+            <>
+              <ul className="divide-y divide-border">
+                {shownRows.map((row) => (
+                  <li key={row.id} className="flex items-start justify-between gap-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{row.requirement_type.name}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {row.is_required ? "Required" : "Optional"}
+                        {row.due_at ? ` · due ${manila(row.due_at)}` : ""}
+                      </p>
+                    </div>
+                    <Pill
+                      tone={row.done ? "success" : row.status === "rejected" ? "brand" : "warn"}
+                    >
+                      {row.status.replaceAll("_", " ")}
+                    </Pill>
+                  </li>
+                ))}
+              </ul>
+              {rows.length > 6 && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Showing 6 of {rows.length} items.
+                </p>
+              )}
+            </>
           )}
         </Card>
-        <Card className="!rounded-xl !p-6">
-          <DashboardHeading
-            title="Requirement checklist"
-            description="Outstanding required items appear first"
-            action={<DashboardLink href="/student/requirements">View all</DashboardLink>}
+      </section>
+
+      <section aria-labelledby="student-recs">
+        <SectionHeading
+          id="student-recs"
+          title="Top recommendations"
+          description="Your latest saved matches, ranked by similarity score"
+          action={
+            <Link
+              to="/student/$section"
+              params={{ section: "recommendations" }}
+              className={linkClass}
+            >
+              All recommendations
+            </Link>
+          }
+        />
+        {failed.matches ? (
+          <ErrorState
+            title="Could not load recommendations"
+            message={failed.matches}
+            onRetry={() => setRetry((v) => v + 1)}
           />
-          {!rows ? (
-            <DashboardEmpty>
-              {loading ? "Loading requirements…" : "Requirements are unavailable. Please retry."}
-            </DashboardEmpty>
-          ) : rows.length === 0 ? (
-            <DashboardEmpty>
-              No requirements have been configured for this cohort yet.
-            </DashboardEmpty>
-          ) : (
-            <ul className="divide-y divide-border">
-              {shownRows.map((row) => (
-                <li key={row.id} className="flex items-start justify-between gap-3 py-3 first:pt-0">
-                  <div>
-                    <p className="text-sm font-medium">{row.requirement_type.name}</p>
-                    {row.due_at && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Due {new Date(row.due_at).toLocaleDateString()}
-                      </p>
-                    )}
-                    {!row.is_required && <p className="text-xs text-muted-foreground">Optional</p>}
-                  </div>
-                  <Pill tone={row.done ? "success" : "warn"}>
-                    {row.status.replaceAll("_", " ")}
-                  </Pill>
+        ) : loading ? (
+          <Card>
+            <LoadingBlock label="Loading recommendations" rows={3} />
+          </Card>
+        ) : !recommendations?.length ? (
+          <EmptyState
+            icon={ListOrdered}
+            title="No saved recommendations yet"
+            description="Recommendations use your competencies. Update them, then generate recommendations."
+            action={
+              <Link
+                to="/student/$section"
+                params={{ section: "recommendations" }}
+                className={linkClass}
+              >
+                Go to recommendations
+              </Link>
+            }
+          />
+        ) : (
+          <>
+            <ul className="grid gap-3 md:grid-cols-3">
+              {recommendations.slice(0, 3).map((item) => (
+                <li key={item.id}>
+                  <Link
+                    to="/student/$section"
+                    params={{ section: "recommendations" }}
+                    className="block h-full rounded-xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-brand/40 hover:bg-brand-soft/30"
+                  >
+                    <p className="text-xs font-medium text-muted-foreground">Rank {item.rank}</p>
+                    <p className="mt-1 font-semibold">
+                      {item.snapshot.host_name ?? "Host not recorded"}
+                    </p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {item.snapshot.opportunity_title ?? "Internship opportunity"}
+                    </p>
+                    <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <div>
+                        <dt className="inline">Similarity score </dt>
+                        <dd className="inline font-semibold text-foreground tabular-nums">
+                          {formatSimilarity(item.similarity_score)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="sr-only">Distance</dt>
+                        <dd className="inline">
+                          {item.distance_km === null
+                            ? "Distance not recorded"
+                            : `${Number(item.distance_km).toFixed(2)} km straight-line`}
+                        </dd>
+                      </div>
+                    </dl>
+                  </Link>
                 </li>
               ))}
             </ul>
-          )}
-          {rows && rows.length > 6 && (
-            <p className="mt-4 text-xs text-muted-foreground">
-              Showing 6 of {rows.length} items. Open the full checklist to submit or review
-              documents.
+            <p className="mt-3 text-xs text-muted-foreground">
+              Saved {manila(recommendations[0]!.generated_at)}. Slots may have changed since then; a
+              similarity score is not a placement decision.
             </p>
-          )}
-        </Card>
-      </div>
-      <Card className="!rounded-xl !p-6">
-        <DashboardHeading
-          title="Internship progress"
-          action={<DashboardLink href="/student/internship">My internship</DashboardLink>}
-        />
-        {placement ? (
-          <>
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold">{placement.opportunity.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {placement.host_establishment.name}
-                </p>
-              </div>
-              <Pill tone={placement.status === "active" ? "success" : "info"}>
-                {placement.status}
-              </Pill>
-            </div>
-            {percent !== null && hours !== null ? (
-              <>
-                <div className="mb-3 flex flex-wrap justify-between gap-2 text-sm">
-                  <p>
-                    {number(hours)} of {number(target!)} required hours certified
-                  </p>
-                  <strong className="text-success">{Math.round(percent)}% complete</strong>
-                </div>
-                <DashboardProgress value={percent} label="Certified internship hours" />
-                {progress?.remaining_minutes !== null &&
-                  progress?.remaining_minutes !== undefined && (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      {number(progress.remaining_minutes / 60)} hours remaining. Pending time logs
-                      are not included.
-                    </p>
-                  )}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {loading
-                  ? "Loading certified progress…"
-                  : target === null
-                    ? "Required hours are awaiting department confirmation."
-                    : "Certified progress is unavailable. Refresh to retry."}
-              </p>
-            )}
-            {placement.status === "approved" && (
-              <p className="mt-4 rounded-lg bg-info-soft p-3 text-sm text-info">
-                Your placement is approved. Time-log submissions become available when it is active.
-              </p>
-            )}
-            {progress?.flags.map((flag) => (
-              <p key={flag.code} className="mt-3 rounded-lg bg-warn-soft p-3 text-sm text-warn">
-                Attention required: {flag.description}
-              </p>
-            ))}
           </>
-        ) : (
-          <DashboardEmpty>
-            No placement has been recorded for this enrollment. Explore recommendations and complete
-            your requirements while your coordinator reviews placement readiness.
-          </DashboardEmpty>
         )}
-      </Card>
+      </section>
     </>
   );
 }

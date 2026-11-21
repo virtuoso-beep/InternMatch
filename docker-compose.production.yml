@@ -77,10 +77,13 @@ services:
           memory: 512M
 
   frontend:
-    # Build the static files and serve them using a lightweight server on port 8080
-    command: ["sh", "-c", "npm install && npm run build && npx serve -s dist -l 8080"]
+    # Build the TanStack Start app (Nitro node-server preset, see vite.config.ts) and run its Node server
+    # on port 8080; Nginx proxies / to it and /api to Laravel.
+    command: ["sh", "-c", "npm ci && npm run build && node .output/server/index.mjs"]
     environment:
       - NODE_ENV=production
+      - PORT=8080
+      - HOST=0.0.0.0
       - VITE_API_URL=${APP_URL}
     restart: always
     deploy:

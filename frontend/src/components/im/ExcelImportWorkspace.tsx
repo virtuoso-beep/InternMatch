@@ -4,6 +4,7 @@ import { Button, Card, formatStatus } from "./ui";
 import { useSessionUser } from "./SessionGuard";
 
 import { activationLabel } from "@/lib/activation";
+import { ConfirmButton } from "./actions";
 
 type Row = Partial<
   Record<
@@ -218,7 +219,7 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
         Upload, map columns, resolve conflicts, then confirm within this workflow.
       </p>
       {error && (
-        <p role="alert" className="mb-4 rounded border border-red-300 bg-red-50 p-3">
+        <p role="alert" className="mb-4 rounded border border-brand/30 bg-brand-soft p-3">
           {error}
         </p>
       )}
@@ -554,12 +555,12 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
                           )}
                         </div>
                         {report?.errors.map((message, i) => (
-                          <p key={`e${i}`} className="text-sm text-red-700">
+                          <p key={`e${i}`} className="text-sm text-brand">
                             {message}
                           </p>
                         ))}
                         {report?.warnings.map((message, i) => (
-                          <p key={`w${i}`} className="text-sm text-amber-800">
+                          <p key={`w${i}`} className="text-sm text-warn">
                             {message}
                           </p>
                         ))}
@@ -652,22 +653,35 @@ export function ExcelImportWorkspace({ module }: { module: ImportModule }) {
                       />{" "}
                       I reviewed the records, program, term, and warnings.
                     </label>
-                    <Button
+                    <ConfirmButton
+                      variant="primary"
                       disabled={!confirmed || failures > 0 || rows.every((r) => r.skip)}
-                      onClick={() =>
-                        run(async () => {
-                          const response = await mutate<Result>(
-                            `/coordinator-imports/${batch.id}/confirm`,
-                            { revision: preview.revision },
-                          );
-                          setResult(response);
-                          window.dispatchEvent(new Event("internmatch:records-imported"));
+                      title={`Import ${rows.filter((r) => !r.skip).length} records?`}
+                      description={`${rows.filter((r) => !r.skip).length} rows will be saved and ${rows.filter((r) => r.skip).length} skipped${
+                        preview.counts
+                          ? ` (${Object.entries(preview.counts)
+                              .map(([key, count]) => `${count} ${key.replaceAll("_", " ")}`)
+                              .join(", ")})`
+                          : ""
+                      }. Permissions and database conflicts are checked again while saving. Imported records are not removed automatically.`}
+                      confirmLabel="Confirm import"
+                      success="Import completed"
+                      onConfirm={async () => {
+                        const response = await mutate<Result>(
+                          `/coordinator-imports/${batch.id}/confirm`,
+                          { revision: preview.revision },
+                        );
+                        setResult(response);
+                        window.dispatchEvent(new Event("internmatch:records-imported"));
+                        try {
                           localStorage.setItem("internmatch:records-imported", String(Date.now()));
-                        })
-                      }
+                        } catch {
+                          // Other tabs refresh on their next load when storage is blocked.
+                        }
+                      }}
                     >
                       Confirm import
-                    </Button>
+                    </ConfirmButton>
                   </div>
                 )}
               </Card>

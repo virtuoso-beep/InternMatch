@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/im/ui";
 import { ChatWorkspace } from "@/components/im/ChatWorkspace";
 import { NotificationList } from "@/components/im/NotificationList";
 import { MoaWorkspace } from "@/components/im/MoaWorkspace";
-import { LiveDashboard } from "@/components/im/LiveDashboard";
+import { SupervisorDashboard } from "@/components/im/SupervisorDashboard";
 import { MonitoringWorkspace } from "@/components/im/MonitoringWorkspace";
 import { OpportunityWorkspace } from "@/components/im/OpportunityWorkspace";
 import { HostWorkspace } from "@/components/im/HostWorkspace";
@@ -17,7 +17,7 @@ export function SupervisorSection({ section }: { section: string }) {
     case "profile":
       return <ProfileEditor role="supervisor" />;
     case "":
-      return <LiveDashboard />;
+      return <SupervisorDashboard />;
     case "interns":
       return <MonitoringWorkspace key="interns" view="interns" />;
     case "attendance":

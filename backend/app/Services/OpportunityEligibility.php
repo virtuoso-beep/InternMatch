@@ -21,6 +21,8 @@ class OpportunityEligibility
         if ($enrollment->status !== EnrollmentStatus::Enrolled || ! $programTerm->program->is_active
             || ! $programTerm->academicTerm->is_active
             || $opportunity->status !== OpportunityStatus::Published
+            || $opportunity->archived_at !== null || $opportunity->hostEstablishment->archived_at !== null
+            || $programTerm->academicTerm->archived_at !== null
             || ! $opportunity->hostEstablishment->is_active
             || $opportunity->academic_term_id !== $programTerm->academic_term_id
             || ($opportunity->ends_on && $opportunity->ends_on->isBefore(today()))) {
@@ -44,7 +46,7 @@ class OpportunityEligibility
             return null;
         }
         $moa = Moa::query()->where('host_establishment_id', $opportunity->host_establishment_id)
-            ->where('status', MoaStatus::Active)->whereDate('effective_on', '<=', today())
+            ->where('status', MoaStatus::Active)->whereNull('archived_at')->whereDate('effective_on', '<=', today())
             ->whereDate('expires_on', '>=', today())
             ->where(fn ($query) => $query->where('is_institution_wide', true)
                 ->orWhereHas('programs', fn ($programs) => $programs->whereKey($programId)))

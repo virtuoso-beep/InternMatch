@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, CardTitle, PageHeader } from "./ui";
+import { toast } from "sonner";
+import { Button, Card, CardTitle, FormField, FormModal, PageHeader } from "./ui";
+import { inputClass, toFormError, type FormError } from "./formUtils";
 import { AcademicSetup } from "./AcademicSetup";
 
 type Program = {
@@ -117,7 +119,7 @@ export function ProgramRegistry() {
             />
           ))}
       </div>
-      <details className="mt-6 rounded border bg-white p-4">
+      <details className="mt-6 rounded border bg-card p-4">
         <summary className="cursor-pointer font-semibold">Academic setup and enrollment</summary>
         <p className="my-3 text-sm text-muted-foreground">
           Configure requirements, create academic terms and enroll students.
@@ -138,7 +140,7 @@ function ProgramForm({
   const [hours, setHours] = useState(program.required_ojt_hours?.toString() ?? "");
   const [term, setTerm] = useState(program.internship_term ?? "");
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState<FormError | null>(null);
   const [editing, setEditing] = useState(false);
   return (
     <Card>
@@ -146,108 +148,96 @@ function ProgramForm({
       <p className="mt-3 border-t pt-3 text-muted-foreground">{program.name}</p>
       <dl className="my-5 grid grid-cols-2 gap-4 text-sm">
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">Required hours</dt>
+          <dt className="text-xs text-muted-foreground">Required hours</dt>
           <dd className="mt-1 font-semibold">
             {program.required_ojt_hours ?? "Awaiting confirmation"}
           </dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">Competencies</dt>
+          <dt className="text-xs text-muted-foreground">Competencies</dt>
           <dd className="mt-1 font-semibold">{program.competencies_count} mapped</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">Cluster</dt>
+          <dt className="text-xs text-muted-foreground">Cluster</dt>
           <dd className="mt-1">{program.cluster || "Not recorded"}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">Internship term</dt>
+          <dt className="text-xs text-muted-foreground">Internship term</dt>
           <dd className="mt-1">{program.internship_term || "Not recorded"}</dd>
         </div>
       </dl>
-      {!editing && (
-        <Button
-          variant="outline"
-          onClick={() => {
-            setHours(program.required_ojt_hours?.toString() ?? "");
-            setTerm(program.internship_term ?? "");
-            setMessage("");
-            setEditing(true);
-          }}
-        >
-          Edit requirements <span className="sr-only">{program.code}</span>
-        </Button>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setHours(program.required_ojt_hours?.toString() ?? "");
+          setTerm(program.internship_term ?? "");
+          setError(null);
+          setEditing(true);
+        }}
+      >
+        Edit requirements <span className="sr-only">{program.code}</span>
+      </Button>
+      {program.required_ojt_hours === null && (
+        <p role="status" className="mt-3 text-sm">
+          Required hours are not confirmed.
+        </p>
       )}
-      {editing && (
-        <form
-          className="mt-4 space-y-3"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setSaving(true);
-            setMessage("");
-            try {
-              const { data } = await mutate<{ data: Program }>(
-                `/programs/${program.id}`,
-                {
-                  required_ojt_hours: hours === "" ? null : Number(hours),
-                  internship_term: term.trim() || null,
-                },
-                "PATCH",
-              );
-              onSaved(data);
-              setMessage("Saved to the program record.");
-              setEditing(false);
-            } catch (cause) {
-              setMessage(cause instanceof Error ? cause.message : "Unable to save.");
-            } finally {
-              setSaving(false);
-            }
-          }}
+      <FormModal
+        open={editing}
+        onClose={() => setEditing(false)}
+        title={`Edit requirements: ${program.code}`}
+        description={program.name}
+        submitLabel="Save requirements"
+        busy={saving}
+        error={error}
+        onSubmit={async () => {
+          setSaving(true);
+          setError(null);
+          try {
+            const { data } = await mutate<{ data: Program }>(
+              `/programs/${program.id}`,
+              {
+                required_ojt_hours: hours === "" ? null : Number(hours),
+                internship_term: term.trim() || null,
+              },
+              "PATCH",
+            );
+            onSaved(data);
+            setEditing(false);
+            toast.success("Program requirements saved");
+          } catch (cause) {
+            setError(toFormError(cause, "Unable to save."));
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        <FormField
+          label="Confirmed required hours"
+          helper="Leave empty while the hours are awaiting confirmation."
         >
-          <fieldset disabled={saving} className="space-y-3">
-            <label className="block text-sm">
-              Confirmed required hours
-              <input
-                aria-label={`${program.code} confirmed required hours`}
-                className="mt-1 w-full rounded border p-2"
-                type="number"
-                min="1"
-                max="10000"
-                step="1"
-                placeholder="Awaiting confirmation"
-                value={hours}
-                onChange={(event) => setHours(event.target.value)}
-              />
-            </label>
-            <label className="block text-sm">
-              Internship year / semester
-              <input
-                aria-label={`${program.code} internship term`}
-                className="mt-1 w-full rounded border p-2"
-                maxLength={255}
-                value={term}
-                onChange={(event) => setTerm(event.target.value)}
-              />
-            </label>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save requirements"}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={saving}
-              onClick={() => {
-                setEditing(false);
-                setMessage("");
-              }}
-            >
-              Cancel
-            </Button>
-          </fieldset>
-        </form>
-      )}
-      <p role="status" className="mt-3 text-sm">
-        {message ||
-          (program.required_ojt_hours === null ? "Required hours are not confirmed." : "")}
-      </p>
+          <input
+            name="required_ojt_hours"
+            className={inputClass}
+            type="number"
+            min="1"
+            max="10000"
+            step="1"
+            placeholder="Awaiting confirmation"
+            value={hours}
+            onChange={(event) => setHours(event.target.value)}
+          />
+        </FormField>
+        <FormField label="Internship year or semester">
+          <input
+            name="internship_term"
+            className={inputClass}
+            maxLength={255}
+            value={term}
+            onChange={(event) => setTerm(event.target.value)}
+          />
+        </FormField>
+      </FormModal>
     </Card>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { AdminOverview, AdminTerms, AdminSettings } from "@/components/im/AdminWorkspace";
+import { AdminTerms, AdminSettings } from "@/components/im/AdminWorkspace";
+import { AdminOverview } from "@/components/im/AdminOverview";
 import { ExcelImportWorkspace } from "@/components/im/ExcelImportWorkspace";
 import { ImportHistory } from "@/components/im/ImportHistory";
 import { BackupHistory } from "@/components/im/BackupHistory";
@@ -210,17 +211,15 @@ Local backup history is connected to this screen. Scheduling runs through Window
           <CardTitle>Backup configuration</CardTitle>
           <dl className="mt-4 space-y-4 text-sm">
             <div>
-              <dt className="text-xs uppercase text-muted-foreground">Storage usage</dt>
+              <dt className="text-xs text-muted-foreground">Storage usage</dt>
               <dd>Not connected</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase text-muted-foreground">Scheduling</dt>
+              <dt className="text-xs text-muted-foreground">Scheduling</dt>
               <dd>See local schedule in backup history below.</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase text-muted-foreground">
-                Retention and recovery targets
-              </dt>
+              <dt className="text-xs text-muted-foreground">Retention and recovery targets</dt>
               <dd>Local backups are retained until operator review; no automatic deletion.</dd>
             </div>
           </dl>

@@ -17,6 +17,10 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Laravel validation errors (HTTP 422), keyed by field name, e.g. "capacities.0.capacity". */
+    public errors?: Record<string, string[]>,
+    /** Seconds to wait before retrying (HTTP 429), from retry_after or the Retry-After header. */
+    public retryAfter?: number,
   ) {
     super(message);
   }
@@ -29,12 +33,18 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   headers.set("Accept", "application/json");
   if (init.body && !(init.body instanceof FormData))
     headers.set("Content-Type", "application/json");
-  const response = await fetch(`${base}${path}`, {
-    ...init,
-    headers,
-    credentials: "same-origin",
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, {
+      ...init,
+      headers,
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+  } catch {
+    // Status 0: the request never reached the server (offline, DNS, server down).
+    throw new ApiError(0, "Cannot reach InternMatch. Check your connection and try again.");
+  }
   if (response.status === 204) return undefined as T;
   const json = await response.json().catch(() => null);
   if (!response.ok) {
@@ -46,7 +56,15 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
           : response.status >= 500
             ? "The service is unavailable. Please try again shortly."
             : (json?.message ?? "The request could not be completed.");
-    throw new ApiError(response.status, message);
+    const errors =
+      response.status === 422 && json?.errors && typeof json.errors === "object"
+        ? (json.errors as Record<string, string[]>)
+        : undefined;
+    const retryAfter =
+      response.status === 429
+        ? Number(json?.retry_after ?? response.headers.get("Retry-After") ?? 60) || 60
+        : undefined;
+    throw new ApiError(response.status, message, errors, retryAfter);
   }
   if (json === null) throw new ApiError(502, "The API returned an unexpected response.");
   return json as T;

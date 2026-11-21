@@ -25,7 +25,7 @@ class AcademicController extends Controller
         return response()->json([
             'hosts' => HostAccess::query($request->user())->orderBy('name')->get(['id', 'name']),
             'programs' => $programs->orderBy('code')->get(['id', 'code', 'name', 'required_ojt_hours']),
-            'terms' => AcademicTerm::where('is_active', true)->orderByDesc('starts_on')->get(),
+            'terms' => AcademicTerm::where('is_active', true)->whereNull('archived_at')->orderByDesc('starts_on')->get(),
             'competencies' => Competency::where('is_active', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }

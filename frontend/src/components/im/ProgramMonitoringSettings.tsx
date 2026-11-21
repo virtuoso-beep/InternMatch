@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, CardTitle, PageHeader } from "./ui";
+import { Plus } from "lucide-react";
+import { toast } from "sonner";
+import { Button, Card, CardTitle, FormModal, PageHeader } from "./ui";
+import { inputClass, toFormError, type FormError } from "./formUtils";
 
 type Program = {
   id: number;
@@ -204,6 +207,10 @@ function Settings({
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [rubric, setRubric] = useState(currentRubric);
+  const [rubricOpen, setRubricOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [rubricError, setRubricError] = useState<FormError | null>(null);
+  const [rulesError, setRulesError] = useState<FormError | null>(null);
   const [terms, setTerms] = useState(program.program_terms);
   const term = terms.find((item) => item.id === Number(termId));
   useEffect(() => {
@@ -233,12 +240,27 @@ function Settings({
         ) : (
           <p className="mb-4">No confirmed rubric.</p>
         )}
-        <form
-          className="space-y-3"
-          onSubmit={async (event) => {
-            event.preventDefault();
+        <Button
+          onClick={() => {
+            setRubricError(null);
+            setRubricOpen(true);
+          }}
+        >
+          <Plus size={16} aria-hidden="true" />
+          New rubric version
+        </Button>
+        <FormModal
+          open={rubricOpen}
+          size="lg"
+          onClose={() => setRubricOpen(false)}
+          title={`New rubric version: ${program.code}`}
+          description="Existing evaluations keep their original rubric."
+          submitLabel="Save new rubric version"
+          busy={busy}
+          error={rubricError}
+          onSubmit={async () => {
             setBusy(true);
-            setMessage("");
+            setRubricError(null);
             try {
               const result = await mutate<{ data: Config["rubrics"][number] }>(
                 `/programs/${program.id}/evaluation-rubrics`,
@@ -254,24 +276,23 @@ function Settings({
               );
               setRubric(result.data);
               saved();
-              setMessage(
-                "New rubric version saved. Existing evaluations keep their original rubric.",
-              );
+              setRubricOpen(false);
+              toast.success("New rubric version saved");
             } catch (cause) {
-              setMessage(cause instanceof Error ? cause.message : "Unable to save rubric.");
+              setRubricError(toFormError(cause, "Unable to save rubric."));
             } finally {
               setBusy(false);
             }
           }}
         >
-          <fieldset disabled={busy} className="space-y-3">
+          <div className="space-y-3">
             <label className="block text-sm">
               Rubric name
               <input
                 required
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="mt-1 block w-full rounded border p-2"
+                className={`mt-1 ${inputClass}`}
               />
             </label>
             <label className="block text-sm">
@@ -280,7 +301,7 @@ function Settings({
                 required
                 value={approval}
                 onChange={(event) => setApproval(event.target.value)}
-                className="mt-1 block w-full rounded border p-2"
+                className={`mt-1 ${inputClass}`}
               />
             </label>
             {criteria.map((criterion, index) => (
@@ -305,7 +326,7 @@ function Settings({
                           ),
                         )
                       }
-                      className="mt-1 block w-full rounded border p-2"
+                      className={`mt-1 ${inputClass}`}
                     />
                   </label>
                 ))}
@@ -329,9 +350,6 @@ function Settings({
               >
                 Add criterion
               </Button>
-              <Button type="submit" disabled={busy}>
-                Save new rubric version
-              </Button>
               <Button
                 variant="outline"
                 onClick={() => {
@@ -343,8 +361,8 @@ function Settings({
                 Clear rubric draft
               </Button>
             </div>
-          </fieldset>
-        </form>
+          </div>
+        </FormModal>
       </Card>
       <Card>
         <CardTitle>Monitoring rules</CardTitle>
@@ -353,12 +371,27 @@ function Settings({
           this program term only when the department approves it; every change is logged. Only
           certified time counts.
         </p>
-        <form
-          className="space-y-3"
-          onSubmit={async (event) => {
-            event.preventDefault();
+        <Button
+          onClick={() => {
+            setRulesError(null);
+            setRulesOpen(true);
+          }}
+        >
+          Edit monitoring rules
+        </Button>
+        <FormModal
+          open={rulesOpen}
+          size="lg"
+          onClose={() => setRulesOpen(false)}
+          title={`Monitoring rules: ${program.code}`}
+          description="Change a value only when the department approves it. Every change is logged."
+          submitLabel="Save monitoring rules"
+          busy={busy}
+          submitDisabled={!termId}
+          error={rulesError}
+          onSubmit={async () => {
             setBusy(true);
-            setMessage("");
+            setRulesError(null);
             try {
               const rules = {
                 ...Object.fromEntries(
@@ -378,16 +411,17 @@ function Settings({
                   item.id === Number(termId) ? { ...item, monitoring_rules: rules } : item,
                 ),
               );
-              setMessage("Monitoring rules saved.");
               saved();
+              setRulesOpen(false);
+              toast.success("Monitoring rules saved");
             } catch (cause) {
-              setMessage(cause instanceof Error ? cause.message : "Unable to save rules.");
+              setRulesError(toFormError(cause, "Unable to save rules."));
             } finally {
               setBusy(false);
             }
           }}
         >
-          <fieldset disabled={busy} className="space-y-3">
+          <div className="space-y-3">
             <label className="block text-sm">
               Academic term
               <select
@@ -395,7 +429,7 @@ function Settings({
                 required
                 value={termId}
                 onChange={(event) => setTermId(event.target.value)}
-                className="ml-2 rounded border p-2"
+                className={`mt-1 ${inputClass}`}
               >
                 <option value="">Select term</option>
                 {terms.map((item) => (
@@ -419,14 +453,14 @@ function Settings({
                       onChange={(event) =>
                         setSpecRules((current) => ({ ...current, [rule.key]: event.target.value }))
                       }
-                      className="w-24 rounded border p-2"
+                      className={`${inputClass} w-28`}
                     />
                     <span className="text-xs text-muted-foreground">{rule.unit}</span>
                   </span>
                 </label>
               ))}
             </div>
-            <p className="pt-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <p className="pt-2 text-xs font-semibold text-muted-foreground">
               Optional legacy hours threshold
             </p>
             <label className="block text-sm">
@@ -437,7 +471,7 @@ function Settings({
                 max="365"
                 value={days}
                 onChange={(event) => setDays(event.target.value)}
-                className="ml-2 rounded border p-2"
+                className={`mt-1 ${inputClass}`}
               />
             </label>
             <label className="block text-sm">
@@ -448,7 +482,7 @@ function Settings({
                 max="10000"
                 value={hours}
                 onChange={(event) => setHours(event.target.value)}
-                className="ml-2 rounded border p-2"
+                className={`mt-1 ${inputClass}`}
               />
             </label>
             <label className="block text-sm">
@@ -457,7 +491,7 @@ function Settings({
                 required
                 value={ruleApproval}
                 onChange={(event) => setRuleApproval(event.target.value)}
-                className="mt-1 block w-full rounded border p-2"
+                className={`mt-1 ${inputClass}`}
               />
             </label>
             {term && (
@@ -470,9 +504,6 @@ function Settings({
                   `Preview: flag when remaining days ≤ ${days} AND remaining certified-work hours needed ≥ ${hours}.`}
               </p>
             )}
-            <Button type="submit" disabled={busy || !termId}>
-              Save monitoring rules
-            </Button>
             <Button
               variant="outline"
               disabled={!termId}
@@ -486,8 +517,8 @@ function Settings({
             >
               Reset to saved rules
             </Button>
-          </fieldset>
-        </form>
+          </div>
+        </FormModal>
       </Card>
     </div>
   );

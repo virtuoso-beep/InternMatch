@@ -40,6 +40,8 @@ class OpportunityManagement
             'capacity' => ['prohibited'],
         ])->validate();
         $host = HostAccess::query($actor)->findOrFail($data['host_establishment_id']);
+        abort_if($host->archived_at !== null || $opportunity?->archived_at !== null, 409, 'Restore the archived record before changing it.');
+        abort_if(\App\Models\AcademicTerm::whereKey($data['academic_term_id'])->whereNotNull('archived_at')->exists(), 422, 'The selected term is archived.');
         HostAccess::authorizePrograms($actor, array_column($data['programs'], 'program_id'));
         $saved = DB::transaction(function () use ($actor, $data, $opportunity, $host) {
             HostAccess::query($actor)->whereKey($host->id)->lockForUpdate()->firstOrFail();

@@ -39,7 +39,10 @@ class AppServiceProvider extends ServiceProvider
         }
 
         RateLimiter::for('login', fn (Request $request): array => [
-            Limit::perMinute(30)->by('ip:'.$request->ip()),
+            Limit::perMinute(30)->by('ip:'.$request->ip())->response(fn (Request $request, array $headers) => response()->json([
+                'message' => 'Too many sign-in attempts. Please wait before trying again.',
+                'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+            ], 429, $headers)),
         ]);
     }
 }

@@ -1,15 +1,21 @@
-import { AdminFormDialog } from "./AdminFormDialog";
 import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
+import { Plus } from "lucide-react";
+import { toast } from "sonner";
+import { ConfirmButton } from "./actions";
 import {
-  BookOpen,
-  GraduationCap,
-  TriangleAlert,
-  UserCog,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
-import { Button, Card, CardTitle, PageHeader, Pill, formatAction, formatDateTime } from "./ui";
+  Button,
+  Card,
+  CardTitle,
+  FormField,
+  FormGrid,
+  FormModal,
+  FormSection,
+  PageHeader,
+  Pill,
+} from "./ui";
+import { inputClass, toFormError, type FormError } from "./formUtils";
+import { RankingStatus } from "./RankingStatus";
 
 type Term = {
   id: number;
@@ -19,6 +25,7 @@ type Term = {
   starts_on: string;
   ends_on: string;
   is_active: boolean;
+  archived_at?: string | null;
 };
 type Overview = {
   total_users: number;
@@ -31,155 +38,11 @@ type Overview = {
 };
 const linkClass =
   "inline-block rounded-lg border border-brand/30 px-4 py-2 text-sm font-semibold text-brand hover:bg-brand-soft";
-function AdminLink({ section, children }: { section: string; children: React.ReactNode }) {
+export function AdminLink({ section, children }: { section: string; children: React.ReactNode }) {
   return (
     <a className={linkClass} href={`/admin/${section}`}>
       {children}
     </a>
-  );
-}
-
-export function AdminOverview() {
-  const [data, setData] = useState<Overview | null>(null);
-  const [error, setError] = useState("");
-  const [revision, setRevision] = useState(0);
-  useEffect(() => {
-    let active = true;
-    setError("");
-    api<Overview>("/admin/overview")
-      .then((d) => {
-        if (active) setData(d);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [revision]);
-  const count = (role: string) => data?.users_by_role.find((r) => r.role === role)?.total ?? 0;
-  return (
-    <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <PageHeader title="Overview" subtitle="System-wide summary and platform status" />
-        <Button variant="outline" onClick={() => setRevision((v) => v + 1)}>
-          Refresh overview
-        </Button>
-      </div>
-      {error && <p role="alert">{error}</p>}
-      {!data && !error && <p role="status">Loading overview…</p>}
-      {data && (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {(
-              [
-                ["Total Users", data.total_users, Users],
-                ["Students", count("student"), GraduationCap],
-                ["Coordinators", count("coordinator"), UserCog],
-                ["Active Programs", data.programs.filter((p) => p.is_active).length, BookOpen],
-              ] as [string, number, LucideIcon][]
-            ).map(([label, value, Icon]) => (
-              <Card key={label}>
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm text-muted-foreground">{label}</p>
-                  <span className="flex size-8 items-center justify-center rounded-md bg-brand-soft text-brand">
-                    <Icon size={16} aria-hidden="true" />
-                  </span>
-                </div>
-                <p className="my-2 text-3xl font-bold">{value}</p>
-                <p className="text-xs text-muted-foreground">Current system records</p>
-              </Card>
-            ))}
-          </div>
-          {!!data.programs_without_coordinator?.length && (
-            <div
-              role="status"
-              className="flex items-start gap-3 rounded-lg border border-warn/40 bg-warn-soft p-4 text-sm"
-            >
-              <TriangleAlert size={18} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
-              <div className="flex-1">
-                <p className="font-semibold">
-                  {data.programs_without_coordinator.map((p) => p.code).join(", ")}{" "}
-                  {data.programs_without_coordinator.length === 1 ? "has" : "have"} no active
-                  coordinator
-                </p>
-                <p className="text-muted-foreground">
-                  No one can review or place students in{" "}
-                  {data.programs_without_coordinator.length === 1
-                    ? "this program"
-                    : "these programs"}{" "}
-                  until a coordinator is assigned.
-                </p>
-              </div>
-              <AdminLink section="users">Assign coordinator</AdminLink>
-            </div>
-          )}
-          <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-            <Card>
-              <CardTitle>Users by Role</CardTitle>
-              {["student", "coordinator", "supervisor", "dean", "admin"].map((role) => (
-                <div key={role} className="flex justify-between border-b py-3 text-sm">
-                  <span className="capitalize">{role}</span>
-                  <strong>{count(role)}</strong>
-                </div>
-              ))}
-              <div className="mt-4">
-                <AdminLink section="users">Manage accounts</AdminLink>
-              </div>
-            </Card>
-            <Card>
-              <CardTitle>Programs</CardTitle>
-              {data.programs
-                .filter((p) => p.is_active)
-                .map((p) => (
-                  <div key={p.id} className="flex justify-between gap-3 border-b py-3 text-sm">
-                    <span>
-                      <strong>{p.code}</strong>
-                      <small className="ml-2 text-muted-foreground">{p.cluster}</small>
-                    </span>
-                    <Pill tone={p.is_active ? "success" : "muted"}>
-                      {p.is_active ? "Active" : "Inactive"}
-                    </Pill>
-                  </div>
-                ))}
-              <div className="mt-4">
-                <AdminLink section="programs">Manage programs</AdminLink>
-              </div>
-            </Card>
-          </div>
-          <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-            <Card>
-              <CardTitle>Messaging Status</CardTitle>
-              <div className="my-4 flex justify-between">
-                <span>Global chatbox</span>
-                <Pill tone={data.chat_enabled ? "success" : "muted"}>
-                  {data.chat_enabled ? "Active" : "Disabled"}
-                </Pill>
-              </div>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Control availability without access to private conversations.
-              </p>
-              <AdminLink section="chat-settings">Manage Chatbox</AdminLink>
-            </Card>
-            <Card>
-              <CardTitle>Recent Administrative Activity</CardTitle>
-              {data.recent_activity.map((a) => (
-                <div className="border-b py-3 text-sm" key={a.id}>
-                  <p>{formatAction(a.action)}</p>
-                  <small className="text-muted-foreground" title={a.created_at}>
-                    {formatDateTime(a.created_at)}
-                  </small>
-                </div>
-              ))}
-              {!data.recent_activity.length && <p>No recorded activity.</p>}
-              <div className="mt-4">
-                <AdminLink section="audit">View audit trail</AdminLink>
-              </div>
-            </Card>
-          </div>
-        </>
-      )}
-    </div>
   );
 }
 
@@ -189,6 +52,7 @@ export function AdminTerms() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [formError, setFormError] = useState<FormError | null>(null);
   const empty = { code: "", name: "", academic_year: "", starts_on: "", ends_on: "" };
   const [draft, setDraft] = useState(empty);
   useEffect(() => {
@@ -216,57 +80,69 @@ export function AdminTerms() {
         </p>
       )}
       <div className="mb-5">
-        <Button onClick={() => setCreating(true)}>+ Add Term</Button>
+        <Button
+          onClick={() => {
+            setFormError(null);
+            setCreating(true);
+          }}
+        >
+          <Plus size={16} aria-hidden="true" />
+          Add term
+        </Button>
       </div>
-      {creating && (
-        <AdminFormDialog title="Add Term" onClose={() => setCreating(false)}>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setBusy(true);
-              try {
-                await mutate("/academic-terms", draft);
-                setDraft(empty);
-                setCreating(false);
-                setRevision((v) => v + 1);
-                setMessage("Academic term saved.");
-              } catch (e) {
-                setMessage((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              {(
-                [
-                  ["code", "Term code"],
-                  ["name", "Term name"],
-                  ["academic_year", "Academic year"],
-                  ["starts_on", "Start date"],
-                  ["ends_on", "End date"],
-                ] as const
-              ).map(([key, label]) => (
-                <label key={key} className="text-sm">
-                  {label}
-                  <input
-                    required
-                    type={key.endsWith("_on") ? "date" : "text"}
-                    value={draft[key]}
-                    onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-                    className="mt-1 block w-full rounded border p-2"
-                  />
-                </label>
-              ))}
-            </div>
-            <div className="mt-4">
-              <Button disabled={busy} type="submit">
-                Add term
-              </Button>
-            </div>
-          </form>
-        </AdminFormDialog>
-      )}
+      <FormModal
+        open={creating}
+        onClose={() => {
+          setCreating(false);
+          setDraft(empty);
+          setFormError(null);
+        }}
+        title="Add academic term"
+        description="Set the term's code, name, academic year and dates."
+        submitLabel="Add term"
+        busy={busy}
+        error={formError}
+        onSubmit={async () => {
+          setBusy(true);
+          setFormError(null);
+          try {
+            await mutate("/academic-terms", draft);
+            setDraft(empty);
+            setCreating(false);
+            setRevision((v) => v + 1);
+            toast.success("Academic term added");
+          } catch (cause) {
+            setFormError(toFormError(cause, "Unable to add the term."));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <FormSection title="Term details">
+          <FormGrid>
+            {(
+              [
+                ["code", "Term code"],
+                ["name", "Term name"],
+                ["academic_year", "Academic year"],
+                ["starts_on", "Start date"],
+                ["ends_on", "End date"],
+              ] as const
+            ).map(([key, label]) => (
+              <FormField key={key} label={label} required>
+                <input
+                  required
+                  name={key}
+                  type={key.endsWith("_on") ? "date" : "text"}
+                  value={draft[key]}
+                  onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                  className={inputClass}
+                />
+              </FormField>
+            ))}
+          </FormGrid>
+        </FormSection>
+      </FormModal>
       <div className="mt-5">
         <Card>
           <div className="overflow-auto">
@@ -293,33 +169,75 @@ export function AdminTerms() {
                       {t.starts_on.slice(0, 10)} – {t.ends_on.slice(0, 10)}
                     </td>
                     <td className="p-3">
-                      <Pill tone={t.is_active ? "success" : "muted"}>
-                        {t.is_active ? "Active" : "Inactive"}
+                      <Pill tone={t.archived_at ? "muted" : t.is_active ? "success" : "muted"}>
+                        {t.archived_at ? "Archived" : t.is_active ? "Active" : "Inactive"}
                       </Pill>
                     </td>
                     <td className="p-3">
-                      <Button
-                        disabled={busy}
-                        variant="outline"
-                        onClick={async () => {
-                          setBusy(true);
-                          try {
-                            await mutate(
-                              `/admin/terms/${t.id}`,
-                              { is_active: !t.is_active },
-                              "PATCH",
-                            );
-                            setRevision((v) => v + 1);
-                            setMessage("Term availability saved.");
-                          } catch (e) {
-                            setMessage((e as Error).message);
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      >
-                        {t.is_active ? "Deactivate" : "Set active"}
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        {!t.archived_at && (
+                          <ConfirmButton
+                            size="sm"
+                            tone={t.is_active ? "danger" : "primary"}
+                            title={t.is_active ? `Deactivate ${t.name}?` : `Set ${t.name} active?`}
+                            description={
+                              t.is_active
+                                ? "Students in this term are no longer offered opportunities or recommendations until it is active again. Records are kept."
+                                : "The term becomes available for enrollment, opportunities and recommendations."
+                            }
+                            confirmLabel={t.is_active ? "Deactivate" : "Set active"}
+                            success={t.is_active ? "Term deactivated" : "Term set active"}
+                            onConfirm={() =>
+                              mutate(`/admin/terms/${t.id}`, { is_active: !t.is_active }, "PATCH")
+                            }
+                            onDone={() => setRevision((v) => v + 1)}
+                          >
+                            {t.is_active ? "Deactivate" : "Set active"}
+                          </ConfirmButton>
+                        )}
+                        {!t.archived_at && !t.is_active && (
+                          <ConfirmButton
+                            size="sm"
+                            tone="danger"
+                            title={`Archive ${t.name}?`}
+                            description="The term is hidden from term choices and cannot be activated until it is restored. Its enrollments and history are kept."
+                            confirmLabel="Archive"
+                            success="Term archived"
+                            onConfirm={() => mutate(`/academic-terms/${t.id}/archive`, {})}
+                            onDone={() => setRevision((v) => v + 1)}
+                          >
+                            Archive
+                          </ConfirmButton>
+                        )}
+                        {t.archived_at && (
+                          <ConfirmButton
+                            size="sm"
+                            title={`Restore ${t.name}?`}
+                            description="The term returns to term choices as inactive. Set it active separately when needed."
+                            confirmLabel="Restore"
+                            success="Term restored"
+                            onConfirm={() => mutate(`/academic-terms/${t.id}/restore`, {})}
+                            onDone={() => setRevision((v) => v + 1)}
+                          >
+                            Restore
+                          </ConfirmButton>
+                        )}
+                        {!t.is_active && (
+                          <ConfirmButton
+                            size="sm"
+                            variant="ghost"
+                            tone="danger"
+                            title={`Delete ${t.name}?`}
+                            description="Only a term with no programs, opportunities or capacities can be deleted. This cannot be undone. A term with history must be archived instead."
+                            confirmLabel="Delete"
+                            success="Term deleted"
+                            onConfirm={() => mutate(`/academic-terms/${t.id}`, undefined, "DELETE")}
+                            onDone={() => setRevision((v) => v + 1)}
+                          >
+                            Delete
+                          </ConfirmButton>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -353,6 +271,7 @@ export function AdminSettings() {
   return (
     <>
       <PageHeader title="System Settings" subtitle="Platform identity and display preferences" />
+      <RankingStatus />
       {message && (
         <p role="status" className="mb-4">
           {message}

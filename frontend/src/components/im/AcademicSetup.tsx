@@ -1,29 +1,31 @@
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { api, mutate } from "@/lib/api";
 import type { PlacementReference } from "@/lib/placement";
-import { Button, Card, CardTitle } from "./ui";
+import { Button, Card, CardTitle, FormField, FormGrid, FormModal, FormSection } from "./ui";
+import { inputClass, toFormError, type FormError } from "./formUtils";
 import { RequirementConfiguration } from "./RequirementWorkspace";
+
+const emptyTerm = { code: "", academic_year: "", name: "", starts_on: "", ends_on: "" };
+const emptyEnrollment = {
+  student_email: "",
+  student_number: "",
+  program_id: "",
+  academic_term_id: "",
+  year_level: "",
+  enrolled_on: "",
+  target_completion_on: "",
+};
 
 export function AcademicSetup() {
   const [reference, setReference] = useState<PlacementReference | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [term, setTerm] = useState({
-    code: "",
-    academic_year: "",
-    name: "",
-    starts_on: "",
-    ends_on: "",
-  });
-  const [enrollment, setEnrollment] = useState({
-    student_email: "",
-    student_number: "",
-    program_id: "",
-    academic_term_id: "",
-    year_level: "",
-    enrolled_on: "",
-    target_completion_on: "",
-  });
+  const [error, setError] = useState<FormError | null>(null);
+  const [open, setOpen] = useState<"term" | "enrollment" | null>(null);
+  const [term, setTerm] = useState(emptyTerm);
+  const [enrollment, setEnrollment] = useState(emptyEnrollment);
   useEffect(() => {
     let active = true;
     api<PlacementReference>("/placement-reference")
@@ -37,55 +39,23 @@ export function AcademicSetup() {
       active = false;
     };
   }, []);
+  const start = (kind: "term" | "enrollment") => {
+    setError(null);
+    if (kind === "term") setTerm(emptyTerm);
+    else setEnrollment(emptyEnrollment);
+    setOpen(kind);
+  };
   return (
     <>
       <RequirementConfiguration />
       <div className="mb-6 grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardTitle>Create academic term</CardTitle>
-          <form
-            className="space-y-3"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              setBusy(true);
-              setMessage("");
-              try {
-                await mutate("/academic-terms", term);
-                setReference(await api<PlacementReference>("/placement-reference"));
-                setMessage("Academic term saved.");
-              } catch (cause) {
-                setMessage(cause instanceof Error ? cause.message : "Unable to save term.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {(
-              [
-                ["code", "Term code"],
-                ["academic_year", "Academic year"],
-                ["name", "Term name"],
-                ["starts_on", "Term start"],
-                ["ends_on", "Term end"],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="block text-sm">
-                {label}
-                <input
-                  required
-                  className="mt-1 block w-full rounded border p-2"
-                  type={key.endsWith("_on") ? "date" : "text"}
-                  value={term[key]}
-                  onChange={(event) =>
-                    setTerm((current) => ({ ...current, [key]: event.target.value }))
-                  }
-                />
-              </label>
-            ))}
-            <Button type="submit" disabled={busy}>
-              Create term
-            </Button>
-          </form>
+          <CardTitle>Academic terms</CardTitle>
+          <p className="mb-3 text-sm">Create a term before enrolling students into it.</p>
+          <Button onClick={() => start("term")}>
+            <Plus size={16} aria-hidden="true" />
+            Create academic term
+          </Button>
         </Card>
         <Card>
           <CardTitle>Enroll a student account</CardTitle>
@@ -93,64 +63,128 @@ export function AcademicSetup() {
             Use the email of the existing student account. Program hours must be
             department-confirmed.
           </p>
-          <form
-            className="space-y-3"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              setBusy(true);
-              setMessage("");
-              try {
-                await mutate("/enrollments", {
-                  ...enrollment,
-                  program_id: Number(enrollment.program_id),
-                  academic_term_id: Number(enrollment.academic_term_id),
-                  year_level: Number(enrollment.year_level),
-                  target_completion_on: enrollment.target_completion_on || null,
-                });
-                setMessage("Student enrollment saved.");
-              } catch (cause) {
-                setMessage(cause instanceof Error ? cause.message : "Unable to enroll student.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {(
-              [
-                ["student_email", "Student email"],
-                ["student_number", "Institutional student number"],
-                ["year_level", "Year level"],
-                ["enrolled_on", "Enrollment date"],
-                ["target_completion_on", "Target completion date"],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="block text-sm">
-                {label}
-                <input
-                  required={key !== "target_completion_on"}
-                  className="mt-1 block w-full rounded border p-2"
-                  type={
-                    key.endsWith("_on")
-                      ? "date"
-                      : key === "student_number"
-                        ? "text"
-                        : key === "student_email"
-                          ? "email"
-                          : "number"
-                  }
-                  min="1"
-                  value={enrollment[key]}
-                  onChange={(event) =>
-                    setEnrollment((current) => ({ ...current, [key]: event.target.value }))
-                  }
-                />
-              </label>
-            ))}
-            <label className="block text-sm">
-              Program
+          <Button onClick={() => start("enrollment")}>
+            <Plus size={16} aria-hidden="true" />
+            Enroll student
+          </Button>
+        </Card>
+        {message && (
+          <p role="status" className="lg:col-span-2">
+            {message}
+          </p>
+        )}
+      </div>
+      <FormModal
+        open={open === "term"}
+        onClose={() => setOpen(null)}
+        title="Create academic term"
+        description="The new term starts inactive until an administrator sets it active."
+        submitLabel="Create term"
+        busy={busy}
+        error={error}
+        onSubmit={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await mutate("/academic-terms", term);
+            setReference(await api<PlacementReference>("/placement-reference"));
+            setOpen(null);
+            toast.success("Academic term created");
+          } catch (cause) {
+            setError(toFormError(cause, "Unable to save term."));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <FormGrid>
+          {(
+            [
+              ["code", "Term code"],
+              ["academic_year", "Academic year"],
+              ["name", "Term name"],
+              ["starts_on", "Term start"],
+              ["ends_on", "Term end"],
+            ] as const
+          ).map(([key, label]) => (
+            <FormField key={key} label={label} required>
+              <input
+                required
+                name={key}
+                className={inputClass}
+                type={key.endsWith("_on") ? "date" : "text"}
+                value={term[key]}
+                onChange={(event) =>
+                  setTerm((current) => ({ ...current, [key]: event.target.value }))
+                }
+              />
+            </FormField>
+          ))}
+        </FormGrid>
+      </FormModal>
+      <FormModal
+        open={open === "enrollment"}
+        onClose={() => setOpen(null)}
+        size="lg"
+        title="Enroll student"
+        description="Enroll an existing student account in a program and term."
+        submitLabel="Save enrollment"
+        busy={busy}
+        error={error}
+        onSubmit={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await mutate("/enrollments", {
+              ...enrollment,
+              program_id: Number(enrollment.program_id),
+              academic_term_id: Number(enrollment.academic_term_id),
+              year_level: Number(enrollment.year_level),
+              target_completion_on: enrollment.target_completion_on || null,
+            });
+            setOpen(null);
+            toast.success("Student enrolled");
+          } catch (cause) {
+            setError(toFormError(cause, "Unable to enroll student."));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <FormSection title="Student">
+          <FormGrid>
+            <FormField label="Student email" required>
+              <input
+                required
+                type="email"
+                name="student_email"
+                className={inputClass}
+                value={enrollment.student_email}
+                onChange={(event) =>
+                  setEnrollment((current) => ({ ...current, student_email: event.target.value }))
+                }
+              />
+            </FormField>
+            <FormField label="Institutional student number" required>
+              <input
+                required
+                name="student_number"
+                className={inputClass}
+                value={enrollment.student_number}
+                onChange={(event) =>
+                  setEnrollment((current) => ({ ...current, student_number: event.target.value }))
+                }
+              />
+            </FormField>
+          </FormGrid>
+        </FormSection>
+        <FormSection title="Program and term">
+          <FormGrid>
+            <FormField label="Program" required>
               <select
                 required
-                className="mt-1 block w-full rounded border p-2"
+                name="program_id"
+                className={inputClass}
                 value={enrollment.program_id}
                 onChange={(event) =>
                   setEnrollment((current) => ({ ...current, program_id: event.target.value }))
@@ -164,12 +198,12 @@ export function AcademicSetup() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="block text-sm">
-              Academic term
+            </FormField>
+            <FormField label="Academic term" required>
               <select
                 required
-                className="mt-1 block w-full rounded border p-2"
+                name="academic_term_id"
+                className={inputClass}
                 value={enrollment.academic_term_id}
                 onChange={(event) =>
                   setEnrollment((current) => ({ ...current, academic_term_id: event.target.value }))
@@ -182,18 +216,49 @@ export function AcademicSetup() {
                   </option>
                 ))}
               </select>
-            </label>
-            <Button type="submit" disabled={busy}>
-              Save enrollment
-            </Button>
-          </form>
-        </Card>
-        {message && (
-          <p role="status" className="lg:col-span-2">
-            {message}
-          </p>
-        )}
-      </div>
+            </FormField>
+            <FormField label="Year level" required>
+              <input
+                required
+                type="number"
+                min="1"
+                name="year_level"
+                className={inputClass}
+                value={enrollment.year_level}
+                onChange={(event) =>
+                  setEnrollment((current) => ({ ...current, year_level: event.target.value }))
+                }
+              />
+            </FormField>
+            <FormField label="Enrollment date" required>
+              <input
+                required
+                type="date"
+                name="enrolled_on"
+                className={inputClass}
+                value={enrollment.enrolled_on}
+                onChange={(event) =>
+                  setEnrollment((current) => ({ ...current, enrolled_on: event.target.value }))
+                }
+              />
+            </FormField>
+            <FormField label="Target completion date">
+              <input
+                type="date"
+                name="target_completion_on"
+                className={inputClass}
+                value={enrollment.target_completion_on}
+                onChange={(event) =>
+                  setEnrollment((current) => ({
+                    ...current,
+                    target_completion_on: event.target.value,
+                  }))
+                }
+              />
+            </FormField>
+          </FormGrid>
+        </FormSection>
+      </FormModal>
     </>
   );
 }

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['placement_id', 'week_starts_on', 'content', 'document_id', 'status', 'submitted_at'])]
+#[Fillable(['placement_id', 'week_starts_on', 'content', 'document_id', 'status', 'submitted_at', 'review_comments'])]
 class JournalEntry extends Model
 {
     /** @use HasFactory<JournalEntryFactory> */

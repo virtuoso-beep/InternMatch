@@ -92,7 +92,9 @@ class StudentResource extends Resource
             Action::make('withdraw')->label('Withdraw enrollment')->color('danger')
                 ->authorize(fn (StudentEnrollment $record) => Gate::allows('update', $record))
                 ->visible(fn (StudentEnrollment $record) => $record->status === EnrollmentStatus::Enrolled && ! $record->placements()->exists())
-                ->requiresConfirmation()->modalDescription('Withdraw this enrollment while retaining its records and audit history.')
+                ->requiresConfirmation()
+                ->modalHeading(fn (StudentEnrollment $record) => 'Withdraw '.($record->student?->user?->name ?? 'this student').'?')
+                ->modalDescription(fn (StudentEnrollment $record) => 'Withdraw '.($record->student?->user?->name ?? 'this student').' from '.($record->programTerm?->program?->code ?? 'the program').' for '.($record->programTerm?->academicTerm?->name ?? 'this term').'. Their records and audit history are retained.')
                 ->schema([Textarea::make('reason')->required()->maxLength(2000)])
                 ->action(fn (StudentEnrollment $record, array $data) => StudentEnrollmentManagement::withdraw(Filament::auth()->user(), $record, $data))
                 ->successNotificationTitle('Enrollment withdrawn'),

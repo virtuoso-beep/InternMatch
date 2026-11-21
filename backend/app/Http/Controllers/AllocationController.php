@@ -27,8 +27,9 @@ class AllocationController extends Controller
             $proposal->items = DB::table('placement_proposal_items as i')->join('student_enrollments as e', 'e.id', '=', 'i.student_enrollment_id')->join('students as s', 's.id', '=', 'e.student_id')->join('users as u', 'u.id', '=', 's.user_id')->leftJoin('opportunities as o', 'o.id', '=', 'i.opportunity_id')->leftJoin('host_establishments as h', 'h.id', '=', 'o.host_establishment_id')->leftJoin('recommendations as r', 'r.id', '=', 'i.recommendation_id')->where('i.placement_proposal_id', $proposal->id)->select(['i.*', 'u.name as student_name', 'o.title as opportunity_title', 'h.name as host_name', 'r.similarity_score', 'r.distance_km'])->orderBy('i.id')->get();
         }
         $hosts = HostAccess::query($request->user())->pluck('id');
+        $reasons = $readiness->reasonsForMany($enrollments);
 
-        return response()->json(['cohorts' => $terms, 'students' => $enrollments->map(fn ($e) => ['id' => $e->id, 'name' => $e->student->user?->name ?? 'Archived student account', 'program_term_id' => $e->program_term_id, 'academic_eligibility_confirmed' => $e->academic_eligibility_confirmed === null ? null : (bool) $e->academic_eligibility_confirmed, 'reasons' => $readiness->reasons($e)]), 'proposals' => $proposals,
+        return response()->json(['cohorts' => $terms, 'students' => $enrollments->map(fn ($e) => ['id' => $e->id, 'name' => $e->student->user?->name ?? 'Archived student account', 'program_term_id' => $e->program_term_id, 'academic_eligibility_confirmed' => $e->academic_eligibility_confirmed === null ? null : (bool) $e->academic_eligibility_confirmed, 'reasons' => $reasons[$e->id]]), 'proposals' => $proposals,
             'opportunities' => Opportunity::whereIn('host_establishment_id', $hosts)->where('status', 'published')->get(['id', 'title', 'host_establishment_id']),
             'supervisors' => User::where('role', Role::Supervisor)->where('status', 'active')->whereHas('hostEstablishments', fn ($q) => $q->whereIn('host_establishments.id', $hosts))->with('hostEstablishments:id')->get(['id', 'name'])]);
     }

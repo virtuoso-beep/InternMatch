@@ -39,7 +39,7 @@ class MoaController extends Controller
 
     public function index(Request $request)
     {
-        return response()->json($this->query($request)->with(['hostEstablishment:id,name', 'programs:id,code', 'document'])->latest()->paginate(30), headers: ['Cache-Control' => 'no-store']);
+        return response()->json($this->query($request)->when(! $request->boolean('include_archived'), fn ($query) => $query->whereNull('archived_at'))->with(['hostEstablishment:id,name', 'programs:id,code', 'document'])->latest()->paginate(30), headers: ['Cache-Control' => 'no-store']);
     }
 
     public function save(Request $request, ?int $moa = null)
@@ -60,6 +60,7 @@ class MoaController extends Controller
             'max_interns_per_term' => ['prohibited'], 'document_id' => ['prohibited'],
         ]);
         $host = HostAccess::query($user)->findOrFail($data['host_establishment_id']);
+        abort_if($host->archived_at !== null || $existing?->archived_at !== null, 409, 'Restore the archived record before changing it.');
         abort_if($existing && $existing->host_establishment_id !== $host->id, 422, 'An agreement cannot be moved to another host.');
         HostAccess::authorizePrograms($user, $data['program_ids']);
         abort_if($user->role !== Role::Admin && $data['is_institution_wide'], 403);

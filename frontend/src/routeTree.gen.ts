@@ -15,6 +15,8 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CoordinatorRouteImport } from './routes/coordinator'
 import { Route as DeanRouteImport } from './routes/dean'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StudentRouteImport } from './routes/student'
 import { Route as SupervisorRouteImport } from './routes/supervisor'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -56,6 +58,16 @@ const CoordinatorRoute = CoordinatorRouteImport.update({
 const DeanRoute = DeanRouteImport.update({
   id: '/dean',
   path: '/dean',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudentRoute = StudentRouteImport.update({
@@ -126,6 +138,8 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/coordinator': typeof CoordinatorRouteWithChildren
   '/dean': typeof DeanRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/student': typeof StudentRouteWithChildren
   '/supervisor': typeof SupervisorRouteWithChildren
   '/admin/$section': typeof AdminSectionRoute
@@ -143,6 +157,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activate': typeof ActivateRoute
   '/auth': typeof AuthRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/admin/$section': typeof AdminSectionRoute
   '/coordinator/$section': typeof CoordinatorSectionRoute
   '/dean/$section': typeof DeanSectionRoute
@@ -162,6 +178,8 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/coordinator': typeof CoordinatorRouteWithChildren
   '/dean': typeof DeanRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/student': typeof StudentRouteWithChildren
   '/supervisor': typeof SupervisorRouteWithChildren
   '/admin/$section': typeof AdminSectionRoute
@@ -184,6 +202,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/coordinator'
     | '/dean'
+    | '/forgot-password'
+    | '/reset-password'
     | '/student'
     | '/supervisor'
     | '/admin/$section'
@@ -201,6 +221,8 @@ export interface FileRouteTypes {
     | '/'
     | '/activate'
     | '/auth'
+    | '/forgot-password'
+    | '/reset-password'
     | '/admin/$section'
     | '/coordinator/$section'
     | '/dean/$section'
@@ -219,6 +241,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/coordinator'
     | '/dean'
+    | '/forgot-password'
+    | '/reset-password'
     | '/student'
     | '/supervisor'
     | '/admin/$section'
@@ -240,6 +264,8 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CoordinatorRoute: typeof CoordinatorRouteWithChildren
   DeanRoute: typeof DeanRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   StudentRoute: typeof StudentRouteWithChildren
   SupervisorRoute: typeof SupervisorRouteWithChildren
 }
@@ -286,6 +312,20 @@ declare module '@tanstack/react-router' {
       path: '/dean'
       fullPath: '/dean'
       preLoaderRoute: typeof DeanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/student': {
@@ -447,6 +487,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CoordinatorRoute: CoordinatorRouteWithChildren,
   DeanRoute: DeanRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   StudentRoute: StudentRouteWithChildren,
   SupervisorRoute: SupervisorRouteWithChildren,
 }

@@ -1,5 +1,5 @@
 import { NotificationList } from "@/components/im/NotificationList";
-import { LiveDashboard } from "@/components/im/LiveDashboard";
+import { DeanDashboard } from "@/components/im/DeanDashboard";
 import { ProfileEditor } from "@/components/im/ProfileEditor";
 import { ReportWorkspace } from "@/components/im/ReportWorkspace";
 import { ProgramAnalytics } from "@/components/im/ProgramAnalytics";
@@ -13,7 +13,7 @@ export function DeanSection({ section }: { section: string }) {
     case "profile":
       return <ProfileEditor role="dean" />;
     case "":
-      return <LiveDashboard />;
+      return <DeanDashboard />;
     case "performance":
     case "hosts":
     case "equity":

@@ -13,7 +13,7 @@ class HostController extends Controller
     {
         abort_unless(in_array($request->user()->role, [Role::Admin, Role::Coordinator, Role::Supervisor], true), 403);
 
-        return response()->json(HostAccess::query($request->user())->orderBy('name')->paginate(50), headers: ['Cache-Control' => 'no-store']);
+        return response()->json(HostAccess::query($request->user())->when(! $request->boolean('include_archived'), fn ($query) => $query->whereNull('archived_at'))->orderBy('name')->paginate(50), headers: ['Cache-Control' => 'no-store']);
     }
 
     public function store(Request $request)

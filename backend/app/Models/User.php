@@ -6,8 +6,10 @@ use App\Enums\AccountStatus;
 use App\Enums\Permission;
 use App\Enums\Role;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\PasswordResetLink;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -20,7 +22,7 @@ use Illuminate\Notifications\Notifiable;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements FilamentUser, \Filament\Models\Contracts\HasName
+class User extends Authenticatable implements FilamentUser, HasName
 {
     public function getFilamentName(): string
     {
@@ -28,7 +30,14 @@ class User extends Authenticatable implements FilamentUser, \Filament\Models\Con
     }
 
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, \Illuminate\Database\Eloquent\SoftDeletes;
+    use HasFactory, \Illuminate\Database\Eloquent\SoftDeletes, Notifiable;
+
+    /** Password reset e-mail links to the portal's reset page (PasswordResetController). */
+    public function sendPasswordResetNotification($token): void
+    {
+        $url = config('internmatch.portal_url').'/reset-password?token='.urlencode($token).'&email='.urlencode((string) $this->email);
+        $this->notify(new PasswordResetLink($url, (int) config('auth.passwords.users.expire', 60)));
+    }
 
     public function canAccessPanel(Panel $panel): bool
     {

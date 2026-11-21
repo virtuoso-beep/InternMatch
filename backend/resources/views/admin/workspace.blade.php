@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>InternMatch Administration</title>
+    {{-- Applies the saved light/dark choice (set in the administration shell) before first paint. --}}
+    <script>(function(){try{var p=localStorage.getItem("internmatch:theme");var d=p==="dark"||(p!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.classList.add("dark");}catch(e){}})();</script>
     @if ($entry)
         @foreach ($entry['css'] ?? [] as $css)
             <link rel="stylesheet" href="{{ asset('admin-ui/'.$css) }}">

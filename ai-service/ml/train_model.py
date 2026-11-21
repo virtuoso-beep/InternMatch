@@ -5,11 +5,16 @@ import joblib
 import os
 import argparse
 
+try:
+    from ml.model_card import FEATURES, write_train_meta
+except ImportError:  # run as a script from ml/
+    from model_card import FEATURES, write_train_meta
+
 def train_model(train_path: str, model_path: str, scaler_path: str):
     df = pd.read_csv(train_path)
     
-    features = ['similarity_score', 'distance_km', 'capacity_at_time', 'moa_active', 'distance_km_missing']
-    X = df[features]
+    features = FEATURES
+    X = df[features].to_numpy(dtype=float)  # plain arrays, as at ranking time
     y = df['label']
     
     scaler = StandardScaler()
@@ -24,6 +29,7 @@ def train_model(train_path: str, model_path: str, scaler_path: str):
     joblib.dump(model, model_path)
     joblib.dump(scaler, scaler_path)
     
+    write_train_meta(model_path, df)
     print("Model and scaler saved successfully.")
     print(f"Coefficients: {dict(zip(features, model.coef_[0]))}")
 

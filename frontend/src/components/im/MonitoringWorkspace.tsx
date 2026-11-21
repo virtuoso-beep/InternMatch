@@ -5,6 +5,9 @@ import {
   Card,
   CardTitle,
   Field,
+  FormField,
+  FormGrid,
+  FormModal,
   PageHeader,
   Pill,
   StatCard,
@@ -13,7 +16,11 @@ import {
   studentName,
   formatRating,
 } from "./ui";
+import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { useSessionUser } from "./SessionGuard";
+import { ConfirmButton, ReasonButton } from "./actions";
+import { inputClass, toFormError, type FormError } from "./formUtils";
 import { EvaluationPanel } from "./EvaluationPanel";
 import { AttendanceTable, InternProgress } from "./SupervisorMonitoring";
 
@@ -29,6 +36,9 @@ export type Placement = {
     program_term: { program: { code: string } };
   };
   supervisor: { name: string } | null;
+  /** Present when the list was requested with include=progress,evaluations. */
+  progress?: Monitoring["progress"];
+  evaluations?: { period: string; status: string; weighted_percentage: number | null }[];
   moa?: {
     status: string;
     lifecycle_status?: string;
@@ -45,8 +55,19 @@ type Log = {
   status: string;
   notes: string | null;
 };
-type Journal = { id: number; week_starts_on: string; content: string; status: string };
+type Journal = {
+  id: number;
+  week_starts_on: string;
+  content: string;
+  status: string;
+  review_comments?: string | null;
+};
 export type Monitoring = {
+  placement?: {
+    status: string;
+    hours_certified_at?: string | null;
+    certified_minutes?: number | null;
+  };
   time_logs: Log[];
   journals: Journal[];
   progress: {
@@ -80,7 +101,9 @@ export function MonitoringWorkspace({
     let active = true;
     setError("");
     setResult(null);
-    api<{ data: Placement[]; last_page: number }>(`/placements?page=${page}`)
+    api<{ data: Placement[]; last_page: number }>(
+      `/placements?page=${page}${view === "interns" ? "&include=progress,evaluations" : ""}`,
+    )
       .then((value) => {
         if (active) {
           setResult(value);
@@ -140,7 +163,11 @@ export function MonitoringWorkspace({
                 {item.host_establishment.name} · {item.starts_on?.slice(0, 10) ?? "Start unset"} –{" "}
                 {item.ends_on?.slice(0, 10) ?? "End unset"}
               </p>
-              <InternProgress placementId={item.id} />
+              <InternProgress
+                placementId={item.id}
+                progress={item.progress}
+                evaluations={item.evaluations}
+              />
               <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => {
@@ -363,7 +390,7 @@ function StudentInternshipSummary({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b text-xs text-muted-foreground uppercase">
+                  <tr className="border-b text-xs text-muted-foreground">
                     <th scope="col" className="py-3 pr-4 font-medium">
                       Week beginning
                     </th>
@@ -422,11 +449,11 @@ function StudentInternshipSummary({
           <Field label="Start date" value={dateLabel(placement.starts_on)} />
           <Field label="Target completion" value={dateLabel(placement.ends_on)} />
           <div>
-            <p className="mb-2 text-xs text-muted-foreground uppercase">Placement status</p>
+            <p className="mb-2 text-xs text-muted-foreground">Placement status</p>
             <Pill tone={statusTone(placement.status)}>{placement.status}</Pill>
           </div>
           <div>
-            <p className="mb-2 text-xs text-muted-foreground uppercase">MOA status</p>
+            <p className="mb-2 text-xs text-muted-foreground">MOA status</p>
             <Pill tone={statusTone(moaStatus)}>{moaStatus}</Pill>
           </div>
         </Card>
@@ -445,7 +472,7 @@ function StudentInternshipSummary({
             aria-valuenow={Number(percent.toFixed(1))}
             aria-valuemin={0}
             aria-valuemax={100}
-            className="h-2.5 overflow-hidden rounded-full bg-slate-100"
+            className="h-2.5 overflow-hidden rounded-full bg-muted"
           >
             <div className="h-full rounded-full bg-success" style={{ width: `${percent}%` }} />
           </div>
@@ -494,9 +521,11 @@ export function PlacementMonitoring({
     break_minutes: "0",
     notes: "",
   };
-  const [time, setTime] = useState(emptyTime);
-  const [journal, setJournal] = useState({ week_starts_on: "", content: "", status: "draft" });
-  const [comments, setComments] = useState<Record<string, string>>({});
+  const [timeEditor, setTimeEditor] = useState<(typeof emptyTime & { reason?: string }) | null>(
+    null,
+  );
+  const [journalEditor, setJournalEditor] = useState<JournalDraft | null>(null);
+  const refresh = () => setRevision((value) => value + 1);
   useEffect(() => {
     let active = true;
     api<Monitoring>(`/placements/${placement.id}/monitoring`)
@@ -525,7 +554,11 @@ export function PlacementMonitoring({
       setBusy(false);
     }
   };
-  const canSubmit = user.role === "student" && placement.status === "active";
+  const current = data?.placement ?? placement;
+  const certified = Boolean(data?.placement?.hours_certified_at);
+  const canSubmit = user.role === "student" && current.status === "active" && !certified;
+  const canClose =
+    (user.role === "coordinator" || user.role === "admin") && current.status === "active";
   const progress = data?.progress;
   return (
     <div className="space-y-5">
@@ -537,7 +570,7 @@ export function PlacementMonitoring({
               type="button"
               aria-pressed={tab === name}
               onClick={() => setTab(name)}
-              className={`rounded-full border px-4 py-2 text-sm font-medium ${tab === name ? "border-brand bg-brand text-white" : "bg-card hover:bg-muted"}`}
+              className={`rounded-full border px-4 py-2 text-sm font-medium ${tab === name ? "border-brand bg-brand text-brand-foreground" : "bg-card hover:bg-muted"}`}
             >
               {name}
             </button>
@@ -590,6 +623,57 @@ export function PlacementMonitoring({
               ))}
             </div>
           )}
+          {certified && (
+            <p className="mt-3 text-sm">
+              Hours certified by the coordinator:{" "}
+              {((data?.placement?.certified_minutes ?? 0) / 60).toFixed(2)} hours.
+            </p>
+          )}
+          {(user.role === "coordinator" || user.role === "admin") &&
+            current.status === "approved" && (
+              <div className="mt-4">
+                <ConfirmButton
+                  variant="primary"
+                  title={`Start the deployment of ${studentName(placement.student_enrollment.student.user)}?`}
+                  description={`The placement at ${placement.host_establishment.name} becomes active${placement.starts_on ? ` (start date ${placement.starts_on.slice(0, 10)})` : ""}. The intern can then submit time logs and journals.`}
+                  confirmLabel="Start deployment"
+                  success="Deployment started"
+                  onConfirm={() => mutate(`/placements/${placement.id}/start`, {})}
+                  onDone={refresh}
+                >
+                  Start deployment
+                </ConfirmButton>
+              </div>
+            )}
+          {canClose && progress && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {!certified && (
+                <ConfirmButton
+                  title={`Certify hours for ${studentName(placement.student_enrollment.student.user)}?`}
+                  description={`Certify ${(progress.completed_minutes / 60).toFixed(2)} supervisor-certified hours at ${placement.host_establishment.name}. Every time log must already be certified or returned. After this, the intern cannot add or change logs.`}
+                  confirmLabel="Certify hours"
+                  success="Hours certified"
+                  onConfirm={() => mutate(`/placements/${placement.id}/certify-hours`, {})}
+                  onDone={refresh}
+                >
+                  Certify hours
+                </ConfirmButton>
+              )}
+              {certified && (
+                <ConfirmButton
+                  tone="danger"
+                  title={`End the deployment of ${studentName(placement.student_enrollment.student.user)}?`}
+                  description={`The placement at ${placement.host_establishment.name} becomes completed. Chat for this deployment becomes read-only, and the supervisor can no longer send messages. This cannot be undone.`}
+                  confirmLabel="End deployment"
+                  success="Deployment ended"
+                  onConfirm={() => mutate(`/placements/${placement.id}/end`, {})}
+                  onDone={refresh}
+                >
+                  End deployment
+                </ConfirmButton>
+              )}
+            </div>
+          )}
         </Card>
       )}
       {message && <p role="status">{message}</p>}
@@ -599,67 +683,12 @@ export function PlacementMonitoring({
         <Card>
           <CardTitle>Time logs</CardTitle>
           {canSubmit && (
-            <form
-              className="mb-5 grid gap-3 sm:grid-cols-2"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                if (
-                  await action(`/placements/${placement.id}/time-logs`, {
-                    ...time,
-                    time_in: new Date(time.time_in).toISOString(),
-                    time_out: new Date(time.time_out).toISOString(),
-                    break_minutes: Number(time.break_minutes),
-                  })
-                )
-                  setTime(emptyTime);
-              }}
-            >
-              {(["time_in", "time_out"] as const).map((key) => (
-                <label key={key} className="text-sm">
-                  {key === "time_in" ? "Start (local time)" : "End (local time)"}
-                  <input
-                    type="datetime-local"
-                    required
-                    value={time[key]}
-                    onChange={(event) =>
-                      setTime((current) => ({ ...current, [key]: event.target.value }))
-                    }
-                    className="mt-1 block w-full rounded border p-2"
-                  />
-                </label>
-              ))}
-              <label className="text-sm">
-                Break minutes
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={time.break_minutes}
-                  onChange={(event) =>
-                    setTime((current) => ({ ...current, break_minutes: event.target.value }))
-                  }
-                  className="mt-1 block w-full rounded border p-2"
-                />
-              </label>
-              <label className="text-sm">
-                Work notes
-                <input
-                  value={time.notes}
-                  onChange={(event) =>
-                    setTime((current) => ({ ...current, notes: event.target.value }))
-                  }
-                  className="mt-1 block w-full rounded border p-2"
-                />
-              </label>
-              <Button type="submit" disabled={busy}>
-                {time.id ? "Resubmit time log" : "Submit time log"}
+            <div className="mb-4">
+              <Button onClick={() => setTimeEditor(emptyTime)}>
+                <Plus size={16} aria-hidden="true" />
+                Add time log
               </Button>
-              {time.id && (
-                <Button variant="outline" onClick={() => setTime(emptyTime)}>
-                  Cancel edit
-                </Button>
-              )}
-            </form>
+            </div>
           )}
           {data?.time_logs.length === 0 && <p>No time logs recorded.</p>}
           {user.role === "supervisor" && data ? (
@@ -684,54 +713,30 @@ export function PlacementMonitoring({
                       ? "Awaiting verification"
                       : `${(log.credited_minutes / 60).toFixed(2)} hours`}
                   </p>
-                  <p>{log.notes}</p>
+                  {log.status === "flagged" && log.notes ? (
+                    <p className="rounded-lg border border-warn/40 bg-warn-soft p-3">
+                      Returned for correction: {log.notes}
+                    </p>
+                  ) : (
+                    <p>{log.notes}</p>
+                  )}
                   {canSubmit && log.status !== "verified" && (
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={() =>
-                        setTime({
+                        setTimeEditor({
                           id: log.id,
                           time_in: localInput(log.time_in),
                           time_out: localInput(log.time_out),
                           break_minutes: String(log.break_minutes),
-                          notes: log.notes ?? "",
+                          notes: log.status === "flagged" ? "" : (log.notes ?? ""),
+                          ...(log.status === "flagged" && log.notes ? { reason: log.notes } : {}),
                         })
                       }
                     >
-                      Edit time log
+                      {log.status === "flagged" ? "Correct and resubmit" : "Edit time log"}
                     </Button>
-                  )}
-                  {user.role === "supervisor" && log.status !== "verified" && (
-                    <div className="flex flex-wrap items-end gap-2">
-                      <label>
-                        Review note
-                        <input
-                          className="ml-2 rounded border p-2"
-                          value={comments[`time${log.id}`] ?? ""}
-                          onChange={(event) =>
-                            setComments((current) => ({
-                              ...current,
-                              [`time${log.id}`]: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-                      {["verified", "flagged"].map((status) => (
-                        <Button
-                          key={status}
-                          disabled={busy}
-                          variant="outline"
-                          onClick={() =>
-                            action(`/time-logs/${log.id}/verify`, {
-                              status,
-                              notes: comments[`time${log.id}`] || null,
-                            })
-                          }
-                        >
-                          {status === "verified" ? "Certify hours" : "Flag for correction"}
-                        </Button>
-                      ))}
-                    </div>
                   )}
                 </section>
               ))}
@@ -745,55 +750,16 @@ export function PlacementMonitoring({
         <Card>
           <CardTitle>Weekly journals</CardTitle>
           {canSubmit && (
-            <form
-              className="mb-4 space-y-3"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                if (await action(`/placements/${placement.id}/journals`, journal))
-                  setJournal({ week_starts_on: "", content: "", status: "draft" });
-              }}
-            >
-              <label className="block text-sm">
-                Week beginning (Monday)
-                <input
-                  type="date"
-                  required
-                  value={journal.week_starts_on}
-                  onChange={(event) =>
-                    setJournal((current) => ({ ...current, week_starts_on: event.target.value }))
-                  }
-                  className="ml-2 rounded border p-2"
-                />
-              </label>
-              <label className="block text-sm">
-                Journal content
-                <textarea
-                  required
-                  maxLength={30000}
-                  value={journal.content}
-                  onChange={(event) =>
-                    setJournal((current) => ({ ...current, content: event.target.value }))
-                  }
-                  className="mt-1 min-h-32 w-full rounded border p-2"
-                />
-              </label>
-              <label className="block text-sm">
-                Save as
-                <select
-                  value={journal.status}
-                  onChange={(event) =>
-                    setJournal((current) => ({ ...current, status: event.target.value }))
-                  }
-                  className="ml-2 rounded border p-2"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="submitted">Submit for review</option>
-                </select>
-              </label>
-              <Button type="submit" disabled={busy}>
-                Save journal
+            <div className="mb-4">
+              <Button
+                onClick={() =>
+                  setJournalEditor({ week_starts_on: "", content: "", status: "draft" })
+                }
+              >
+                <Plus size={16} aria-hidden="true" />
+                Add journal
               </Button>
-            </form>
+            </div>
           )}
           {data?.journals.length === 0 && <p>No journals recorded.</p>}
           <div className="divide-y">
@@ -803,50 +769,84 @@ export function PlacementMonitoring({
                   Week of {entry.week_starts_on.slice(0, 10)} · {entry.status}
                 </p>
                 <p className="whitespace-pre-wrap">{entry.content}</p>
+                {entry.status === "rejected" && entry.review_comments && (
+                  <p className="rounded-lg border border-warn/40 bg-warn-soft p-3">
+                    Returned for correction: {entry.review_comments}
+                  </p>
+                )}
                 {canSubmit && ["draft", "rejected"].includes(entry.status) && (
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      setJournal({
-                        week_starts_on: entry.week_starts_on.slice(0, 10),
-                        content: entry.content,
-                        status: "draft",
-                      })
-                    }
-                  >
-                    Edit journal
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setJournalEditor({
+                          week_starts_on: entry.week_starts_on.slice(0, 10),
+                          content: entry.content,
+                          status: "draft",
+                          ...(entry.review_comments ? { reason: entry.review_comments } : {}),
+                        })
+                      }
+                    >
+                      {entry.status === "rejected" ? "Revise journal" : "Edit journal"}
+                    </Button>
+                    {entry.status === "draft" && (
+                      <ConfirmButton
+                        size="sm"
+                        variant="primary"
+                        title={`Submit the journal for the week of ${entry.week_starts_on.slice(0, 10)}?`}
+                        description="Your coordinator reviews it. A submitted journal cannot be edited unless it is returned."
+                        confirmLabel="Submit journal"
+                        success="Journal submitted"
+                        onConfirm={() =>
+                          mutate(`/placements/${placement.id}/journals`, {
+                            week_starts_on: entry.week_starts_on.slice(0, 10),
+                            content: entry.content,
+                            status: "submitted",
+                          })
+                        }
+                        onDone={refresh}
+                      >
+                        Submit journal
+                      </ConfirmButton>
+                    )}
+                  </div>
                 )}
                 {user.role === "coordinator" && entry.status === "submitted" && (
                   <div className="flex flex-wrap gap-2">
-                    <label>
-                      Review comments
-                      <input
-                        className="ml-2 rounded border p-2"
-                        value={comments[`journal${entry.id}`] ?? ""}
-                        onChange={(event) =>
-                          setComments((current) => ({
-                            ...current,
-                            [`journal${entry.id}`]: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    {["approved", "rejected"].map((status) => (
-                      <Button
-                        key={status}
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() =>
-                          action(`/journals/${entry.id}/review`, {
-                            status,
-                            comments: comments[`journal${entry.id}`] || null,
-                          })
-                        }
-                      >
-                        {status === "approved" ? "Approve journal" : "Return for correction"}
-                      </Button>
-                    ))}
+                    <ConfirmButton
+                      size="sm"
+                      title={`Approve the journal for the week of ${entry.week_starts_on.slice(0, 10)}?`}
+                      description={`Approve the weekly journal from ${studentName(placement.student_enrollment.student.user)}. The intern is notified.`}
+                      confirmLabel="Approve"
+                      success="Journal approved"
+                      onConfirm={() =>
+                        mutate(`/journals/${entry.id}/review`, {
+                          status: "approved",
+                          comments: null,
+                        })
+                      }
+                      onDone={refresh}
+                    >
+                      Approve journal
+                    </ConfirmButton>
+                    <ReasonButton
+                      size="sm"
+                      title={`Return the journal for the week of ${entry.week_starts_on.slice(0, 10)}`}
+                      description="The intern sees this reason and can revise and resubmit the journal."
+                      submitLabel="Return journal"
+                      field="comments"
+                      success="Journal returned for correction"
+                      onSubmit={(reason) =>
+                        mutate(`/journals/${entry.id}/review`, {
+                          status: "rejected",
+                          comments: reason,
+                        })
+                      }
+                      onDone={refresh}
+                    >
+                      Return for correction
+                    </ReasonButton>
                   </div>
                 )}
               </section>
@@ -857,8 +857,231 @@ export function PlacementMonitoring({
       {(user.role === "student"
         ? tab === "Evaluations"
         : section === "all" || section === "Evaluations") && (
-        <EvaluationPanel placementId={placement.id} placementStatus={placement.status} />
+        <EvaluationPanel placementId={placement.id} placementStatus={current.status} />
+      )}
+      {timeEditor && (
+        <TimeLogModal
+          placementId={placement.id}
+          initial={timeEditor}
+          onClose={() => setTimeEditor(null)}
+          onSaved={() => {
+            setTimeEditor(null);
+            refresh();
+          }}
+        />
+      )}
+      {journalEditor && (
+        <JournalModal
+          placementId={placement.id}
+          initial={journalEditor}
+          onClose={() => setJournalEditor(null)}
+          onSaved={() => {
+            setJournalEditor(null);
+            refresh();
+          }}
+        />
       )}
     </div>
+  );
+}
+
+type JournalDraft = { week_starts_on: string; content: string; status: string; reason?: string };
+
+function TimeLogModal({
+  placementId,
+  initial,
+  onClose,
+  onSaved,
+}: {
+  placementId: number;
+  initial: {
+    id: number | null;
+    time_in: string;
+    time_out: string;
+    break_minutes: string;
+    notes: string;
+    reason?: string;
+  };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<FormError | null>(null);
+  return (
+    <FormModal
+      open
+      onClose={onClose}
+      title={
+        initial.reason
+          ? "Correct and resubmit time log"
+          : initial.id
+            ? "Edit time log"
+            : "Add time log"
+      }
+      description="Times are entered in your local time. Your supervisor certifies the hours."
+      submitLabel={initial.id ? "Resubmit time log" : "Submit time log"}
+      busy={busy}
+      error={error}
+      onSubmit={async () => {
+        setBusy(true);
+        setError(null);
+        try {
+          await mutate(`/placements/${placementId}/time-logs`, {
+            ...(value.id ? { id: value.id } : {}),
+            time_in: new Date(value.time_in).toISOString(),
+            time_out: new Date(value.time_out).toISOString(),
+            break_minutes: Number(value.break_minutes),
+            notes: value.notes || null,
+          });
+          onSaved();
+          toast.success(initial.id ? "Time log resubmitted" : "Time log submitted");
+        } catch (cause) {
+          setError(toFormError(cause, "Unable to save the time log."));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {initial.reason && (
+        <p className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm">
+          Returned for correction: {initial.reason}
+        </p>
+      )}
+      <FormGrid>
+        <FormField label="Start (local time)" required>
+          <input
+            type="datetime-local"
+            name="time_in"
+            required
+            className={inputClass}
+            value={value.time_in}
+            onChange={(event) => setValue((v) => ({ ...v, time_in: event.target.value }))}
+          />
+        </FormField>
+        <FormField label="End (local time)" required>
+          <input
+            type="datetime-local"
+            name="time_out"
+            required
+            className={inputClass}
+            value={value.time_out}
+            onChange={(event) => setValue((v) => ({ ...v, time_out: event.target.value }))}
+          />
+        </FormField>
+        <FormField label="Break minutes" required>
+          <input
+            type="number"
+            name="break_minutes"
+            min="0"
+            required
+            className={inputClass}
+            value={value.break_minutes}
+            onChange={(event) => setValue((v) => ({ ...v, break_minutes: event.target.value }))}
+          />
+        </FormField>
+      </FormGrid>
+      <FormField label="Work notes">
+        <textarea
+          name="notes"
+          rows={3}
+          maxLength={5000}
+          className={inputClass}
+          value={value.notes}
+          onChange={(event) => setValue((v) => ({ ...v, notes: event.target.value }))}
+        />
+      </FormField>
+    </FormModal>
+  );
+}
+
+function JournalModal({
+  placementId,
+  initial,
+  onClose,
+  onSaved,
+}: {
+  placementId: number;
+  initial: JournalDraft;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<FormError | null>(null);
+  const editing = Boolean(initial.week_starts_on);
+  return (
+    <FormModal
+      open
+      size="lg"
+      onClose={onClose}
+      title={
+        initial.reason
+          ? `Revise journal: week of ${initial.week_starts_on}`
+          : editing
+            ? `Edit journal: week of ${initial.week_starts_on}`
+            : "Add journal"
+      }
+      description="Save a draft to keep working on it, or submit it for your coordinator's review."
+      submitLabel={value.status === "submitted" ? "Submit journal" : "Save draft"}
+      busy={busy}
+      error={error}
+      onSubmit={async () => {
+        setBusy(true);
+        setError(null);
+        try {
+          await mutate(`/placements/${placementId}/journals`, {
+            week_starts_on: value.week_starts_on,
+            content: value.content,
+            status: value.status,
+          });
+          onSaved();
+          toast.success(value.status === "submitted" ? "Journal submitted" : "Draft saved");
+        } catch (cause) {
+          setError(toFormError(cause, "Unable to save the journal."));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {initial.reason && (
+        <p className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm">
+          Returned for correction: {initial.reason}
+        </p>
+      )}
+      <FormField label="Week beginning (Monday)" required>
+        <input
+          type="date"
+          name="week_starts_on"
+          required
+          disabled={editing}
+          className={inputClass}
+          value={value.week_starts_on}
+          onChange={(event) => setValue((v) => ({ ...v, week_starts_on: event.target.value }))}
+        />
+      </FormField>
+      <FormField label="Journal content" required>
+        <textarea
+          name="content"
+          required
+          rows={8}
+          maxLength={30000}
+          className={inputClass}
+          value={value.content}
+          onChange={(event) => setValue((v) => ({ ...v, content: event.target.value }))}
+        />
+      </FormField>
+      <FormField label="Save as">
+        <select
+          name="status"
+          className={inputClass}
+          value={value.status}
+          onChange={(event) => setValue((v) => ({ ...v, status: event.target.value }))}
+        >
+          <option value="draft">Draft</option>
+          <option value="submitted">Submit for review</option>
+        </select>
+      </FormField>
+    </FormModal>
   );
 }

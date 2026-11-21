@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
 import { SYNTHETIC_LABEL, withSynthetic } from "@/lib/synthetic";
 import {
   Button,
   Card,
+  FormField,
+  Modal,
   Pill,
   downloadText,
   formatSimilarity,
   studentName,
   formatStatus,
 } from "./ui";
+import { inputClass } from "./formUtils";
 import { SyntheticToggle } from "./SyntheticToggle";
 type Student = {
   id: number;
@@ -81,10 +84,6 @@ export function RecommendationBatch({ done }: { done: () => void }) {
   useEffect(() => {
     void loadHistory(historyPage);
   }, [historyPage, loadHistory]);
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (open) dialog.current?.showModal();
-  }, [open]);
   const scope = students.filter(
     (s) => s.program_term.program.code === program && (includeSynthetic || !s.is_synthetic),
   );
@@ -236,63 +235,58 @@ export function RecommendationBatch({ done }: { done: () => void }) {
           </Button>
         </div>
       </details>
-      {open && (
-        <dialog
-          ref={dialog}
-          onCancel={(e) => {
-            if (busy) e.preventDefault();
-            else setOpen(false);
-          }}
-          aria-labelledby="batch-title"
-          className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-auto rounded-xl border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/40"
-        >
-          <h2 id="batch-title" className="bg-brand p-5 text-xl font-semibold text-white">
-            Regenerate recommendation batch
-          </h2>
-          <div className="space-y-4 p-5">
-            <label className="block text-sm">
-              Program
-              <select
-                aria-label="Batch program"
-                disabled={busy}
-                value={program}
-                onChange={(e) => setProgram(e.target.value)}
-                className="mt-1 w-full rounded border p-2"
-              >
-                {[...new Set(students.map((s) => s.program_term.program.code))].map((code) => (
-                  <option key={code}>{code}</option>
-                ))}
-              </select>
-            </label>
-            <p className="rounded-lg bg-brand-soft p-4 text-sm">
-              Generate new recommendations for this program only. Existing placements are skipped
-              and will not be reassigned by this action.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>{scope.filter((s) => !protectedStudent(s)).length} enrollments to process</Card>
-              <Card>{scope.filter(protectedStudent).length} protected / skipped</Card>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Matching checks competency embeddings, program eligibility, host capacity and MOA
-              validity. Missing data may cause individual records to fail. Results do not approve
-              placements.
-            </p>
-            {busy && (
-              <p role="status">
-                Processed {results.length} of {scope.length}. Keep this window open.
-              </p>
-            )}
-            <div className="flex gap-3">
-              <Button variant="outline" disabled={busy} onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button disabled={busy || !scope.length} onClick={() => void run()}>
-                {busy ? "Generating…" : "Regenerate recommendations"}
-              </Button>
-            </div>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        size="md"
+        dismissible={!busy}
+        title="Regenerate recommendation batch"
+        description="Create new recommendations for one program. Existing placements are skipped."
+        footer={
+          <>
+            <Button variant="outline" disabled={busy} onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={busy || !scope.length} onClick={() => void run()}>
+              {busy ? "Generating…" : "Regenerate recommendations"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Program" required>
+            <select
+              aria-label="Batch program"
+              disabled={busy}
+              value={program}
+              onChange={(e) => setProgram(e.target.value)}
+              className={inputClass}
+            >
+              {[...new Set(students.map((s) => s.program_term.program.code))].map((code) => (
+                <option key={code}>{code}</option>
+              ))}
+            </select>
+          </FormField>
+          <p className="rounded-lg bg-brand-soft p-4 text-sm">
+            Generate new recommendations for this program only. Existing placements are skipped and
+            will not be reassigned by this action.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Card>{scope.filter((s) => !protectedStudent(s)).length} enrollments to process</Card>
+            <Card>{scope.filter(protectedStudent).length} protected / skipped</Card>
           </div>
-        </dialog>
-      )}
+          <p className="text-sm text-muted-foreground">
+            Matching checks competency embeddings, program eligibility, host capacity and MOA
+            validity. Missing data may cause individual records to fail. Results do not approve
+            placements.
+          </p>
+          {busy && (
+            <p role="status" className="text-sm font-medium">
+              Processed {results.length} of {scope.length}. Keep this window open.
+            </p>
+          )}
+        </div>
+      </Modal>
       {!!results.length && (
         <Card className="mt-4">
           <h2 className="font-semibold">Batch results {busy ? "— in progress" : "— completed"}</h2>

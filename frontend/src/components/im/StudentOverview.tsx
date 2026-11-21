@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useSessionUser } from "./SessionGuard";
-import { Button, Card, CardTitle, Field, PageHeader, Pill } from "./ui";
+import { Button, Card, CardTitle, Field, PageHeader, Pill, ViewModal } from "./ui";
 import { StoredRecommendations } from "./StoredRecommendations";
 
 type Enrollment = {
@@ -310,29 +310,14 @@ function EligibleOpportunities({ enrollmentId }: { enrollmentId: number }) {
 }
 
 function OpportunityDetails({ item, onClose }: { item: Opportunity; onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
-  }, []);
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="opportunity-details-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border bg-card p-6 text-foreground shadow-xl backdrop:bg-black/35"
+    <ViewModal
+      open
+      onClose={onClose}
+      title={item.title}
+      description={`${item.host_name} · ${item.city}`}
     >
-      <h2 id="opportunity-details-title" className="text-xl font-semibold">
-        {item.title}
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {item.host_name} · {item.city}
-      </p>
-      <h3 className="mt-5 font-semibold">About the opportunity</h3>
+      <h3 className="font-semibold">About the opportunity</h3>
       <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
         {item.description || "No description recorded."}
       </p>
@@ -344,9 +329,6 @@ function OpportunityDetails({ item, onClose }: { item: Opportunity; onClose: () 
         {item.eligibility.capacity_remaining} program slots available · MOA valid through{" "}
         {item.eligibility.moa_expires_on}. Placement remains subject to coordinator approval.
       </p>
-      <div className="mt-6 flex justify-end">
-        <Button onClick={onClose}>Close</Button>
-      </div>
-    </dialog>
+    </ViewModal>
   );
 }

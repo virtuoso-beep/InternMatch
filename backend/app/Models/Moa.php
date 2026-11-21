@@ -28,6 +28,7 @@ class Moa extends Model
             'max_interns_per_term' => 'integer',
             'signatories' => 'array',
             'is_institution_wide' => 'boolean',
+            'archived_at' => 'immutable_datetime',
         ];
     }
 

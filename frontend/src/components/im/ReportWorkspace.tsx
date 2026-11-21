@@ -4,6 +4,7 @@ import { useSessionUser } from "./SessionGuard";
 import { Button, Card, CardTitle, PageHeader, Pill, Row, Table } from "./ui";
 import { SYNTHETIC_LABEL } from "@/lib/synthetic";
 import { SyntheticToggle } from "./SyntheticToggle";
+import { ConfirmButton } from "./actions";
 
 type Report = {
   id: number;
@@ -145,20 +146,30 @@ export function ReportWorkspace({
               onChange={setIncludeSynthetic}
               disabled={busy}
             />
-            <Button
+            <ConfirmButton
+              variant="primary"
               disabled={busy || !cohort}
-              onClick={() =>
-                void run(() =>
-                  mutate("/reports", {
-                    program_term_id: Number(cohort),
-                    kind,
-                    include_synthetic: includeSynthetic,
-                  }),
-                )
-              }
+              title={`Generate a ${labels[kind as keyof typeof labels] ?? "report"}?`}
+              description={`Creates a new snapshot for ${(() => {
+                const c = data?.cohorts.find((item) => String(item.id) === cohort);
+                return c
+                  ? `${c.program.code} · ${c.academic_term.name}`
+                  : "the selected program and term";
+              })()}${includeSynthetic ? ", including synthetic test records (labelled on every export)" : ""}. It stays a draft until you approve it for the dean.`}
+              confirmLabel="Generate report"
+              success="Report generated"
+              onConfirm={async () => {
+                const result = await mutate<{ data: Report }>("/reports", {
+                  program_term_id: Number(cohort),
+                  kind,
+                  include_synthetic: includeSynthetic,
+                });
+                setSelected(result.data);
+                setRevision((v) => v + 1);
+              }}
             >
               Generate report
-            </Button>
+            </ConfirmButton>
           </>
         )}
         <Button
@@ -207,7 +218,10 @@ export function ReportWorkspace({
                   </td>
                   <td>
                     {report.approved_at
-                      ? new Date(report.approved_at).toLocaleDateString("en-PH")
+                      ? new Date(report.approved_at).toLocaleDateString("en-PH", {
+                          timeZone: "Asia/Manila",
+                          dateStyle: "medium",
+                        })
                       : "Not approved"}
                   </td>
                   <td>
@@ -323,12 +337,24 @@ export function ReportWorkspace({
               Download PDF
             </a>
             {user.role === "coordinator" && !selected.approved_at && (
-              <Button
+              <ConfirmButton
+                variant="primary"
                 disabled={busy}
-                onClick={() => void run(() => mutate(`/reports/${selected.id}/approve`, {}))}
+                title="Approve this report for the dean?"
+                description={`The dean can view and download this ${selected.payload.rows.length}-record snapshot once it is approved. An approved snapshot cannot be changed; generate a new one for corrections.`}
+                confirmLabel="Approve"
+                success="Report approved for the dean"
+                onConfirm={async () => {
+                  const result = await mutate<{ data: Report }>(
+                    `/reports/${selected.id}/approve`,
+                    {},
+                  );
+                  setSelected(result.data);
+                  setRevision((v) => v + 1);
+                }}
               >
                 Approve report for dean
-              </Button>
+              </ConfirmButton>
             )}
           </div>
           <Button variant="outline" disabled={busy} onClick={() => setSelected(null)}>

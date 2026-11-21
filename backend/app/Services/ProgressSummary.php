@@ -144,7 +144,11 @@ class ProgressSummary
         }
 
         // Rule 6 — Requirement incomplete N working days after its deadline.
-        foreach ($term->requirements()->where('is_required', true)->whereNotNull('due_at')->where('due_at', '<', now())->with('requirementType')->get() as $requirement) {
+        // Lists preload requirements (with their types) to avoid one query per row; same filter either way.
+        $overdue = $term->relationLoaded('requirements')
+            ? $term->requirements->filter(fn ($r) => $r->is_required && $r->due_at !== null && $r->due_at->lt(now()))->values()
+            : $term->requirements()->where('is_required', true)->whereNotNull('due_at')->where('due_at', '<', now())->with('requirementType')->get();
+        foreach ($overdue as $requirement) {
             $due = CarbonImmutable::parse($requirement->due_at)->setTimezone($zone)->startOfDay();
             if (self::workingDays($due->addDay(), $today) < $rules['requirement_grace_days']) {
                 continue;

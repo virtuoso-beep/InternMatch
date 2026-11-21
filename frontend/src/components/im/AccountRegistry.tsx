@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { api, mutate } from "@/lib/api";
 import type { PlacementReference } from "@/lib/placement";
 import { useSessionUser } from "./SessionGuard";
-import { Button, Card, CardTitle, PageHeader } from "./ui";
+import { Plus } from "lucide-react";
+import { toast } from "sonner";
+import { Button, Card, FormField, FormGrid, FormModal, FormSection, Modal, PageHeader } from "./ui";
+import { ConfirmButton } from "./actions";
+import { inputClass, toFormError, type FormError } from "./formUtils";
 
 type Account = {
   id: number;
@@ -22,15 +26,11 @@ const roles = [
   ["admin", "System administrator"],
 ];
 const statusTone = (status: string) =>
-  `rounded-full px-3 py-1 capitalize ${status === "active" ? "bg-emerald-50 text-emerald-700" : status === "pending" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`;
+  `rounded-full px-3 py-1 capitalize ${status === "active" ? "bg-success-soft text-success" : status === "pending" ? "bg-warn-soft text-warn" : "bg-brand-soft text-brand"}`;
 
 export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boolean }) {
+  const actor = useSessionUser();
   const [creating, setCreating] = useState(false);
-  const createDialog = useRef<HTMLElement>(null);
-  // Move focus into the dialog when it opens so Escape and keyboard users work immediately.
-  useEffect(() => {
-    if (creating) createDialog.current?.focus();
-  }, [creating]);
   const [items, setItems] = useState<Account[] | null>(null);
   const [reference, setReference] = useState<PlacementReference | null>(null);
   const [page, setPage] = useState(1);
@@ -43,13 +43,20 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [draft, setDraft] = useState({
+  const emptyDraft = {
     name: "",
     email: "",
     password: "",
     role: "student",
     status: "pending",
-  });
+  };
+  const [draft, setDraft] = useState(emptyDraft);
+  const [formError, setFormError] = useState<FormError | null>(null);
+  const closeCreate = () => {
+    setCreating(false);
+    setDraft(emptyDraft);
+    setFormError(null);
+  };
   useEffect(() => {
     let active = true;
     setItems(null);
@@ -87,8 +94,14 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
         </p>
       )}
       <div className="mb-5 flex gap-3">
-        <Button onClick={() => setCreating(true)}>
-          {studentsOnly ? "+ Add Student" : "+ Add User"}
+        <Button
+          onClick={() => {
+            setFormError(null);
+            setCreating(true);
+          }}
+        >
+          <Plus size={16} aria-hidden="true" />
+          {studentsOnly ? "Add student" : "Add user"}
         </Button>
         {studentsOnly && (
           <a className="rounded border px-4 py-2 text-sm" href="/admin/student-import">
@@ -96,127 +109,101 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
           </a>
         )}
       </div>
-      {creating && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !busy) setCreating(false);
-          }}
-        >
-          <section
-            ref={createDialog}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-label={studentsOnly ? "Add Student" : "Add User"}
-            className="max-h-[90dvh] w-full max-w-xl overflow-auto rounded-2xl bg-card p-6 shadow-xl outline-none"
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && !busy) setCreating(false);
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">{studentsOnly ? "Add Student" : "Add User"}</h2>
-              <Button variant="outline" disabled={busy} onClick={() => setCreating(false)}>
-                Cancel
-              </Button>
-            </div>
-            {message && (
-              <p role="status" className="my-3">
-                {message}
-              </p>
-            )}
-            <form
-              className="mt-3 grid gap-3 md:grid-cols-2"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                setBusy(true);
-                setMessage("");
-                try {
-                  await mutate("/users", draft);
-                  setDraft({
-                    name: "",
-                    email: "",
-                    password: "",
-                    role: "student",
-                    status: "pending",
-                  });
-                  setRevision((value) => value + 1);
-                  setMessage("Account created. Assign its program or host access as needed.");
-                  setCreating(false);
-                } catch (cause) {
-                  setMessage(cause instanceof Error ? cause.message : "Unable to create account.");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <label className="text-sm">
-                Full name
-                <input
-                  required
-                  maxLength={255}
-                  className="mt-1 block w-full rounded border p-2"
-                  value={draft.name}
-                  onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                />
-              </label>
-              <label className="text-sm">
-                Institutional email
-                <input
-                  type="email"
-                  required
-                  className="mt-1 block w-full rounded border p-2"
-                  value={draft.email}
-                  onChange={(event) => setDraft({ ...draft, email: event.target.value })}
-                />
-              </label>
-              <label className="text-sm">
-                Initial password (at least 12 characters)
-                <input
-                  type="password"
-                  required
-                  minLength={12}
-                  autoComplete="new-password"
-                  className="mt-1 block w-full rounded border p-2"
-                  value={draft.password}
-                  onChange={(event) => setDraft({ ...draft, password: event.target.value })}
-                />
-              </label>
-              <label className="text-sm">
-                Role
-                <select
-                  className="mt-1 block w-full rounded border p-2"
-                  value={draft.role}
-                  onChange={(event) => setDraft({ ...draft, role: event.target.value })}
-                >
-                  {roles.map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
-                Account status
-                <select
-                  className="mt-1 block w-full rounded border p-2"
-                  value={draft.status}
-                  onChange={(event) => setDraft({ ...draft, status: event.target.value })}
-                >
-                  <option value="pending">Pending</option>
-                  <option value="active">Active</option>
-                  <option value="disabled">Disabled</option>
-                </select>
-              </label>
-              <div className="flex items-end">
-                <Button type="submit" disabled={busy}>
-                  Create account
-                </Button>
-              </div>
-            </form>
-          </section>
-        </div>
-      )}
+      <FormModal
+        open={creating}
+        onClose={closeCreate}
+        title={studentsOnly ? "Add student" : "Add user"}
+        description="Provision an account. Program or host access is assigned afterwards."
+        submitLabel="Create account"
+        busyLabel="Creating…"
+        busy={busy}
+        error={formError}
+        onSubmit={async () => {
+          setBusy(true);
+          setMessage("");
+          setFormError(null);
+          try {
+            await mutate("/users", draft);
+            setDraft(emptyDraft);
+            setRevision((value) => value + 1);
+            setCreating(false);
+            toast.success("Account created", {
+              description: "Assign its program or host access as needed.",
+            });
+          } catch (cause) {
+            setFormError(toFormError(cause, "Unable to create the account."));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <FormSection title="Account">
+          <FormGrid>
+            <FormField label="Full name" required>
+              <input
+                required
+                name="name"
+                maxLength={255}
+                className={inputClass}
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              />
+            </FormField>
+            <FormField label="Institutional email" required>
+              <input
+                type="email"
+                name="email"
+                required
+                className={inputClass}
+                value={draft.email}
+                onChange={(event) => setDraft({ ...draft, email: event.target.value })}
+              />
+            </FormField>
+          </FormGrid>
+          <FormField label="Initial password" required helper="At least 12 characters.">
+            <input
+              type="password"
+              name="password"
+              required
+              minLength={12}
+              autoComplete="new-password"
+              className={inputClass}
+              value={draft.password}
+              onChange={(event) => setDraft({ ...draft, password: event.target.value })}
+            />
+          </FormField>
+        </FormSection>
+        <FormSection title="Role and status">
+          <FormGrid>
+            <FormField label="Role">
+              <select
+                name="role"
+                className={inputClass}
+                value={draft.role}
+                onChange={(event) => setDraft({ ...draft, role: event.target.value })}
+              >
+                {roles.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Account status">
+              <select
+                name="status"
+                className={inputClass}
+                value={draft.status}
+                onChange={(event) => setDraft({ ...draft, status: event.target.value })}
+              >
+                <option value="pending">Pending</option>
+                <option value="active">Active</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </FormField>
+          </FormGrid>
+        </FormSection>
+      </FormModal>
       <Card>
         {!studentsOnly && (
           <div
@@ -310,7 +297,7 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
             Refresh accounts
           </Button>
         </div>
-        <p className="mb-3 text-sm text-slate-500">
+        <p className="mb-3 text-sm text-muted-foreground">
           Search and filters apply to all account records.
         </p>
         {loadError && <p role="alert">{loadError} Use Refresh accounts to retry.</p>}
@@ -319,7 +306,7 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b text-xs uppercase text-slate-500">
+                <thead className="border-b text-xs text-muted-foreground">
                   <tr>
                     <th className="p-3">Name / email</th>
                     <th className="p-3 max-sm:hidden">Role</th>
@@ -334,7 +321,7 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
                         <span className="font-semibold">
                           {account.name} · {account.program_label}
                         </span>
-                        <div className="text-slate-500">{account.email}</div>
+                        <div className="text-muted-foreground">{account.email}</div>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs sm:hidden">
                           <span>
                             {roles.find(([value]) => value === account.role)?.[1] ?? "Unassigned"}
@@ -349,9 +336,69 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
                         <span className={statusTone(account.status)}>{account.status}</span>
                       </td>
                       <td className="p-3">
-                        <Button onClick={() => setSelected(account.id)}>
-                          Edit <span className="sr-only">{account.email}</span>
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" onClick={() => setSelected(account.id)}>
+                            Manage access <span className="sr-only">{account.email}</span>
+                          </Button>
+                          {account.role &&
+                            actor.id !== account.id &&
+                            account.status === "active" && (
+                              <ConfirmButton
+                                size="sm"
+                                tone="danger"
+                                title={`Disable ${account.name}?`}
+                                description={`${account.email} can no longer sign in. Records are kept, and you can enable the account again.`}
+                                confirmLabel="Disable"
+                                success="Account disabled"
+                                onConfirm={() =>
+                                  mutate(
+                                    `/users/${account.id}/access`,
+                                    { role: account.role, status: "disabled" },
+                                    "PATCH",
+                                  )
+                                }
+                                onDone={() => setRevision((value) => value + 1)}
+                              >
+                                Disable
+                              </ConfirmButton>
+                            )}
+                          {account.role &&
+                            actor.id !== account.id &&
+                            account.status === "disabled" && (
+                              <ConfirmButton
+                                size="sm"
+                                title={`Enable ${account.name}?`}
+                                description={`${account.email} can sign in again with the same role and access.`}
+                                confirmLabel="Enable"
+                                success="Account enabled"
+                                onConfirm={() =>
+                                  mutate(
+                                    `/users/${account.id}/access`,
+                                    { role: account.role, status: "active" },
+                                    "PATCH",
+                                  )
+                                }
+                                onDone={() => setRevision((value) => value + 1)}
+                              >
+                                Enable
+                              </ConfirmButton>
+                            )}
+                          {account.status === "pending" && account.email && (
+                            <ConfirmButton
+                              size="sm"
+                              title={`Send an activation link to ${account.name}?`}
+                              description={`A one-time link goes to ${account.email} so the person can set their own password. It expires in 72 hours, and any earlier unused link stops working.`}
+                              confirmLabel="Send link"
+                              success="Activation link sent"
+                              onConfirm={() =>
+                                mutate(`/users/${account.id}/activation`, {}, "POST")
+                              }
+                              onDone={() => setRevision((value) => value + 1)}
+                            >
+                              Send activation link
+                            </ConfirmButton>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -363,7 +410,7 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
                 No accounts match these filters on this page.
               </p>
             )}
-            <p className="mt-3 text-sm text-slate-500">
+            <p className="mt-3 text-sm text-muted-foreground">
               Showing {visible?.length} of {items.length} accounts on page {page}.
             </p>
           </>
@@ -378,9 +425,10 @@ export function AccountRegistry({ studentsOnly = false }: { studentsOnly?: boole
                 key={`${account.id}:${revision}`}
                 account={account}
                 reference={reference}
-                onClose={() => {
+                onClose={(changed) => {
                   setSelected(null);
-                  setRevision((value) => value + 1);
+                  // Refetch only after a save, so the opener keeps focus when nothing changed.
+                  if (changed) setRevision((value) => value + 1);
                 }}
               />
             ))}
@@ -421,9 +469,11 @@ function AccountForm({
 }: {
   account: Account;
   reference: PlacementReference;
-  onClose: () => void;
+  onClose: (changed: boolean) => void;
 }) {
   const actor = useSessionUser();
+  const changed = useRef(false);
+  const close = () => onClose(changed.current);
   const [role, setRole] = useState(account.role ?? "");
   const [savedRole, setSavedRole] = useState(account.role);
   const [status, setStatus] = useState(account.status);
@@ -436,11 +486,14 @@ function AccountForm({
     setMessage("");
     try {
       await mutate(path, data, method);
+      changed.current = true;
       if (path.endsWith("/access")) setSavedRole(role);
-      setMessage(
-        path.endsWith("/activation")
-          ? `Activation link sent to ${account.email ?? "the account e-mail"}. It works once and expires in 72 hours unless re-sent.`
-          : "Access saved.",
+      toast.success(
+        path.endsWith("/access")
+          ? "Role and status saved"
+          : path.endsWith("/programs")
+            ? "Program access saved"
+            : "Host access saved",
       );
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Unable to save access.");
@@ -449,17 +502,19 @@ function AccountForm({
     }
   }
   return (
-    <Card>
-      <CardTitle>
-        {account.name} · {account.program_label}
-      </CardTitle>
-      <p className="mb-3 text-sm">{account.email}</p>
-      <Button disabled={busy} onClick={onClose}>
-        Close editor
-      </Button>
-      <p className="my-3 text-sm text-slate-500">
-        Save each access section separately. Closing discards unsaved changes.
-      </p>
+    <Modal
+      open
+      size="lg"
+      onClose={close}
+      dismissible={!busy}
+      title={`Manage access: ${account.name}`}
+      description={`${account.email} · ${account.program_label}. Save each section separately; closing discards unsaved changes.`}
+      footer={
+        <Button variant="outline" disabled={busy} onClick={close}>
+          Close
+        </Button>
+      }
+    >
       {actor.id === account.id && (
         <p className="mb-3 text-sm">You cannot change your own role or account status.</p>
       )}
@@ -560,20 +615,6 @@ function AccountForm({
             </Button>
           </fieldset>
         )}
-        <fieldset className="mt-4 rounded border p-3">
-          <legend>Account activation</legend>
-          <p className="mb-3 text-xs text-muted-foreground">
-            E-mail a one-time link so the person can set their own password. Sending a new link
-            cancels any earlier unused link.
-          </p>
-          <Button
-            variant="outline"
-            disabled={busy || !account.email}
-            onClick={() => void save(`/users/${account.id}/activation`, {}, "POST")}
-          >
-            Send activation link
-          </Button>
-        </fieldset>
         {savedRole === "supervisor" && (
           <fieldset className="mt-4 rounded border p-3">
             <legend>Assigned establishments</legend>
@@ -603,10 +644,15 @@ function AccountForm({
             </Button>
           </fieldset>
         )}
-        <p role="status" className="mt-3 text-sm">
-          {message}
-        </p>
+        {message && (
+          <p
+            role="alert"
+            className="mt-3 rounded-lg border border-brand/20 bg-brand-soft px-3 py-2 text-sm text-brand"
+          >
+            {message}
+          </p>
+        )}
       </fieldset>
-    </Card>
+    </Modal>
   );
 }

@@ -37,6 +37,10 @@ done
 
 php artisan db:seed --force
 
+# Filament otherwise scans its resource folders on every request (about 80 ms each on this bind mount).
+# Rebuilt on every start; after adding a Filament resource or page, restart the container.
+php artisan filament:cache-components
+
 echo "Starting Laravel development server..."
 
 exec php artisan serve --host=0.0.0.0 --port=8000 --no-reload

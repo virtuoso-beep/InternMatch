@@ -75,9 +75,10 @@ class ProgramAnalyticsController extends Controller
         foreach ($distances as $distance) {
             $distanceBands[$distance < 5 ? 'Under 5 km' : ($distance < 10 ? '5 to under 10 km' : ($distance <= 20 ? '10 to 20 km' : 'Over 20 km'))]++;
         }
-        $similarityBands = ['90 to 100%' => 0, '80 to under 90%' => 0, '70 to under 80%' => 0, 'Below 70%' => 0];
+        // Raw cosine similarity scores (spec: never shown as a percentage).
+        $similarityBands = ['0.90 to 1.00' => 0, '0.80 to under 0.90' => 0, '0.70 to under 0.80' => 0, 'Below 0.70' => 0];
         foreach (Recommendation::whereIn('student_enrollment_id', $enrollments->pluck('id'))->pluck('similarity_score') as $score) {
-            $similarityBands[$score >= .9 ? '90 to 100%' : ($score >= .8 ? '80 to under 90%' : ($score >= .7 ? '70 to under 80%' : 'Below 70%'))]++;
+            $similarityBands[$score >= .9 ? '0.90 to 1.00' : ($score >= .8 ? '0.80 to under 0.90' : ($score >= .7 ? '0.70 to under 0.80' : 'Below 0.70'))]++;
         }
         $demand = Opportunity::where('status', 'published')->when($hideSynthetic, fn ($q) => $q->where('is_synthetic', false))->whereHas('programs', fn ($q) => $q->whereIn('programs.id', $programIds))->with('competencies')->get()
             ->flatMap(fn ($o) => $o->competencies->pluck('name'))->countBy()->sortDesc();
@@ -87,8 +88,40 @@ class ProgramAnalyticsController extends Controller
             'programs' => $performance->values(), 'hosts' => $inventory->values(),
             'equity' => ['median_km' => $distances->isEmpty() ? null : round($distances->median(), 2), 'measured_placements' => $distances->count(), 'missing_coordinates' => $missing, 'over_20_km' => $distances->filter(fn ($d) => $d > 20)->count(), 'bands' => $bands($distanceBands)],
             'similarity_bands' => $bands($similarityBands), 'competency_demand' => $bands($demand),
+            'weekly' => $this->weekly($placements->pluck('id')->all()),
             'terms' => $enrollments->groupBy('programTerm.academic_term_id')->map(fn ($group) => ['term' => $group->first()->programTerm->academicTerm->name, ...$summary($group)])->values(),
             'synthetic' => SyntheticData::meta($request), 'generated_at' => now()->toIso8601String(),
         ], headers: ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * The last 16 weeks (Monday start, Manila dates as stored), one aggregate query: certified hours from
+     * verified time logs, time logs submitted, and interns who logged time. Weeks without logs are zero.
+     *
+     * @param  array<int>  $placementIds
+     * @return array<int, array{week: string, label: string, certified_hours: float, logs: int, interns: int}>
+     */
+    private function weekly(array $placementIds): array
+    {
+        $first = today()->startOfWeek()->subWeeks(15);
+        $rows = $placementIds === [] ? collect() : DB::table('time_logs')
+            ->whereIn('placement_id', $placementIds)
+            ->where('work_date', '>=', $first->toDateString())
+            ->selectRaw("DATE_FORMAT(DATE_SUB(work_date, INTERVAL WEEKDAY(work_date) DAY), '%Y-%m-%d') as week")
+            ->selectRaw("SUM(CASE WHEN status = 'verified' THEN COALESCE(credited_minutes, 0) ELSE 0 END) as minutes")
+            ->selectRaw('COUNT(*) as logs, COUNT(DISTINCT placement_id) as interns')
+            ->groupBy('week')->get()->keyBy('week');
+        $weeks = [];
+        for ($i = 0; $i < 16; $i++) {
+            $start = $first->copy()->addWeeks($i);
+            $row = $rows->get($start->toDateString());
+            $weeks[] = [
+                'week' => $start->toDateString(), 'label' => $start->format('M j'),
+                'certified_hours' => round(((int) ($row->minutes ?? 0)) / 60, 1),
+                'logs' => (int) ($row->logs ?? 0), 'interns' => (int) ($row->interns ?? 0),
+            ];
+        }
+
+        return $weeks;
     }
 }

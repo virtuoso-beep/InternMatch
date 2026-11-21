@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 function NotFoundComponent() {
   return (
@@ -99,13 +100,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap",
-      },
-      { rel: "icon", type: "image/png", href: "/umtc-seal.png" },
+      { rel: "icon", type: "image/png", href: "/images/brand/umtc-seal-64.png" },
+      { rel: "apple-touch-icon", href: "/images/brand/umtc-seal-128.png" },
     ],
   }),
 
@@ -117,8 +113,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Applies the saved light/dark preference before first paint (lib/theme.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>

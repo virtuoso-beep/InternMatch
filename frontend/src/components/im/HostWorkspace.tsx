@@ -1,7 +1,20 @@
-import { AdminFormDialog } from "./AdminFormDialog";
 import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, CardTitle, PageHeader } from "./ui";
+import { Plus } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Button,
+  Card,
+  CardTitle,
+  FormField,
+  FormGrid,
+  FormModal,
+  FormSection,
+  PageHeader,
+  Pill,
+} from "./ui";
+import { ConfirmButton } from "./actions";
+import { inputClass, toFormError, type FormError } from "./formUtils";
 import type { PlacementReference } from "@/lib/placement";
 import { useSessionUser } from "./SessionGuard";
 import { ExcelImportButton } from "./ExcelImportButton";
@@ -18,6 +31,7 @@ type Host = {
   contact_number: string | null;
   latitude: string | null;
   longitude: string | null;
+  archived_at?: string | null;
 };
 export function HostWorkspace() {
   const user = useSessionUser();
@@ -30,6 +44,7 @@ export function HostWorkspace() {
   const [search, setSearch] = useState("");
   const [coordinates, setCoordinates] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const isAdmin = user.role === "admin";
   const visible = hosts?.filter(
     (host) =>
@@ -46,7 +61,9 @@ export function HostWorkspace() {
     setHosts(null);
     setError("");
     Promise.all([
-      api<{ data: Host[]; last_page: number }>(`/hosts?page=${page}`),
+      api<{ data: Host[]; last_page: number }>(
+        `/hosts?page=${page}${showArchived ? "&include_archived=1" : ""}`,
+      ),
       api<PlacementReference>("/placement-reference"),
     ])
       .then(([result, refs]) => {
@@ -62,7 +79,7 @@ export function HostWorkspace() {
     return () => {
       active = false;
     };
-  }, [page, revision]);
+  }, [page, revision, showArchived]);
   return (
     <>
       <PageHeader
@@ -74,6 +91,20 @@ export function HostWorkspace() {
         <CreateHost reference={reference} onCreated={() => setRevision((value) => value + 1)} />
       )}
       {error && <p role="alert">{error}</p>}
+      {(user.role === "admin" || user.role === "coordinator") && (
+        <label className="mb-4 flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => {
+              setSelected(null);
+              setPage(1);
+              setShowArchived(event.target.checked);
+            }}
+          />
+          Show archived establishments
+        </label>
+      )}
       {isAdmin && (
         <Card>
           <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -123,7 +154,7 @@ export function HostWorkspace() {
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b text-xs uppercase text-muted-foreground">
+              <thead className="border-b text-xs text-muted-foreground">
                 <tr>
                   {["Establishment", "City", "Contact", "Coordinates", "Action"].map((label) => (
                     <th key={label} className="p-3">
@@ -136,7 +167,8 @@ export function HostWorkspace() {
                 {visible?.map((host) => (
                   <tr className="border-b" key={host.id}>
                     <td className="p-3">
-                      <strong>{host.name}</strong>
+                      <strong>{host.name}</strong>{" "}
+                      {host.archived_at && <Pill tone="muted">Archived</Pill>}
                       <p>{host.code}</p>
                     </td>
                     <td className="p-3">{host.city || "Not recorded"}</td>
@@ -187,11 +219,22 @@ export function HostWorkspace() {
                 </div>
               )}
               <div className="grid items-start gap-5 xl:grid-cols-[2fr_1fr]">
-                <HostForm host={host} />
+                <HostForm
+                  key={`${host.id}:${host.archived_at ?? ""}`}
+                  host={host}
+                  onChanged={() => {
+                    setSelected(null);
+                    setRevision((value) => value + 1);
+                  }}
+                />
                 {reference && (
                   <Card>
                     <CardTitle>Program capacity</CardTitle>
-                    <HostCapacity host={host} reference={reference} />
+                    <HostCapacity
+                      host={host}
+                      reference={reference}
+                      readOnly={Boolean(host.archived_at)}
+                    />
                   </Card>
                 )}
               </div>
@@ -235,7 +278,7 @@ function CreateHost({
   onCreated: () => void;
 }) {
   const [creating, setCreating] = useState(false);
-  const [value, setValue] = useState({
+  const empty = {
     code: "",
     name: "",
     address: "",
@@ -243,45 +286,65 @@ function CreateHost({
     program_id: "",
     academic_term_id: "",
     capacity: "",
-  });
+  };
+  const [value, setValue] = useState(empty);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<FormError | null>(null);
+  const close = () => {
+    setCreating(false);
+    setValue(empty);
+    setError(null);
+  };
   return (
     <>
       <div className="mb-5">
-        <Button onClick={() => setCreating(true)}>+ Add Host</Button>
+        <Button
+          onClick={() => {
+            setError(null);
+            setCreating(true);
+          }}
+        >
+          <Plus size={16} aria-hidden="true" />
+          Add host
+        </Button>
       </div>
-      {creating && (
-        <AdminFormDialog title="Add Host" onClose={() => setCreating(false)}>
-          <form
-            className="mt-4 grid gap-3 md:grid-cols-2"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              setBusy(true);
-              setError("");
-              try {
-                await mutate("/hosts", {
-                  code: value.code,
-                  name: value.name,
-                  address: value.address,
-                  city: value.city,
-                  capacities: [
-                    {
-                      program_id: Number(value.program_id),
-                      academic_term_id: Number(value.academic_term_id),
-                      capacity: Number(value.capacity),
-                    },
-                  ],
-                });
-                onCreated();
-                setCreating(false);
-              } catch (cause) {
-                setError(cause instanceof Error ? cause.message : "Unable to create host.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
+      <FormModal
+        open={creating}
+        onClose={close}
+        title="Add host establishment"
+        description="Record the establishment and its first program capacity."
+        submitLabel="Save establishment"
+        busy={busy}
+        error={error}
+        onSubmit={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await mutate("/hosts", {
+              code: value.code,
+              name: value.name,
+              address: value.address,
+              city: value.city,
+              capacities: [
+                {
+                  program_id: Number(value.program_id),
+                  academic_term_id: Number(value.academic_term_id),
+                  capacity: Number(value.capacity),
+                },
+              ],
+            });
+            onCreated();
+            close();
+            toast.success("Host establishment added");
+          } catch (cause) {
+            setError(toFormError(cause, "Unable to create the host."));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <FormSection title="Establishment">
+          <FormGrid>
             {(
               [
                 ["code", "Host reference code"],
@@ -290,32 +353,41 @@ function CreateHost({
                 ["city", "Host city"],
               ] as const
             ).map(([key, label]) => (
-              <label className="text-sm" key={key}>
-                {label}
+              <FormField key={key} label={label} required>
                 <input
                   required
-                  className="mt-1 block w-full rounded border p-2"
+                  name={key}
+                  className={inputClass}
                   value={value[key]}
                   onChange={(event) =>
                     setValue((current) => ({ ...current, [key]: event.target.value }))
                   }
                 />
-              </label>
+              </FormField>
             ))}
+          </FormGrid>
+        </FormSection>
+        <FormSection
+          title="Program capacity"
+          description="Slots this establishment offers to one program in one term."
+        >
+          <FormGrid>
             <ProgramTermFields
               reference={reference}
               program={value.program_id}
               term={value.academic_term_id}
+              programName="capacities.0.program_id"
+              termName="capacities.0.academic_term_id"
               onProgram={(program_id) => setValue((current) => ({ ...current, program_id }))}
               onTerm={(academic_term_id) =>
                 setValue((current) => ({ ...current, academic_term_id }))
               }
             />
-            <label className="text-sm">
-              Program capacity
+            <FormField label="Program capacity" required>
               <input
                 required
-                className="mt-1 block w-full rounded border p-2"
+                name="capacities.0.capacity"
+                className={inputClass}
                 type="number"
                 min="0"
                 max="100000"
@@ -324,16 +396,10 @@ function CreateHost({
                   setValue((current) => ({ ...current, capacity: event.target.value }))
                 }
               />
-            </label>
-            <div className="flex items-end">
-              <Button disabled={busy} type="submit">
-                Save establishment
-              </Button>
-            </div>
-            {error && <p role="alert">{error}</p>}
-          </form>
-        </AdminFormDialog>
-      )}
+            </FormField>
+          </FormGrid>
+        </FormSection>
+      </FormModal>
     </>
   );
 }
@@ -344,20 +410,24 @@ function ProgramTermFields({
   term,
   onProgram,
   onTerm,
+  programName = "program_id",
+  termName = "academic_term_id",
 }: {
   reference: PlacementReference;
   program: string;
   term: string;
   onProgram: (value: string) => void;
   onTerm: (value: string) => void;
+  programName?: string;
+  termName?: string;
 }) {
   return (
     <>
-      <label className="text-sm">
-        Program
+      <FormField label="Program" required>
         <select
           required
-          className="mt-1 block w-full rounded border p-2"
+          name={programName}
+          className={inputClass}
           value={program}
           onChange={(event) => onProgram(event.target.value)}
         >
@@ -368,12 +438,12 @@ function ProgramTermFields({
             </option>
           ))}
         </select>
-      </label>
-      <label className="text-sm">
-        Academic term
+      </FormField>
+      <FormField label="Academic term" required>
         <select
           required
-          className="mt-1 block w-full rounded border p-2"
+          name={termName}
+          className={inputClass}
           value={term}
           onChange={(event) => onTerm(event.target.value)}
         >
@@ -384,20 +454,28 @@ function ProgramTermFields({
             </option>
           ))}
         </select>
-      </label>
+      </FormField>
     </>
   );
 }
 
-function HostCapacity({ host, reference }: { host: Host; reference: PlacementReference }) {
+function HostCapacity({
+  host,
+  reference,
+  readOnly,
+}: {
+  host: Host;
+  reference: PlacementReference;
+  readOnly: boolean;
+}) {
   const [rows, setRows] = useState<
     { program_id: number; academic_term_id: number; capacity: number }[]
   >([]);
-  const [program, setProgram] = useState("");
-  const [term, setTerm] = useState("");
-  const [capacity, setCapacity] = useState("");
   const [message, setMessage] = useState("");
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState({ program: "", term: "", capacity: "" });
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<FormError | null>(null);
   const load = () =>
     api<{ data: typeof rows }>(`/hosts/${host.id}/capacities`)
       .then((result) => setRows(result.data))
@@ -421,71 +499,89 @@ function HostCapacity({ host, reference }: { host: Host; reference: PlacementRef
           </li>
         ))}
       </ul>
-      <form
-        className="grid gap-3 md:grid-cols-2"
-        onSubmit={async (event) => {
-          event.preventDefault();
+      {message && <p role="status">{message}</p>}
+      {!readOnly && (
+        <Button
+          variant="outline"
+          onClick={() => {
+            setValue({ program: "", term: "", capacity: "" });
+            setError(null);
+            setOpen(true);
+          }}
+        >
+          Set program capacity
+        </Button>
+      )}
+      <FormModal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Set program capacity: ${host.name}`}
+        description="Total slots this establishment offers one program in one term. Saving replaces the current value."
+        submitLabel="Save capacity"
+        busy={busy}
+        error={error}
+        onSubmit={async () => {
           setBusy(true);
-          setMessage("");
+          setError(null);
           try {
             await mutate(
               `/hosts/${host.id}/capacities`,
               {
                 capacities: [
                   {
-                    program_id: Number(program),
-                    academic_term_id: Number(term),
-                    capacity: Number(capacity),
+                    program_id: Number(value.program),
+                    academic_term_id: Number(value.term),
+                    capacity: Number(value.capacity),
                   },
                 ],
               },
               "PUT",
             );
             await load();
-            setMessage("Program capacity saved.");
+            setOpen(false);
+            toast.success("Program capacity saved");
           } catch (cause) {
-            setMessage(cause instanceof Error ? cause.message : "Unable to save capacity.");
+            setError(toFormError(cause, "Unable to save capacity."));
           } finally {
             setBusy(false);
           }
         }}
       >
-        <ProgramTermFields
-          reference={reference}
-          program={program}
-          term={term}
-          onProgram={setProgram}
-          onTerm={setTerm}
-        />
-        <label className="text-sm">
-          Total slots for this program
-          <input
-            required
-            className="mt-1 block w-full rounded border p-2"
-            type="number"
-            min="0"
-            max="100000"
-            value={capacity}
-            onChange={(event) => setCapacity(event.target.value)}
+        <FormGrid>
+          <ProgramTermFields
+            reference={reference}
+            program={value.program}
+            term={value.term}
+            programName="capacities.0.program_id"
+            termName="capacities.0.academic_term_id"
+            onProgram={(program) => setValue((v) => ({ ...v, program }))}
+            onTerm={(term) => setValue((v) => ({ ...v, term }))}
           />
-        </label>
-        <div className="flex items-end">
-          <Button disabled={busy} type="submit">
-            Save capacity
-          </Button>
-        </div>
-        <p role="status">{message}</p>
-      </form>
+          <FormField label="Total slots for this program" required>
+            <input
+              required
+              name="capacities.0.capacity"
+              className={inputClass}
+              type="number"
+              min="0"
+              max="100000"
+              value={value.capacity}
+              onChange={(event) => setValue((v) => ({ ...v, capacity: event.target.value }))}
+            />
+          </FormField>
+        </FormGrid>
+      </FormModal>
     </details>
   );
 }
 
-function HostForm({ host }: { host: Host }) {
+function HostForm({ host, onChanged }: { host: Host; onChanged: () => void }) {
+  const user = useSessionUser();
   const [saved, setSaved] = useState(host);
   const [value, setValue] = useState(host);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState<FormError | null>(null);
   const fields = [
     ["name", "Establishment name"],
     ["address", "Address"],
@@ -496,130 +592,157 @@ function HostForm({ host }: { host: Host }) {
     ["latitude", "Latitude"],
     ["longitude", "Longitude"],
   ] as const;
-  const dirty = JSON.stringify(value) !== JSON.stringify(saved);
+  const archived = Boolean(saved.archived_at);
+  const manages = user.role === "admin" || user.role === "coordinator";
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
-        <CardTitle>Establishment details · {saved.code}</CardTitle>
-        {!editing && (
-          <Button
-            onClick={() => {
-              setEditing(true);
-              setMessage("");
-            }}
-          >
-            Edit profile
-          </Button>
-        )}
-      </div>
-      {!editing ? (
-        <dl className="grid gap-6 sm:grid-cols-2">
-          {fields.map(([key, label]) => (
-            <div key={key}>
-              <dt className="mb-1 text-xs uppercase text-muted-foreground">{label}</dt>
-              <dd className="break-words">{saved[key] ?? "Not provided"}</dd>
-            </div>
-          ))}
-          <div className="sm:col-span-2">
-            <dt className="text-xs uppercase text-muted-foreground">About the establishment</dt>
-            <dd className="mt-1 whitespace-pre-wrap">
-              {saved.description || "No description provided."}
-            </dd>
-          </div>
-        </dl>
-      ) : (
-        <form
-          onSubmit={async (event) => {
-            event.preventDefault();
-            if (busy) return;
-            if (Boolean(value.latitude) !== Boolean(value.longitude)) {
-              setMessage("Provide both coordinates, or clear both.");
-              return;
-            }
-            setBusy(true);
-            setMessage("");
-            const payload = {
-              ...Object.fromEntries(
-                fields.map(([key]) => [key, value[key] === "" ? null : value[key]]),
-              ),
-              description: value.description || null,
-            };
-            try {
-              const result = await mutate<{ data: Host }>(`/hosts/${host.id}`, payload, "PATCH");
-              setSaved(result.data);
-              setValue(result.data);
-              setEditing(false);
-              setMessage("Company profile saved.");
-            } catch (cause) {
-              setMessage(cause instanceof Error ? cause.message : "Unable to save profile.");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
-            {fields.map(([key, label]) => (
-              <label key={key} className="text-xs uppercase text-muted-foreground">
-                {label}
-                <input
-                  aria-label={`${host.code} ${label}`}
-                  className="mt-1 block w-full rounded border p-2 text-sm text-foreground"
-                  required={["name", "address", "city"].includes(key)}
-                  type={
-                    key === "contact_email"
-                      ? "email"
-                      : ["latitude", "longitude"].includes(key)
-                        ? "number"
-                        : "text"
-                  }
-                  step="any"
-                  min={key === "latitude" ? -90 : key === "longitude" ? -180 : undefined}
-                  max={key === "latitude" ? 90 : key === "longitude" ? 180 : undefined}
-                  value={value[key] ?? ""}
-                  onChange={(event) =>
-                    setValue((current) => ({ ...current, [key]: event.target.value }))
-                  }
-                />
-              </label>
-            ))}
-            <label className="sm:col-span-2 text-sm">
-              About the establishment
-              <textarea
-                className="mt-1 min-h-28 w-full rounded border p-2"
-                maxLength={10000}
-                value={value.description ?? ""}
-                onChange={(event) =>
-                  setValue((current) => ({ ...current, description: event.target.value }))
-                }
-              />
-            </label>
-          </fieldset>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Button type="submit" disabled={busy || !dirty}>
-              {busy ? "Saving…" : "Save profile"}
-            </Button>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <CardTitle>
+          Establishment details · {saved.code} {archived && <Pill tone="muted">Archived</Pill>}
+        </CardTitle>
+        <div className="flex flex-wrap gap-2">
+          {!archived && (
             <Button
-              variant="outline"
-              disabled={busy}
               onClick={() => {
                 setValue(saved);
-                setEditing(false);
-                setMessage("");
+                setError(null);
+                setEditing(true);
               }}
             >
-              Cancel
+              Edit profile
             </Button>
-            <span className="self-center text-xs text-muted-foreground">
-              {dirty ? "Unsaved changes" : "No changes"}
-            </span>
+          )}
+          {manages && !archived && (
+            <ConfirmButton
+              tone="danger"
+              title={`Archive ${saved.name}?`}
+              description="The establishment is hidden from lists and is no longer offered for new recommendations or placements. Its history is kept, and you can restore it later. Establishments with pending, approved or active placements cannot be archived."
+              confirmLabel="Archive"
+              success="Establishment archived"
+              onConfirm={() => mutate(`/hosts/${saved.id}/archive`, {})}
+              onDone={onChanged}
+            >
+              Archive
+            </ConfirmButton>
+          )}
+          {manages && archived && (
+            <ConfirmButton
+              title={`Restore ${saved.name}?`}
+              description="The establishment returns to the lists and can be used for new opportunities and placements."
+              confirmLabel="Restore"
+              success="Establishment restored"
+              onConfirm={() => mutate(`/hosts/${saved.id}/restore`, {})}
+              onDone={onChanged}
+            >
+              Restore
+            </ConfirmButton>
+          )}
+          {manages && (
+            <ConfirmButton
+              tone="danger"
+              variant="ghost"
+              title={`Delete ${saved.name}?`}
+              description="Only an establishment that has never had opportunities, agreements or placements can be deleted. This cannot be undone. Anything with history must be archived instead."
+              confirmLabel="Delete"
+              success="Establishment deleted"
+              onConfirm={() => mutate(`/hosts/${saved.id}`, undefined, "DELETE")}
+              onDone={onChanged}
+            >
+              Delete
+            </ConfirmButton>
+          )}
+        </div>
+      </div>
+      <dl className="grid gap-6 sm:grid-cols-2">
+        {fields.map(([key, label]) => (
+          <div key={key}>
+            <dt className="mb-1 text-xs text-muted-foreground">{label}</dt>
+            <dd className="break-words">{saved[key] ?? "Not provided"}</dd>
           </div>
-        </form>
-      )}
-      {message && (
-        <p role="status" className="mt-4">
-          {message}
-        </p>
-      )}
+        ))}
+        <div className="sm:col-span-2">
+          <dt className="text-xs text-muted-foreground">About the establishment</dt>
+          <dd className="mt-1 whitespace-pre-wrap">
+            {saved.description || "No description provided."}
+          </dd>
+        </div>
+      </dl>
+      <FormModal
+        open={editing}
+        size="lg"
+        onClose={() => setEditing(false)}
+        title={`Edit profile: ${saved.name}`}
+        description="Contact details and coordinates for this establishment."
+        submitLabel="Save profile"
+        busy={busy}
+        error={error}
+        onSubmit={async () => {
+          if (Boolean(value.latitude) !== Boolean(value.longitude)) {
+            setError({
+              message: "Provide both coordinates, or clear both.",
+              fields: { latitude: ["Provide both coordinates, or clear both."] },
+            });
+            return;
+          }
+          setBusy(true);
+          setError(null);
+          const payload = {
+            ...Object.fromEntries(
+              fields.map(([key]) => [key, value[key] === "" ? null : value[key]]),
+            ),
+            description: value.description || null,
+          };
+          try {
+            const result = await mutate<{ data: Host }>(`/hosts/${host.id}`, payload, "PATCH");
+            setSaved(result.data);
+            setValue(result.data);
+            setEditing(false);
+            toast.success("Company profile saved");
+          } catch (cause) {
+            setError(toFormError(cause, "Unable to save profile."));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <FormGrid>
+          {fields.map(([key, label]) => (
+            <FormField key={key} label={label} required={["name", "address", "city"].includes(key)}>
+              <input
+                name={key}
+                className={inputClass}
+                required={["name", "address", "city"].includes(key)}
+                type={
+                  key === "contact_email"
+                    ? "email"
+                    : ["latitude", "longitude"].includes(key)
+                      ? "number"
+                      : "text"
+                }
+                step="any"
+                {...(key === "latitude" ? { min: -90, max: 90 } : {})}
+                {...(key === "longitude" ? { min: -180, max: 180 } : {})}
+                value={value[key] ?? ""}
+                onChange={(event) =>
+                  setValue((current) => ({ ...current, [key]: event.target.value }))
+                }
+              />
+            </FormField>
+          ))}
+        </FormGrid>
+        <FormField label="About the establishment">
+          <textarea
+            name="description"
+            className={inputClass}
+            rows={5}
+            maxLength={10000}
+            value={value.description ?? ""}
+            onChange={(event) =>
+              setValue((current) => ({ ...current, description: event.target.value }))
+            }
+          />
+        </FormField>
+      </FormModal>
     </Card>
   );
 }

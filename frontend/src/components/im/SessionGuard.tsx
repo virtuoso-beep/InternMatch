@@ -57,7 +57,12 @@ export function SessionGuard({ role, children }: { role: RoleKey; children: Reac
       .catch((cause: unknown) => {
         if (!active) return;
         if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
-          void navigate({ to: "/auth", replace: true });
+          // Remember where the user was going; /auth only honours it inside their own portal.
+          void navigate({
+            to: "/auth",
+            search: { redirect: `${window.location.pathname}${window.location.search}` },
+            replace: true,
+          });
         } else {
           setError("Unable to check your session. Check the connection and try again.");
         }

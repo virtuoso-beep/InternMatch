@@ -23,6 +23,8 @@ class Placement extends Model
             'starts_on' => 'immutable_date',
             'ends_on' => 'immutable_date',
             'completed_at' => 'immutable_datetime',
+            'hours_certified_at' => 'immutable_datetime',
+            'certified_minutes' => 'integer',
         ];
     }
 

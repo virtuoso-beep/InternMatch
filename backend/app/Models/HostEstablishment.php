@@ -21,6 +21,7 @@ class HostEstablishment extends Model
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'is_active' => 'boolean',
+            'archived_at' => 'immutable_datetime',
         ];
     }
 

@@ -9,6 +9,7 @@ use App\Models\EvaluationCriterion;
 use App\Models\EvaluationScore;
 use App\Models\Placement;
 use App\Models\StudentEnrollment;
+use App\Models\TimeLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
@@ -75,5 +76,30 @@ class ProgramAnalyticsTest extends TestCase
         foreach ([Role::Student, Role::Supervisor, Role::Admin] as $role) {
             $this->actingAs(User::factory()->withRole($role)->create())->getJson('/api/v1/program-analytics')->assertForbidden();
         }
+    }
+
+    public function test_weekly_activity_covers_sixteen_weeks_and_similarity_bands_are_raw_scores(): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 18)->setTime(9, 0)); // a Wednesday; week starts Monday 16 Nov
+        $enrollment = StudentEnrollment::factory()->create();
+        $placement = Placement::factory()->create(['student_enrollment_id' => $enrollment->id, 'status' => 'active', 'supervisor_id' => User::factory()->withRole(Role::Supervisor)->create()->id, 'starts_on' => '2026-09-01']);
+        $log = fn (string $date, string $status, ?int $minutes) => TimeLog::factory()->create(['placement_id' => $placement->id, 'work_date' => $date, 'time_in' => "{$date} 08:00:00", 'time_out' => "{$date} 17:00:00", 'status' => $status, 'credited_minutes' => $minutes]
+            + ($status === 'verified' ? ['verified_by' => $placement->supervisor_id, 'verified_at' => "{$date} 18:00:00"] : []));
+        $log('2026-11-16', 'verified', 480);
+        $log('2026-11-17', 'pending', null);
+        $log('2026-11-10', 'verified', 420);
+        $log('2026-06-01', 'verified', 480); // outside the 16-week window
+        $coordinator = User::factory()->withRole(Role::Coordinator)->create();
+        $coordinator->programs()->attach($enrollment->programTerm->program_id);
+
+        $weeks = collect($this->actingAs($coordinator)->getJson('/api/v1/program-analytics')->assertOk()->json('weekly'));
+        $this->assertCount(16, $weeks);
+        $this->assertSame('2026-11-16', $weeks->last()['week']);
+        $this->assertEquals(['certified_hours' => 8.0, 'logs' => 2, 'interns' => 1], collect($weeks->last())->only(['certified_hours', 'logs', 'interns'])->all());
+        $this->assertEquals(7.0, $weeks->firstWhere('week', '2026-11-09')['certified_hours']);
+        $this->assertEquals(15.0, $weeks->sum('certified_hours'));
+
+        $labels = collect($this->getJson('/api/v1/program-analytics')->json('similarity_bands'))->pluck('label');
+        $this->assertSame(['0.90 to 1.00', '0.80 to under 0.90', '0.70 to under 0.80', 'Below 0.70'], $labels->all());
     }
 }

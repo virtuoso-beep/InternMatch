@@ -45,22 +45,23 @@ class ChatController extends Controller
     {
         $this->eligible($request);
         $user = $request->user();
-        $page = Conversation::with(['enrollment.student.user', 'enrollment.programTerm.program.coordinators', 'placement.hostEstablishment'])
+        $page = Conversation::with(['enrollment.student.user', 'enrollment.programTerm.program.coordinators', 'placement.hostEstablishment', 'placement.supervisor'])
             ->withCount(['messages as unread_count' => fn ($q) => $q->where('sender_id', '!=', $user->id)->whereRaw('chat_messages.id > COALESCE((SELECT last_message_id FROM conversation_reads WHERE conversation_reads.conversation_id = chat_messages.conversation_id AND user_id = ?), 0)', [$user->id])])
             ->orderByDesc('updated_at')->orderByDesc('id')->paginate(30);
-        $page->getCollection()->transform(fn ($c) => $this->summary($c) + ['unread_count' => $c->unread_count]);
+        $enabled = ChatAccess::enabled(); // read once for the whole list
+        $page->getCollection()->transform(fn ($c) => $this->summary($c, $enabled) + ['unread_count' => $c->unread_count]);
 
         return response()->json($page, headers: ['Cache-Control' => 'no-store']);
     }
 
-    private function summary(Conversation $conversation): array
+    private function summary(Conversation $conversation, ?bool $enabled = null): array
     {
         return ['id' => $conversation->id, 'type' => $conversation->placement_id ? 'placement' : 'coordinator',
             'student' => $conversation->enrollment->student->user?->name ?? 'Former student',
             'program' => $conversation->enrollment->programTerm->program->code,
             'host' => $conversation->placement?->hostEstablishment?->name,
             'enrollment_id' => $conversation->student_enrollment_id, 'placement_id' => $conversation->placement_id,
-            'writable' => ChatAccess::writable($conversation),
+            'writable' => ChatAccess::writable($conversation, $enabled),
             'coordinator_available' => ChatAccess::coordinators($conversation->enrollment)->isNotEmpty(),
             'participants' => array_map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->role->value], ChatAccess::participants($conversation)),
             'updated_at' => $conversation->updated_at];

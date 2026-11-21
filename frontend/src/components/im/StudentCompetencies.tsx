@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, CardTitle, PageHeader } from "./ui";
+import { toast } from "sonner";
+import { Button, Card, CardTitle, ConfirmDialog, FormField, FormModal, PageHeader } from "./ui";
+import { inputClass, toFormError, type FormError } from "./formUtils";
 
 type Item = {
   id: number;
   competency_id: number;
-  level: number;
+  /** Null when the level has not been rated yet (e.g. imported skills). */
+  level: number | null;
   competency: { name: string };
   evidence: { source: string }[];
 };
@@ -100,21 +103,25 @@ export function StudentCompetencies() {
                     <li key={item.id}>
                       <div className="mb-2 flex items-start justify-between gap-4 text-sm sm:text-base">
                         <span>{item.competency.name}</span>
-                        <span className="shrink-0 text-muted-foreground">{item.level}%</span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {item.level === null ? "Not rated" : `${item.level}%`}
+                        </span>
                       </div>
-                      <div
-                        role="progressbar"
-                        aria-label={item.competency.name}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={item.level}
-                        className="h-2.5 overflow-hidden rounded-full bg-slate-100"
-                      >
+                      {item.level !== null && (
                         <div
-                          className="h-full rounded-full bg-brand"
-                          style={{ width: Math.max(0, Math.min(100, item.level)) + "%" }}
-                        />
-                      </div>
+                          role="progressbar"
+                          aria-label={item.competency.name}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={item.level}
+                          className="h-2.5 overflow-hidden rounded-full bg-muted"
+                        >
+                          <div
+                            className="h-full rounded-full bg-brand"
+                            style={{ width: Math.max(0, Math.min(100, item.level)) + "%" }}
+                          />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -130,7 +137,7 @@ export function StudentCompetencies() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="border-b text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                      <tr className="border-b text-xs font-medium text-muted-foreground">
                         <th scope="col" className="py-3 pr-4 font-medium">
                           Competency
                         </th>
@@ -164,7 +171,9 @@ export function StudentCompetencies() {
                               </button>
                             </div>
                           </th>
-                          <td className="py-4 pr-4 align-top">{item.level}%</td>
+                          <td className="py-4 pr-4 align-top">
+                            {item.level === null ? "Not rated" : `${item.level}%`}
+                          </td>
                           <td className="py-4 align-top text-muted-foreground">
                             {evidenceSources(item)}
                           </td>
@@ -181,10 +190,9 @@ export function StudentCompetencies() {
               editor={editor}
               records={records}
               onClose={() => setEditor(null)}
-              onSaved={(data, notice) => {
+              onSaved={(data) => {
                 setRecords(data);
                 setEditor(null);
-                setMessage(notice);
               }}
             />
           )}
@@ -203,26 +211,14 @@ function CompetencyEditor({
   editor: Editor;
   records: Data;
   onClose: () => void;
-  onSaved: (data: Data, notice: string) => void;
+  onSaved: (data: Data) => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const [selected, setSelected] = useState(
     editor.kind === "add" ? "" : String(editor.item.competency_id),
   );
-  const [level, setLevel] = useState(editor.kind === "add" ? "" : String(editor.item.level));
+  const [level, setLevel] = useState(editor.kind === "add" ? "" : String(editor.item.level ?? ""));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const remove = editor.kind === "remove";
-  const title = remove
-    ? "Remove competency"
-    : editor.kind === "edit"
-      ? "Edit competency"
-      : "Add competency";
-  useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
-  }, []);
+  const [error, setError] = useState<FormError | null>(null);
   const choices =
     records.vocabulary.some((item) => item.id === Number(selected)) || editor.kind === "add"
       ? records.vocabulary
@@ -230,130 +226,119 @@ function CompetencyEditor({
           ...records.vocabulary,
           { id: editor.item.competency_id, name: editor.item.competency.name },
         ];
-  return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="competency-editor-title"
-      aria-describedby="competency-editor-description"
-      onCancel={(event) => {
-        event.preventDefault();
-        if (!busy) onClose();
-      }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-6 text-foreground shadow-xl backdrop:bg-black/35"
-    >
-      <h2 id="competency-editor-title" className="text-xl font-semibold">
-        {title}
-      </h2>
-      <p id="competency-editor-description" className="mt-2 text-sm text-muted-foreground">
-        {editor.kind === "remove"
-          ? "Remove " +
-            editor.item.competency.name +
-            " from your skills profile? Competencies with attached evidence cannot be removed."
-          : editor.kind === "edit"
-            ? "Update your self-assessed proficiency."
-            : "Add a skill to your competency profile."}
-      </p>
-      <form
-        className="mt-6 space-y-5"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          if (busy) return;
+
+  if (editor.kind === "remove") {
+    const name = editor.item.competency.name;
+    return (
+      <ConfirmDialog
+        open
+        title={`Remove ${name}?`}
+        description={`Remove ${name} from your skills profile? Competencies with attached evidence cannot be removed. This cannot be undone.`}
+        confirmLabel="Remove competency"
+        busy={busy}
+        error={error?.message}
+        onCancel={onClose}
+        onConfirm={async () => {
           setBusy(true);
-          setError("");
+          setError(null);
           try {
-            if (editor.kind === "remove") {
-              await mutate("/competencies/" + editor.item.id, undefined, "DELETE");
-              onSaved(
-                { ...records, data: records.data.filter((item) => item.id !== editor.item.id) },
-                "Competency removed.",
-              );
-            } else {
-              const response = await mutate<{ data: Omit<Item, "evidence"> }>("/competencies", {
-                competency_id: Number(selected),
-                level: Number(level),
-              });
-              const existing = records.data.find(
-                (item) => item.competency_id === response.data.competency_id,
-              );
-              const saved: Item = { ...response.data, evidence: existing?.evidence ?? [] };
-              onSaved(
-                {
-                  ...records,
-                  data: existing
-                    ? records.data.map((item) => (item.id === existing.id ? saved : item))
-                    : [...records.data, saved],
-                },
-                "Competency saved.",
-              );
-            }
+            await mutate("/competencies/" + editor.item.id, undefined, "DELETE");
+            onSaved({
+              ...records,
+              data: records.data.filter((item) => item.id !== editor.item.id),
+            });
+            toast.success("Competency removed");
           } catch (cause) {
-            setError(cause instanceof Error ? cause.message : "Unable to save. Please try again.");
+            setError(toFormError(cause, "Unable to remove the competency."));
           } finally {
             setBusy(false);
           }
         }}
-      >
-        {!remove && (
-          <>
-            <label className="block">
-              <span className="mb-2 block text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                Competency
-              </span>
-              <select
-                required
-                autoFocus
-                disabled={busy || editor.kind === "edit"}
-                value={selected}
-                onChange={(event) => setSelected(event.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-3 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20"
-              >
-                <option value="">Select a program competency</option>
-                {choices.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                Proficiency (%)
-              </span>
-              <input
-                required
-                disabled={busy}
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                placeholder="75"
-                value={level}
-                onChange={(event) => setLevel(event.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-3 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20"
-              />
-            </label>
-            {editor.kind === "add" &&
-              records.data.some((item) => item.competency_id === Number(selected)) && (
-                <p className="text-sm text-muted-foreground">
-                  This competency is already in your profile. Saving updates its proficiency.
-                </p>
-              )}
-          </>
-        )}
-        {error && (
-          <p role="alert" className="rounded-lg bg-brand-soft p-3 text-sm text-brand">
-            {error}
+      />
+    );
+  }
+
+  return (
+    <FormModal
+      open
+      onClose={onClose}
+      title={
+        editor.kind === "edit"
+          ? `Edit competency: ${editor.item.competency.name}`
+          : "Add competency"
+      }
+      description={
+        editor.kind === "edit"
+          ? "Update your self-assessed proficiency."
+          : "Add a skill to your competency profile."
+      }
+      submitLabel="Save competency"
+      busy={busy}
+      error={error}
+      onSubmit={async () => {
+        setBusy(true);
+        setError(null);
+        try {
+          const response = await mutate<{ data: Omit<Item, "evidence"> }>("/competencies", {
+            competency_id: Number(selected),
+            level: Number(level),
+          });
+          const existing = records.data.find(
+            (item) => item.competency_id === response.data.competency_id,
+          );
+          const saved: Item = { ...response.data, evidence: existing?.evidence ?? [] };
+          onSaved({
+            ...records,
+            data: existing
+              ? records.data.map((item) => (item.id === existing.id ? saved : item))
+              : [...records.data, saved],
+          });
+          toast.success(editor.kind === "edit" ? "Competency updated" : "Competency saved");
+        } catch (cause) {
+          setError(toFormError(cause, "Unable to save. Please try again."));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <FormField label="Competency" required>
+        <select
+          required
+          name="competency_id"
+          disabled={busy || editor.kind === "edit"}
+          value={selected}
+          onChange={(event) => setSelected(event.target.value)}
+          className={inputClass}
+        >
+          <option value="">Select a program competency</option>
+          {choices.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </FormField>
+      <FormField label="Proficiency (%)" required helper="Whole number from 0 to 100.">
+        <input
+          required
+          name="level"
+          disabled={busy}
+          type="number"
+          min="0"
+          max="100"
+          step="1"
+          placeholder="75"
+          value={level}
+          onChange={(event) => setLevel(event.target.value)}
+          className={inputClass}
+        />
+      </FormField>
+      {editor.kind === "add" &&
+        records.data.some((item) => item.competency_id === Number(selected)) && (
+          <p className="text-sm text-muted-foreground">
+            This competency is already in your profile. Saving updates its proficiency.
           </p>
         )}
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="outline" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={busy}>
-            {busy ? "Saving…" : remove ? "Remove" : "Save"}
-          </Button>
-        </div>
-      </form>
-    </dialog>
+    </FormModal>
   );
 }

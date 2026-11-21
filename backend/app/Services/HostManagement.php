@@ -34,6 +34,7 @@ class HostManagement
     {
         return DB::transaction(function () use ($actor, $host, $input) {
             $record = HostAccess::query($actor)->lockForUpdate()->findOrFail($host->id);
+            abort_if($record->archived_at !== null, 409, 'Restore the archived host before changing it.');
             $data = self::validateHost($input, $record);
             abort_if($actor->role === Role::Supervisor && array_key_exists('is_active', $data), 403);
             $record->update($data);
@@ -49,6 +50,7 @@ class HostManagement
         HostAccess::authorizePrograms($actor, array_column($capacity, 'program_id'));
         DB::transaction(function () use ($actor, $host, $capacity) {
             $record = HostAccess::query($actor)->lockForUpdate()->findOrFail($host->id);
+            abort_if($record->archived_at !== null, 409, 'Restore the archived host before changing it.');
             self::saveCapacity($record, $capacity);
             Audit::record($actor, 'host.capacity_updated', $record, ['capacities' => $capacity]);
         });

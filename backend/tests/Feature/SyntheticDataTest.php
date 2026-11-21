@@ -3,11 +3,15 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
-use App\Models\{Placement, StudentEnrollment, TimeLog, User};
+use App\Models\Placement;
+use App\Models\StudentEnrollment;
+use App\Models\TimeLog;
+use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 /** Synthetic test data is hidden by default, visible only on request, labelled when shown, and removable. */
@@ -46,6 +50,32 @@ class SyntheticDataTest extends TestCase
         $this->assertSame(1, $this->stat($shown, 'Completed placements'));
     }
 
+    public function test_admin_overview_hides_synthetic_accounts_unless_included(): void
+    {
+        $admin = User::factory()->withRole(Role::Admin)->create();
+        User::factory()->withRole(Role::Student)->create();
+        User::factory()->withRole(Role::Student)->create(['is_synthetic' => true]);
+        User::factory()->withRole(Role::Supervisor)->create(['is_synthetic' => true]);
+        DB::table('audit_logs')->insert([
+            ['actor_id' => $admin->id, 'action' => 'test.real', 'subject_type' => User::class, 'subject_id' => $admin->id, 'changes' => '[]', 'is_synthetic' => false, 'created_at' => now()->subMinute()],
+            ['actor_id' => $admin->id, 'action' => 'test.synthetic', 'subject_type' => User::class, 'subject_id' => $admin->id, 'changes' => '[]', 'is_synthetic' => true, 'created_at' => now()],
+        ]);
+        $this->actingAs($admin);
+        $total = fn (array $json, string $role) => collect($json['users_by_role'])->firstWhere('role', $role)['total'] ?? 0;
+
+        $hidden = $this->getJson('/api/v1/admin/overview')->assertOk()->assertJsonPath('synthetic', ['can_include' => true, 'included' => false])->json();
+        $this->assertSame(2, $hidden['total_users']);
+        $this->assertSame(1, $total($hidden, 'student'));
+        $this->assertSame(0, $total($hidden, 'supervisor'));
+        $this->assertNotContains('test.synthetic', collect($hidden['recent_activity'])->pluck('action')->all());
+
+        $shown = $this->getJson('/api/v1/admin/overview?include_synthetic=1')->assertOk()->assertJsonPath('synthetic.included', true)->json();
+        $this->assertSame(4, $shown['total_users']);
+        $this->assertSame(2, $total($shown, 'student'));
+        $this->assertSame(1, $total($shown, 'supervisor'));
+        $this->assertContains('test.synthetic', collect($shown['recent_activity'])->pluck('action')->all());
+    }
+
     public function test_program_analytics_hides_synthetic_records_unless_included(): void
     {
         [, , $coordinator] = $this->cohort();
@@ -78,7 +108,7 @@ class SyntheticDataTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'synthetic');
         try {
             file_put_contents($path, $xlsx);
-            $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+            $book = IOFactory::load($path);
             $details = collect($book->getSheet(1)->toArray())->mapWithKeys(fn ($row) => [$row[0] => $row[1]]);
             $this->assertStringStartsWith('Contains synthetic data', $details['Synthetic data']);
             $book->disconnectWorksheets();

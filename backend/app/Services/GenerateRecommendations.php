@@ -2,13 +2,17 @@
 
 namespace App\Services;
 
+use App\Models\HostEstablishment;
 use App\Models\Opportunity;
 use App\Models\Recommendation;
 use App\Models\StudentEnrollment;
 use App\Models\User;
 use App\Notifications\PortalNotification;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class GenerateRecommendations
@@ -23,32 +27,27 @@ class GenerateRecommendations
             ->where('status', 'published')->whereHas('programs', fn ($q) => $q->whereKey($enrollment->programTerm->program_id))->get();
         $vectors = [];
         $sources = [];
+        $profile = $enrollment->student->user?->profile;
         foreach ($candidates as $opportunity) {
-            if (! $this->eligibility->inspect($enrollment, $opportunity)) {
+            $facts = $this->eligibility->inspect($enrollment, $opportunity);
+            if (! $facts) {
                 continue;
             }
             $cached = $this->embeddings->cached($opportunity);
             abort_unless($cached, 409, 'Eligible opportunity embeddings are still processing. Please retry shortly.');
-            $vectors[] = ['id' => $opportunity->id, 'vector' => json_decode($cached->vector, true, flags: JSON_THROW_ON_ERROR)];
+            // The supervised ranker uses the same facts the coordinator sees: straight-line distance, remaining
+            // capacity and agreement status at generation time.
+            $vectors[] = ['id' => $opportunity->id, 'vector' => json_decode($cached->vector, true, flags: JSON_THROW_ON_ERROR),
+                'distance_km' => $this->distance($profile, $opportunity->hostEstablishment), 'capacity_at_time' => $facts['capacity_remaining'],
+                'moa_status_at_time' => $facts['moa_status']];
             $sources[$opportunity->id] = $cached;
         }
         abort_if(count($vectors) > 1000, 422, 'This cohort exceeds the configured matching batch limit.');
-        $scores = [];
-        if ($vectors !== []) {
-            $response = Http::connectTimeout(2)->timeout(7)->post(rtrim(config('matching.url'), '/').'/recommendations', [
-                'student_vector' => json_decode($studentVector->vector, true, flags: JSON_THROW_ON_ERROR), 'candidates' => $vectors,
-            ])->throw()->json();
-            abort_unless(($response['model_name'] ?? null) === config('matching.model') && ($response['model_version'] ?? null) === config('matching.revision'), 503, 'AI model version mismatch.');
-            foreach ($response['data'] ?? [] as $item) {
-                $id = $item['id'] ?? null;
-                $score = $item['similarity_score'] ?? null;
-                abort_unless(isset($sources[$id]) && ! isset($scores[$id]) && is_numeric($score) && is_finite((float) $score) && $score >= -1 && $score <= 1, 503, 'Invalid AI ranking response.');
-                $scores[$id] = (float) $score;
-            }
-            abort_unless(count($scores) === count($vectors), 503, 'Incomplete AI ranking response.');
-        }
+        [$scores, $mlScores, $method, $ranker] = $vectors === []
+            ? [[], [], 'cosine_then_distance', null]
+            : $this->rank(json_decode($studentVector->vector, true, flags: JSON_THROW_ON_ERROR), $vectors, $sources);
 
-        return DB::transaction(function () use ($actor, $enrollment, $studentVector, $scores, $sources) {
+        return DB::transaction(function () use ($actor, $enrollment, $studentVector, $scores, $sources, $mlScores, $method, $ranker) {
             $enrollment = StudentEnrollment::whereKey($enrollment->id)->lockForUpdate()->firstOrFail();
             abort_unless($this->embeddings->key($enrollment->student)['source_text_hash'] === $studentVector->source_text_hash, 409, 'Competencies changed during matching. Retry after processing.');
             $profile = $enrollment->student->user?->profile;
@@ -67,8 +66,7 @@ class GenerateRecommendations
                     'level' => $levels->has($skill->id) && $levels[$skill->id] !== null ? (int) $levels[$skill->id] : null,
                     'minimum_level' => (int) $skill->pivot->minimum_level,
                 ])->values()->all();
-                $distance = $profile?->latitude !== null && $profile?->longitude !== null && $host->latitude !== null && $host->longitude !== null
-                    ? Haversine::kilometers((float) $profile->latitude, (float) $profile->longitude, (float) $host->latitude, (float) $host->longitude) : null;
+                $distance = $this->distance($profile, $host);
                 $rows[] = ['opportunity_id' => $id, 'similarity_score' => $score, 'distance_km' => $distance,
                     'capacity_at_time' => $facts['capacity_remaining'], 'moa_status_at_time' => $facts['moa_status'],
                     'snapshot' => $facts + ['opportunity_title' => $opportunity->title, 'host_name' => $host->name,
@@ -76,22 +74,85 @@ class GenerateRecommendations
                         'competencies' => $skills,
                         'model_name' => config('matching.model'), 'model_version' => config('matching.revision'),
                         'student_source_hash' => $studentVector->source_text_hash, 'opportunity_source_hash' => $sources[$id]->source_text_hash,
-                        'distance_kind' => 'straight_line', 'criteria' => 'Cosine descending; ties use known distance ascending, then opportunity ID. No requirement-completion ranking feature.']];
+                        'distance_kind' => 'straight_line', 'ranking_method' => $method,
+                        'criteria' => $method === 'logistic_regression'
+                            ? 'Logistic Regression suitability probability descending (features: similarity score, straight-line distance, remaining capacity, active agreement, missing-distance flag); ties use similarity score, then opportunity ID. Model trained on approved coordinator judgments.'
+                            : 'Cosine descending; ties use known distance ascending, then opportunity ID. No requirement-completion ranking feature.']
+                        + ($method === 'logistic_regression' ? ['suitability_probability' => round($mlScores[$id], 4), 'ranker' => $ranker] : [])];
             }
-            usort($rows, fn ($a, $b) => ($b['similarity_score'] <=> $a['similarity_score']) ?: (($a['distance_km'] ?? INF) <=> ($b['distance_km'] ?? INF)) ?: ($a['opportunity_id'] <=> $b['opportunity_id']));
+            usort($rows, fn ($a, $b) => $method === 'logistic_regression'
+                ? (($mlScores[$b['opportunity_id']] <=> $mlScores[$a['opportunity_id']]) ?: ($b['similarity_score'] <=> $a['similarity_score']) ?: ($a['opportunity_id'] <=> $b['opportunity_id']))
+                : (($b['similarity_score'] <=> $a['similarity_score']) ?: (($a['distance_km'] ?? INF) <=> ($b['distance_km'] ?? INF)) ?: ($a['opportunity_id'] <=> $b['opportunity_id'])));
             $generation = (string) Str::uuid();
             DB::table('recommendation_generations')->insert(['generation_id' => $generation, 'student_enrollment_id' => $enrollment->id, 'created_by' => $actor->id, 'generated_at' => now()]);
             $saved = [];
             foreach ($rows as $index => $row) {
                 $saved[] = Recommendation::create($row + ['generation_id' => $generation, 'student_enrollment_id' => $enrollment->id,
-                    'rank' => $index + 1, 'ranking_method' => 'cosine_then_distance', 'generated_at' => now()]);
+                    'rank' => $index + 1, 'ranking_method' => $method, 'generated_at' => now()]);
             }
-            Audit::record($actor, 'recommendations.generated', $enrollment, ['generation_id' => $generation, 'count' => count($saved)], $enrollment->programTerm->program_id);
+            Audit::record($actor, 'recommendations.generated', $enrollment, ['generation_id' => $generation, 'count' => count($saved), 'ranking_method' => $method], $enrollment->programTerm->program_id);
             if ($saved !== []) {
                 $enrollment->student->user->notify(new PortalNotification('Recommendations available', count($saved).' eligible internship recommendations are ready for review.'));
             }
 
             return $saved;
         });
+    }
+
+    /**
+     * Rank eligible candidates. With the reranker on 'auto', the AI service's /recommendations/ml decides:
+     * it returns Logistic Regression order only when a validated model is installed, otherwise cosine order.
+     * If that endpoint cannot be reached, plain /recommendations (cosine) is used.
+     *
+     * @return array{0: array<int, float>, 1: array<int, float>, 2: string, 3: array<string, mixed>|null}
+     */
+    private function rank(array $studentVector, array $vectors, array $sources): array
+    {
+        $base = rtrim(config('matching.url'), '/');
+        if (config('matching.reranker') === 'auto') {
+            try {
+                $response = Http::connectTimeout(2)->timeout(7)->post($base.'/recommendations/ml', [
+                    'student_vector' => $studentVector, 'candidates' => $vectors,
+                ])->throw()->json();
+
+                return $this->readRanking($response, $sources, count($vectors));
+            } catch (ConnectionException|RequestException $error) {
+                Log::warning('matching.reranker_unavailable', ['message' => $error->getMessage()]);
+            }
+        }
+        $response = Http::connectTimeout(2)->timeout(7)->post($base.'/recommendations', [
+            'student_vector' => $studentVector,
+            'candidates' => array_map(fn (array $candidate) => ['id' => $candidate['id'], 'vector' => $candidate['vector']], $vectors),
+        ])->throw()->json();
+
+        return $this->readRanking($response, $sources, count($vectors));
+    }
+
+    private function readRanking(?array $response, array $sources, int $expected): array
+    {
+        abort_unless(($response['model_name'] ?? null) === config('matching.model') && ($response['model_version'] ?? null) === config('matching.revision'), 503, 'AI model version mismatch.');
+        $supervised = ($response['ranking_method'] ?? null) === 'logistic_regression';
+        $scores = [];
+        $mlScores = [];
+        foreach ($response['data'] ?? [] as $item) {
+            $id = $item['id'] ?? null;
+            $score = $item['similarity_score'] ?? null;
+            abort_unless(isset($sources[$id]) && ! isset($scores[$id]) && is_numeric($score) && is_finite((float) $score) && $score >= -1 && $score <= 1, 503, 'Invalid AI ranking response.');
+            $scores[$id] = (float) $score;
+            if ($supervised) {
+                $probability = $item['ml_score'] ?? null;
+                abort_unless(is_numeric($probability) && $probability >= 0 && $probability <= 1, 503, 'Invalid AI ranking response.');
+                $mlScores[$id] = (float) $probability;
+            }
+        }
+        abort_unless(count($scores) === $expected, 503, 'Incomplete AI ranking response.');
+
+        return [$scores, $mlScores, $supervised ? 'logistic_regression' : 'cosine_then_distance', $supervised ? ($response['ranker'] ?? null) : null];
+    }
+
+    private function distance(?object $profile, HostEstablishment $host): ?float
+    {
+        return $profile?->latitude !== null && $profile?->longitude !== null && $host->latitude !== null && $host->longitude !== null
+            ? Haversine::kilometers((float) $profile->latitude, (float) $profile->longitude, (float) $host->latitude, (float) $host->longitude) : null;
     }
 }

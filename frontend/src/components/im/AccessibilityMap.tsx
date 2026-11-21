@@ -267,7 +267,7 @@ export function AccessibilityMap({ note }: { note?: string }) {
           <div
             ref={container}
             aria-label="InternMatch location map"
-            className="relative z-0 h-[400px] bg-slate-100 sm:h-[520px]"
+            className="relative z-0 h-[400px] bg-muted sm:h-[520px]"
           />
           <div className="flex flex-wrap gap-x-5 gap-y-2 border-t p-4 text-xs text-muted-foreground">
             {["Under 5 km", "5–10 km", "Over 10 km", "Unknown"].map((label, index) => (

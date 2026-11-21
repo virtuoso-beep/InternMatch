@@ -146,4 +146,41 @@ class AuthControllerTest extends TestCase
 
         $this->actingAs($user)->getJson('/api/v1/test-coordinator')->assertOk()->assertJsonPath('ok', true);
     }
+
+    public function test_throttled_login_returns_message_retry_after_and_header(): void
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->postJson('/api/v1/login', ['email' => 'unknown@example.test', 'password' => 'wrong']);
+        }
+
+        $response = $this->postJson('/api/v1/login', ['email' => 'unknown@example.test', 'password' => 'wrong'])
+            ->assertTooManyRequests()->assertHeader('Retry-After')
+            ->assertJsonStructure(['message', 'retry_after']);
+        $this->assertGreaterThan(0, $response->json('retry_after'));
+        $this->assertLessThanOrEqual(60, $response->json('retry_after'));
+        $this->assertSame((string) $response->json('retry_after'), $response->headers->get('Retry-After'));
+    }
+
+    public function test_unknown_wrong_password_and_unactivated_accounts_get_the_same_message(): void
+    {
+        $active = User::factory()->withRole(Role::Student)->create();
+        $pending = User::factory()->withRole(Role::Student)->create(['status' => AccountStatus::Pending]);
+        $message = fn (string $email, string $password) => $this->postJson('/api/v1/login', ['email' => $email, 'password' => $password])
+            ->assertUnprocessable()->json('errors.email.0');
+
+        $unknown = $message('nobody@example.test', 'password');
+        $this->assertSame($unknown, $message($active->email, 'wrong-password'));
+        $this->assertSame($unknown, $message($pending->email, 'password'));
+        $this->assertGuest();
+    }
+
+    public function test_per_ip_limit_uses_the_same_error_shape(): void
+    {
+        for ($attempt = 0; $attempt < 30; $attempt++) {
+            $this->postJson('/api/v1/login', ['email' => "user{$attempt}@example.test", 'password' => 'wrong']);
+        }
+
+        $this->postJson('/api/v1/login', ['email' => 'another@example.test', 'password' => 'wrong'])
+            ->assertTooManyRequests()->assertHeader('Retry-After')->assertJsonStructure(['message', 'retry_after']);
+    }
 }

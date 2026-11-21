@@ -1,9 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Building2, FileCheck2, MapPinOff, Route, Ruler, TriangleAlert } from "lucide-react";
 import { api } from "@/lib/api";
-import { AccessibilityMap } from "./AccessibilityMap";
 import { withSynthetic } from "@/lib/synthetic";
+import { SERIES_COLORS, TONE_COLOR } from "@/lib/status";
+import { AccessibilityMap } from "./AccessibilityMap";
 import { SyntheticToggle } from "./SyntheticToggle";
-import { Button, Card, CardTitle, PageHeader, Row, StatCard, StatGrid, Table } from "./ui";
+import { Button, Card, PageHeader, Pill, Row, Table } from "./ui";
+import { inputClass } from "./formUtils";
+import { EmptyState, ErrorState, KpiCard, SectionHeading } from "./ds";
+import { BarChartView, ChartCard, DonutChartView } from "./charts";
+import { WeeklyActivity, type Week } from "./WeeklyActivity";
 
 type Band = { label: string; value: number };
 type Summary = {
@@ -38,10 +44,24 @@ export type Data = {
   };
   similarity_bands: Band[];
   competency_demand: Band[];
+  weekly: Week[];
   terms: (Summary & { term: string })[];
   generated_at: string;
 };
 const percent = (v: number | null) => (v === null ? "No records" : `${v.toFixed(1)}%`);
+
+const TITLES = {
+  performance: "Program performance",
+  hosts: "Host establishments",
+  equity: "Placement equity",
+  analytics: "Analytics",
+};
+const SUBTITLES = {
+  performance: "Placement, completion and evaluation outcomes for your assigned programs.",
+  hosts: "Host establishments and their agreements within your assigned programs.",
+  equity: "How far placed students travel to their hosts, using straight-line distance.",
+  analytics: "Recommendation scores, outcomes by term and the skills employers ask for.",
+};
 
 export function ProgramAnalytics({
   section,
@@ -68,347 +88,477 @@ export function ProgramAnalytics({
       active = false;
     };
   }, [revision, includeSynthetic]);
+  const loading = !data && !error;
+  const retry = () => setRevision((v) => v + 1);
   const [hostSearch, setHostSearch] = useState("");
   const [hostFilter, setHostFilter] = useState("all");
-  const visibleHosts =
-    data?.hosts.filter(
-      (h) =>
-        `${h.name} ${h.industry} ${h.city}`
-          .toLowerCase()
-          .includes(hostSearch.trim().toLowerCase()) &&
-        (hostFilter === "all" ||
-          (hostFilter === "expiring"
-            ? h.agreements_expiring_90_days > 0
-            : hostFilter === "uncovered"
-              ? h.current_agreements === 0
-              : h.is_active)),
-    ) ?? [];
-  const titles = {
-    performance: "Program performance",
-    hosts: "Host establishments",
-    equity: "Placement equity",
-    analytics: "Analytics",
-  };
+  const visibleHosts = useMemo(
+    () =>
+      data?.hosts.filter(
+        (h) =>
+          `${h.name} ${h.industry} ${h.city}`
+            .toLowerCase()
+            .includes(hostSearch.trim().toLowerCase()) &&
+          (hostFilter === "all" ||
+            (hostFilter === "expiring"
+              ? h.agreements_expiring_90_days > 0
+              : hostFilter === "uncovered"
+                ? h.current_agreements === 0
+                : h.is_active)),
+      ) ?? [],
+    [data, hostSearch, hostFilter],
+  );
+  const programs = (data?.programs ?? []).filter((p) => !program || p.code === program);
+  const hostCoverage = useMemo(() => {
+    const hosts = data?.hosts ?? [];
+    const none = hosts.filter((h) => h.current_agreements === 0).length;
+    const expiring = hosts.filter(
+      (h) => h.current_agreements > 0 && h.agreements_expiring_90_days > 0,
+    ).length;
+    return [
+      {
+        label: "Current agreement",
+        value: hosts.length - none - expiring,
+        color: TONE_COLOR.success,
+      },
+      { label: "Expiring within 90 days", value: expiring, color: TONE_COLOR.warn },
+      { label: "No current agreement", value: none, color: TONE_COLOR.brand },
+    ];
+  }, [data]);
+
   return (
-    <>
+    <div className="space-y-8">
       <PageHeader
-        title={titles[section]}
-        subtitle="Live records across recorded terms in your assigned programs."
+        title={TITLES[section]}
+        subtitle={SUBTITLES[section]}
         action={
-          <div className="flex flex-wrap items-center gap-3">
+          <>
             <SyntheticToggle
               checked={includeSynthetic}
               onChange={setIncludeSynthetic}
-              disabled={!data && !error}
+              disabled={loading}
             />
-            <Button variant="outline" onClick={() => setRevision((v) => v + 1)}>
-              Refresh program records
+            <Button variant="outline" size="sm" onClick={retry} disabled={loading}>
+              Refresh
             </Button>
-          </div>
+          </>
         }
       />
-      {error && <p role="alert">{error}</p>}
-      {!data && !error && <p role="status">Loading program records…</p>}
-      {data && (
+      {error && (
+        <ErrorState title="Could not load program records" message={error} onRetry={retry} />
+      )}
+
+      {section === "performance" && (
         <>
-          {section === "performance" && (
-            <>
-              <div className="mb-5 flex flex-wrap gap-3">
-                <label className="text-sm">
-                  Program
-                  <select
-                    aria-label="Program"
-                    className="ml-2 rounded border p-2"
-                    value={program}
-                    onChange={(e) => setProgram(e.target.value)}
-                  >
-                    <option value="">All assigned programs</option>
-                    {data.programs.map((p) => (
-                      <option key={p.code}>{p.code}</option>
-                    ))}
-                  </select>
-                </label>
-                <Button variant="outline" onClick={() => setProgram("")}>
-                  Clear filter
-                </Button>
-              </div>
-              <div className="mb-5 grid gap-5 lg:grid-cols-2">
-                {(["placement_rate", "completion_rate"] as const).map((metric) => (
-                  <Card key={metric}>
-                    <CardTitle>
-                      {metric === "placement_rate" ? "Placement rate" : "Completion rate"}
-                    </CardTitle>
-                    <div className="space-y-4">
-                      {data.programs
-                        .filter((p) => !program || p.code === program)
-                        .map((p) => (
-                          <div key={p.code}>
-                            <div className="mb-1 flex justify-between gap-3 text-sm">
-                              <span>{p.code}</span>
-                              <span>{percent(p[metric])}</span>
-                            </div>
-                            {p[metric] !== null && (
-                              <progress
-                                aria-label={`${p.code} ${metric.replaceAll("_", " ")}`}
-                                className="h-2 w-full accent-brand"
-                                max={100}
-                                value={p[metric] ?? 0}
-                              />
-                            )}
-                          </div>
-                        ))}
-                      {data.programs.length === 0 && <p>No assigned programs.</p>}
-                    </div>
-                  </Card>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              Program
+              <select
+                aria-label="Program"
+                className={`${inputClass} w-auto`}
+                value={program}
+                onChange={(e) => setProgram(e.target.value)}
+                disabled={!data}
+              >
+                <option value="">All assigned programs</option>
+                {data?.programs.map((p) => (
+                  <option key={p.code} value={p.code}>
+                    {p.code}
+                  </option>
                 ))}
-              </div>
-              <Card>
-                <CardTitle>Enrollment outcomes</CardTitle>
-                <p className="mb-4 text-sm">
-                  Counts represent enrollment records across terms. Placed includes approved, active
-                  and completed placements. Evaluation averages include only submitted, scored
-                  evaluations.
-                </p>
-                <Table
-                  head={[
-                    "Program",
-                    "Enrollments",
-                    "Placed",
-                    "Completed",
-                    "Placement rate",
-                    "Completion rate",
-                    "Evaluation average",
-                    "Evaluations",
-                  ]}
+              </select>
+            </label>
+            {program && (
+              <Button variant="ghost" size="sm" onClick={() => setProgram("")}>
+                Clear filter
+              </Button>
+            )}
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <ChartCard
+              title="Placement and completion rate by program"
+              description="Share of enrollment records"
+              loading={loading}
+              error={error}
+              onRetry={retry}
+              isEmpty={programs.length === 0}
+              emptyTitle="No programs assigned"
+              emptyDescription="Programs appear here once an administrator assigns them to you."
+              footnote="Placed includes approved, active and completed placements. A blank bar means the program has no enrollment records."
+            >
+              <BarChartView
+                title="Placement and completion rate by program"
+                data={programs.map((p) => ({
+                  program: p.code,
+                  placement: p.placement_rate === null ? null : Number(p.placement_rate.toFixed(1)),
+                  completion:
+                    p.completion_rate === null ? null : Number(p.completion_rate.toFixed(1)),
+                }))}
+                categoryKey="program"
+                categoryLabel="Program"
+                valueLabel="Share of enrollments (%)"
+                unit="%"
+                series={[
+                  { key: "placement", label: "Placement rate", color: TONE_COLOR.info },
+                  { key: "completion", label: "Completion rate", color: TONE_COLOR.success },
+                ]}
+              />
+            </ChartCard>
+            <ChartCard
+              title="Enrollment records by outcome"
+              description="Enrolled, placed and completed"
+              loading={loading}
+              error={error}
+              onRetry={retry}
+              isEmpty={programs.every((p) => p.enrollments === 0)}
+              emptyTitle="No enrollment records yet"
+              emptyDescription="Counts appear once students are enrolled in your programs."
+              footnote="A student can have more than one enrollment, so counts are enrollment records, not unique people."
+            >
+              <BarChartView
+                title="Enrollment records by outcome"
+                data={programs.map((p) => ({
+                  program: p.code,
+                  enrolled: p.enrollments,
+                  placed: p.placed,
+                  completed: p.completed,
+                }))}
+                categoryKey="program"
+                categoryLabel="Program"
+                valueLabel="Enrollment records"
+                unit="records"
+                series={[
+                  { key: "enrolled", label: "Enrolled", color: SERIES_COLORS[0]! },
+                  { key: "placed", label: "Placed", color: TONE_COLOR.info },
+                  { key: "completed", label: "Completed", color: TONE_COLOR.success },
+                ]}
+              />
+            </ChartCard>
+          </div>
+          <Card>
+            <SectionHeading
+              title="Enrollment outcomes"
+              description="Evaluation averages include only submitted, scored evaluations."
+            />
+            {loading ? null : programs.length === 0 ? (
+              <EmptyState compact title="No programs assigned" />
+            ) : (
+              <Table
+                head={[
+                  "Program",
+                  "Enrollments",
+                  "Placed",
+                  "Completed",
+                  "Placement rate",
+                  "Completion rate",
+                  "Evaluation average",
+                  "Evaluations",
+                ]}
+              >
+                {programs.map((p) => (
+                  <Row key={p.code}>
+                    <td className="font-medium">
+                      {p.code} · {p.name}
+                    </td>
+                    <td className="tabular-nums">{p.enrollments}</td>
+                    <td className="tabular-nums">{p.placed}</td>
+                    <td className="tabular-nums">{p.completed}</td>
+                    <td>{percent(p.placement_rate)}</td>
+                    <td>{percent(p.completion_rate)}</td>
+                    <td>{percent(p.evaluation_percent)}</td>
+                    <td className="tabular-nums">{p.evaluation_count}</td>
+                  </Row>
+                ))}
+              </Table>
+            )}
+          </Card>
+        </>
+      )}
+
+      {section === "hosts" && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <KpiCard
+              label="Active host establishments"
+              value={data ? data.hosts.filter((h) => h.is_active).length : null}
+              icon={Building2}
+              loading={loading}
+            />
+            <KpiCard
+              label="Current agreements"
+              value={data ? data.hosts.reduce((n, h) => n + h.current_agreements, 0) : null}
+              icon={FileCheck2}
+              tone="success"
+              loading={loading}
+              hint="Scoped to your programs"
+            />
+            <KpiCard
+              label="Agreements expiring within 90 days"
+              value={
+                data ? data.hosts.reduce((n, h) => n + h.agreements_expiring_90_days, 0) : null
+              }
+              icon={TriangleAlert}
+              tone="warn"
+              loading={loading}
+            />
+          </div>
+          <div className="grid gap-4 xl:grid-cols-5">
+            <ChartCard
+              className="xl:col-span-2"
+              title="Agreement coverage"
+              description="Host establishments by agreement status"
+              loading={loading}
+              error={error}
+              onRetry={retry}
+              isEmpty={!data?.hosts.length}
+              emptyTitle="No host establishments yet"
+              emptyDescription="Hosts appear once they are linked to your programs."
+            >
+              <DonutChartView
+                title="Agreement coverage"
+                slices={hostCoverage}
+                totalLabel="hosts"
+                unit="hosts"
+              />
+            </ChartCard>
+            <Card className="xl:col-span-3">
+              <SectionHeading
+                title="Establishments"
+                description={
+                  data ? `${visibleHosts.length} of ${data.hosts.length} hosts` : undefined
+                }
+              />
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <input
+                  type="search"
+                  aria-label="Search hosts"
+                  placeholder="Search name, industry or city"
+                  className={`${inputClass} max-w-xs`}
+                  value={hostSearch}
+                  onChange={(e) => setHostSearch(e.target.value)}
+                />
+                <select
+                  aria-label="Host coverage"
+                  className={`${inputClass} w-auto`}
+                  value={hostFilter}
+                  onChange={(e) => setHostFilter(e.target.value)}
                 >
-                  {data.programs
-                    .filter((p) => !program || p.code === program)
-                    .map((p) => (
-                      <Row key={p.code}>
-                        <td>
-                          {p.code} · {p.name}
-                        </td>
-                        <td>{p.enrollments}</td>
-                        <td>{p.placed}</td>
-                        <td>{p.completed}</td>
-                        <td>{percent(p.placement_rate)}</td>
-                        <td>{percent(p.completion_rate)}</td>
-                        <td>{percent(p.evaluation_percent)}</td>
-                        <td>{p.evaluation_count}</td>
-                      </Row>
-                    ))}
-                </Table>
-                {data.programs.length === 0 && <p>No programs assigned.</p>}
-              </Card>
-            </>
-          )}
-          {section === "hosts" && (
-            <>
-              <div className="mb-5 flex flex-wrap gap-3">
-                <label className="text-sm">
-                  Search hosts
-                  <input
-                    type="search"
-                    className="ml-2 rounded border p-2"
-                    value={hostSearch}
-                    onChange={(e) => setHostSearch(e.target.value)}
-                  />
-                </label>
-                <label className="text-sm">
-                  Coverage
-                  <select
-                    aria-label="Host coverage"
-                    className="ml-2 rounded border p-2"
-                    value={hostFilter}
-                    onChange={(e) => setHostFilter(e.target.value)}
+                  <option value="all">All hosts</option>
+                  <option value="active">Active hosts</option>
+                  <option value="expiring">Agreements expiring within 90 days</option>
+                  <option value="uncovered">No current agreement</option>
+                </select>
+                {(hostSearch || hostFilter !== "all") && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setHostSearch("");
+                      setHostFilter("all");
+                    }}
                   >
-                    <option value="all">All hosts</option>
-                    <option value="active">Active hosts</option>
-                    <option value="expiring">Agreements expiring within 90 days</option>
-                    <option value="uncovered">No current agreement</option>
-                  </select>
-                </label>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setHostSearch("");
-                    setHostFilter("all");
-                  }}
-                >
-                  Clear host filters
-                </Button>
+                    Clear filters
+                  </Button>
+                )}
               </div>
-              <p className="mb-3 text-xs text-muted-foreground">
-                {visibleHosts.length} of {data.hosts.length} hosts. Summary totals cover all
-                accessible hosts.
-              </p>
-              <StatGrid>
-                <StatCard
-                  label="Accessible active hosts"
-                  value={String(data.hosts.filter((h) => h.is_active).length)}
-                />
-                <StatCard
-                  label="Current scoped agreements"
-                  value={String(data.hosts.reduce((n, h) => n + h.current_agreements, 0))}
-                />
-                <StatCard
-                  label="Agreements expiring within 90 days"
-                  value={String(data.hosts.reduce((n, h) => n + h.agreements_expiring_90_days, 0))}
-                />
-              </StatGrid>
-              <Card>
+              {loading ? null : visibleHosts.length === 0 ? (
+                <EmptyState compact title="No hosts match these filters" />
+              ) : (
                 <Table
-                  head={[
-                    "Establishment",
-                    "Industry",
-                    "City",
-                    "Host status",
-                    "Current scoped agreements",
-                    "Expiring within 90 days",
-                  ]}
+                  head={["Establishment", "Industry", "City", "Status", "Agreements", "Expiring"]}
                 >
                   {visibleHosts.map((h) => (
                     <Row key={h.id}>
-                      <td>{h.name}</td>
-                      <td>{h.industry}</td>
-                      <td>{h.city}</td>
-                      <td>{h.is_active ? "Active" : "Inactive"}</td>
-                      <td>{h.current_agreements || "No current agreement"}</td>
-                      <td>{h.agreements_expiring_90_days}</td>
+                      <td className="font-medium">{h.name}</td>
+                      <td className="text-muted-foreground">{h.industry}</td>
+                      <td className="text-muted-foreground">{h.city}</td>
+                      <td>
+                        <Pill tone={h.is_active ? "success" : "muted"}>
+                          {h.is_active ? "Active" : "Inactive"}
+                        </Pill>
+                      </td>
+                      <td className="tabular-nums">
+                        {h.current_agreements === 0 ? (
+                          <Pill tone="brand">None current</Pill>
+                        ) : (
+                          h.current_agreements
+                        )}
+                      </td>
+                      <td className="tabular-nums">
+                        {h.agreements_expiring_90_days > 0 ? (
+                          <Pill tone="warn">{String(h.agreements_expiring_90_days)}</Pill>
+                        ) : (
+                          0
+                        )}
+                      </td>
                     </Row>
                   ))}
                 </Table>
-                {visibleHosts.length === 0 && <p>No hosts match these filters.</p>}
-              </Card>
-            </>
-          )}
-          {section === "equity" && (
-            <>
-              <StatGrid>
-                <StatCard
-                  label="Median straight-line distance"
-                  value={
-                    data.equity.median_km === null ? "Not recorded" : `${data.equity.median_km} km`
-                  }
-                />
-                <StatCard
-                  label="Measured current placements"
-                  value={String(data.equity.measured_placements)}
-                />
-                <StatCard
-                  label="Current placements over 20 km"
-                  value={String(data.equity.over_20_km)}
-                />
-                <StatCard
-                  label="Placements missing coordinates"
-                  value={String(data.equity.missing_coordinates)}
-                />
-              </StatGrid>
-              <Card>
-                <CardTitle>Current approved and active placements</CardTitle>
-                <Counts values={data.equity.bands} />
-                <p className="mt-3 text-sm">
-                  Distances use stored coordinates and Haversine. They do not measure road distance,
-                  travel time or fairness.
-                </p>
-              </Card>
-              <div className="mt-5">
-                <AccessibilityMap note="Host locations within your assigned programs. Student addresses are not exposed in this view." />
-              </div>
-            </>
-          )}
-          {section === "analytics" && (
-            <div className="grid gap-5 lg:grid-cols-2">
-              <Card>
-                <CardTitle>Stored recommendation snapshots</CardTitle>
-                <Counts values={data.similarity_bands} />
-                <p className="mt-3 text-sm">
-                  Cosine similarity bands include retained generations. These scores are not
-                  placement probabilities.
-                </p>
-              </Card>
-              <Card>
-                <CardTitle>Placement outcomes by term</CardTitle>
-                <div className="space-y-4">
-                  {data.terms.map((t) => (
-                    <div key={t.term}>
-                      <div className="mb-1 flex justify-between gap-3 text-sm">
-                        <span>{t.term}</span>
-                        <span>{percent(t.placement_rate)}</span>
-                      </div>
-                      {t.placement_rate !== null && (
-                        <progress
-                          aria-label={`${t.term} placement rate`}
-                          className="h-2 w-full accent-brand"
-                          max={100}
-                          value={t.placement_rate}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {t.placed} placed / {t.enrollments} enrollment records
-                      </p>
-                    </div>
-                  ))}
-                </div>{" "}
-                {data.terms.length === 0 && <p>No recorded terms.</p>}
-              </Card>
-              <Card className="lg:col-span-2">
-                <CardTitle>Required competencies in published opportunities</CardTitle>
-                <Counts values={data.competency_demand} distribution={false} />
-              </Card>
-            </div>
-          )}
-          <p className="mt-4 text-xs text-muted-foreground">
-            Retrieved {new Date(data.generated_at).toLocaleString()}
-          </p>
+              )}
+            </Card>
+          </div>
         </>
       )}
-    </>
-  );
-}
 
-function Counts({ values, distribution = true }: { values: Band[]; distribution?: boolean }) {
-  const total = values.reduce((sum, value) => sum + value.value, 0);
-  const max = distribution ? total : Math.max(0, ...values.map((value) => value.value));
-  return !total ? (
-    <p>No records available.</p>
-  ) : (
-    <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">
-        {distribution
-          ? `${total} records with available measurements. Percentages use this total.`
-          : "Counts of published opportunities requiring each competency. Bars are scaled to the highest count; competencies can overlap."}
-      </p>
-      {values.map((value) => (
-        <div key={value.label}>
-          <div className="mb-1 flex justify-between gap-3 text-sm">
-            <span>{value.label}</span>
-            <span>
-              {value.value}
-              {distribution ? ` · ${((value.value / total) * 100).toFixed(1)}%` : " opportunities"}
-            </span>
+      {section === "equity" && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              label="Median straight-line distance"
+              value={
+                data?.equity.median_km === null || !data
+                  ? "Not recorded"
+                  : `${data.equity.median_km} km`
+              }
+              icon={Route}
+              loading={loading}
+            />
+            <KpiCard
+              label="Measured current placements"
+              value={data?.equity.measured_placements ?? null}
+              icon={Ruler}
+              loading={loading}
+              hint="Approved and active, with saved coordinates"
+            />
+            <KpiCard
+              label="Placements over 20 km"
+              value={data?.equity.over_20_km ?? null}
+              icon={TriangleAlert}
+              tone={data && data.equity.over_20_km > 0 ? "warn" : "muted"}
+              loading={loading}
+            />
+            <KpiCard
+              label="Placements missing coordinates"
+              value={data?.equity.missing_coordinates ?? null}
+              icon={MapPinOff}
+              tone={data && data.equity.missing_coordinates > 0 ? "warn" : "muted"}
+              loading={loading}
+            />
           </div>
-          <progress
-            aria-label={value.label}
-            className="h-2 w-full accent-brand"
-            max={max || 1}
-            value={value.value}
-          />
+          <ChartCard
+            title="Current placements by distance band"
+            description="Approved and active placements"
+            loading={loading}
+            error={error}
+            onRetry={retry}
+            isEmpty={!data || data.equity.bands.every((b) => b.value === 0)}
+            emptyTitle="No distances to show"
+            emptyDescription="Distances need approved or active placements with saved student and host coordinates."
+            footnote="Distances use stored coordinates and the Haversine formula. They do not measure road distance, travel time or fairness."
+          >
+            <BarChartView
+              title="Current placements by distance band"
+              data={(data?.equity.bands ?? []).map((b) => ({ band: b.label, placements: b.value }))}
+              categoryKey="band"
+              categoryLabel="Distance band"
+              valueLabel="Placements"
+              unit="placements"
+              series={[{ key: "placements", label: "Placements", color: SERIES_COLORS[0]! }]}
+            />
+          </ChartCard>
+          <AccessibilityMap note="Host locations within your assigned programs. Student addresses are not exposed in this view." />
+        </>
+      )}
+
+      {section === "analytics" && (
+        <WeeklyActivity weeks={data?.weekly} loading={loading} error={error} onRetry={retry} />
+      )}
+      {section === "analytics" && (
+        <div className="mt-4 grid gap-4 xl:grid-cols-2">
+          <ChartCard
+            title="Stored recommendations by similarity score"
+            description="Retained recommendation generations, grouped by raw cosine similarity score"
+            loading={loading}
+            error={error}
+            onRetry={retry}
+            isEmpty={!data || data.similarity_bands.every((b) => b.value === 0)}
+            emptyTitle="No stored recommendations yet"
+            emptyDescription="Scores appear after recommendations are generated for students."
+            footnote="Similarity scores are not placement probabilities."
+          >
+            <BarChartView
+              title="Stored recommendations by similarity score"
+              data={(data?.similarity_bands ?? []).map((b) => ({
+                band: b.label,
+                recommendations: b.value,
+              }))}
+              categoryKey="band"
+              categoryLabel="Similarity score"
+              valueLabel="Recommendations"
+              unit="recommendations"
+              series={[
+                { key: "recommendations", label: "Recommendations", color: SERIES_COLORS[0]! },
+              ]}
+            />
+          </ChartCard>
+          <ChartCard
+            title="Enrollment outcomes by term"
+            description="Enrollment records, placed and completed"
+            loading={loading}
+            error={error}
+            onRetry={retry}
+            isEmpty={!data || data.terms.length === 0}
+            emptyTitle="No recorded terms"
+            emptyDescription="Terms appear once students are enrolled."
+            footnote="A student can have more than one enrollment, so counts are enrollment records."
+          >
+            <BarChartView
+              title="Enrollment outcomes by term"
+              data={(data?.terms ?? []).map((t) => ({
+                term: t.term,
+                enrolled: t.enrollments,
+                placed: t.placed,
+                completed: t.completed,
+              }))}
+              categoryKey="term"
+              categoryLabel="Term"
+              valueLabel="Enrollment records"
+              unit="records"
+              series={[
+                { key: "enrolled", label: "Enrolled", color: SERIES_COLORS[0]! },
+                { key: "placed", label: "Placed", color: TONE_COLOR.info },
+                { key: "completed", label: "Completed", color: TONE_COLOR.success },
+              ]}
+            />
+          </ChartCard>
+          <ChartCard
+            className="xl:col-span-2"
+            title="Skills requested by published opportunities"
+            description="Number of published opportunities requiring each competency (top 10; a competency can overlap with others)"
+            loading={loading}
+            error={error}
+            onRetry={retry}
+            isEmpty={!data || data.competency_demand.length === 0}
+            emptyTitle="No published opportunities list competencies"
+            emptyDescription="Competencies appear when opportunities are published with required skills."
+          >
+            <BarChartView
+              title="Skills requested by published opportunities"
+              data={(data?.competency_demand ?? [])
+                .slice(0, 10)
+                .map((b) => ({ competency: b.label, opportunities: b.value }))}
+              categoryKey="competency"
+              categoryLabel="Competency"
+              valueLabel="Opportunities"
+              unit="opportunities"
+              layout="horizontal"
+              height={Math.max(180, Math.min(10, data?.competency_demand.length ?? 0) * 34)}
+              series={[{ key: "opportunities", label: "Opportunities", color: SERIES_COLORS[0]! }]}
+            />
+          </ChartCard>
         </div>
-      ))}
-      <details>
-        <summary className="cursor-pointer text-sm font-semibold text-brand">
-          View exact counts
-        </summary>
-        <Table head={["Category", "Records"]}>
-          {values.map((value) => (
-            <Row key={value.label}>
-              <td>{value.label}</td>
-              <td>{value.value}</td>
-            </Row>
-          ))}
-        </Table>
-      </details>
+      )}
+
+      {data && (
+        <p className="text-xs text-muted-foreground">
+          Retrieved{" "}
+          {new Date(data.generated_at).toLocaleString("en-PH", {
+            timeZone: "Asia/Manila",
+            dateStyle: "medium",
+            timeStyle: "short",
+          })}
+        </p>
+      )}
     </div>
   );
 }

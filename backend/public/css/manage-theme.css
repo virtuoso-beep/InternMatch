@@ -1,0 +1,37 @@
+/*
+ * InternMatch management panel theme (Filament). Styling only.
+ * Matches the portal: UM maroon primary colour (set in ManagementPanelProvider), Public Sans,
+ * the portal's page background, and the same card radius. Light and dark follow Filament's own switch.
+ */
+:root {
+  --im-page: oklch(0.968 0.003 250);
+}
+.dark {
+  --im-page: oklch(0.175 0.008 20);
+}
+.fi-body {
+  background-color: var(--im-page);
+}
+.fi-sidebar,
+.fi-topbar {
+  --im-border: oklch(0.915 0.006 255);
+}
+.dark .fi-sidebar,
+.dark .fi-topbar {
+  --im-border: oklch(1 0 0 / 11%);
+}
+.fi-section,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat {
+  border-radius: 0.75rem;
+}
+.fi-btn,
+.fi-input-wrp {
+  border-radius: 0.5rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

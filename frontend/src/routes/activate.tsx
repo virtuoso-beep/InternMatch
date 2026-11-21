@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { KeyRound } from "lucide-react";
-import sealUrl from "@/assets/umtc-seal.png";
+// Small optimized copy of the seal (the original asset is 868 KB).
+const sealUrl = "/images/brand/umtc-seal-128.webp";
 import { api, mutate } from "@/lib/api";
 import { Button } from "@/components/im/ui";
 

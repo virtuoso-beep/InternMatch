@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
-import { Button, Card, Field, Pill, formatSimilarity } from "./ui";
+import { Button, Card, Field, Pill, ViewModal, formatSimilarity } from "./ui";
+import { ConfirmButton } from "./actions";
 
 type Skill = { name: string; level: number | null; minimum_level: number };
 type Recommendation = {
@@ -34,8 +35,6 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
   const [available, setAvailable] = useState<Available[]>([]);
   const [interested, setInterested] = useState<number[]>([]);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const [filter, setFilter] = useState<Sort>("Highest similarity");
@@ -84,29 +83,27 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
       return difference || a.rank - b.rank;
     });
   async function interest(item: Recommendation, next: boolean) {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      await mutate(
-        "/enrollments/" + enrollmentId + "/opportunities/" + item.opportunity_id + "/interest",
-        { interested: next },
-      );
-      setInterested((current) =>
-        next
-          ? [...new Set([...current, item.opportunity_id])]
-          : current.filter((id) => id !== item.opportunity_id),
-      );
-      setNotice(
-        next
-          ? "Interest saved. Your coordinator still needs to review and approve placement."
-          : "Interest withdrawn.",
-      );
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to save interest.");
-    } finally {
-      setBusy(false);
-    }
+    await mutate(
+      "/enrollments/" + enrollmentId + "/opportunities/" + item.opportunity_id + "/interest",
+      { interested: next },
+    );
+    setInterested((current) =>
+      next
+        ? [...new Set([...current, item.opportunity_id])]
+        : current.filter((id) => id !== item.opportunity_id),
+    );
+  }
+  async function regenerate() {
+    const recommendations = await mutate<{ data: Recommendation[] }>(
+      "/enrollments/" + enrollmentId + "/recommendations",
+      {},
+    );
+    const opportunities = await api<{ data: Available[] }>(
+      "/enrollments/" + enrollmentId + "/opportunities",
+    );
+    setItems(recommendations.data);
+    setAvailable(opportunities.data);
+    setDetails(null);
   }
   return (
     <div className="space-y-5">
@@ -121,7 +118,7 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
               className={
                 "rounded-full border px-5 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand " +
                 (filter === option
-                  ? "border-brand bg-brand text-white"
+                  ? "border-brand bg-brand text-brand-foreground"
                   : "border-border bg-card hover:bg-muted")
               }
             >
@@ -129,57 +126,24 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
             </button>
           ))}
         </div>
-        <Button
-          variant="outline"
-          disabled={busy || loading}
-          onClick={async () => {
-            setBusy(true);
-            setError("");
-            setNotice("");
-            try {
-              const recommendations = await mutate<{ data: Recommendation[] }>(
-                "/enrollments/" + enrollmentId + "/recommendations",
-                {},
-              );
-              const opportunities = await api<{ data: Available[] }>(
-                "/enrollments/" + enrollmentId + "/opportunities",
-              );
-              setItems(recommendations.data);
-              setAvailable(opportunities.data);
-              setDetails(null);
-              setNotice("Recommendations updated.");
-            } catch (cause) {
-              setError(
-                cause instanceof Error ? cause.message : "Unable to generate recommendations.",
-              );
-            } finally {
-              setBusy(false);
-            }
-          }}
+        <ConfirmButton
+          disabled={loading}
+          title={items?.length ? "Refresh your recommendations?" : "Generate your recommendations?"}
+          description="InternMatch compares your saved competencies with every opportunity you are eligible for. The new list replaces the current one; earlier lists stay in your history."
+          confirmLabel={items?.length ? "Refresh recommendations" : "Generate recommendations"}
+          success="Recommendations updated"
+          onConfirm={regenerate}
         >
-          {busy
-            ? "Please wait…"
-            : items?.length
-              ? "Refresh recommendations"
-              : "Generate recommendations"}
-        </Button>
+          {items?.length ? "Refresh recommendations" : "Generate recommendations"}
+        </ConfirmButton>
       </div>
       {error && (
         <div role="alert" className="rounded-lg border border-brand/20 bg-brand-soft p-4 text-sm">
           {error}
-          <button
-            className="ml-3 underline"
-            disabled={busy}
-            onClick={() => setRevision((value) => value + 1)}
-          >
+          <button className="ml-3 underline" onClick={() => setRevision((value) => value + 1)}>
             Reload
           </button>
         </div>
-      )}
-      {notice && (
-        <p role="status" className="rounded-lg bg-success-soft p-3 text-sm text-success">
-          {notice}
-        </p>
       )}
       {loading && <p role="status">Checking recommendations and current availability…</p>}
       {!loading && items && (
@@ -284,18 +248,29 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
                     {sent ? (
                       <>
                         <Pill tone="success">Interest sent</Pill>
-                        <Button
+                        <ConfirmButton
                           variant="ghost"
-                          disabled={busy}
-                          onClick={() => interest(item, false)}
+                          title={`Withdraw interest in ${item.snapshot.opportunity_title ?? "this opportunity"}?`}
+                          description="Your coordinator will no longer see your interest in this opportunity. You can express interest again while it is available."
+                          confirmLabel="Withdraw interest"
+                          tone="danger"
+                          success="Interest withdrawn"
+                          onConfirm={() => interest(item, false)}
                         >
                           Withdraw interest
-                        </Button>
+                        </ConfirmButton>
                       </>
                     ) : (
-                      <Button disabled={busy} onClick={() => interest(item, true)}>
+                      <ConfirmButton
+                        variant="primary"
+                        title={`Express interest in ${item.snapshot.opportunity_title ?? "this opportunity"}?`}
+                        description="Your coordinator sees your interest when reviewing placements. It does not reserve a slot or approve a placement."
+                        confirmLabel="Express interest"
+                        success="Interest saved"
+                        onConfirm={() => interest(item, true)}
+                      >
                         Express interest
-                      </Button>
+                      </ConfirmButton>
                     )}
                     <Button variant="outline" onClick={() => setDetails(item)}>
                       View details
@@ -317,30 +292,15 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
 }
 
 function RecommendationDetails({ item, onClose }: { item: Recommendation; onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
-  }, []);
+  const place = `${item.snapshot.host_name ?? ""}${item.snapshot.city ? " · " + item.snapshot.city : ""}`;
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="recommendation-details-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-border bg-card p-6 text-foreground shadow-xl backdrop:bg-black/35"
+    <ViewModal
+      open
+      onClose={onClose}
+      title={item.snapshot.opportunity_title ?? "Recommendation details"}
+      description={place || undefined}
     >
-      <h2 id="recommendation-details-title" className="text-xl font-semibold">
-        {item.snapshot.opportunity_title ?? "Recommendation details"}
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {item.snapshot.host_name}
-        {item.snapshot.city ? " · " + item.snapshot.city : ""}
-      </p>
-      <h3 className="mt-5 font-semibold">About the opportunity</h3>
+      <h3 className="font-semibold">About the opportunity</h3>
       <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
         {item.snapshot.description || "No description recorded."}
       </p>
@@ -360,9 +320,6 @@ function RecommendationDetails({ item, onClose }: { item: Recommendation; onClos
           {item.moa_status_at_time}. These saved facts may differ from current availability.
         </p>
       </div>
-      <div className="mt-6 flex justify-end">
-        <Button onClick={onClose}>Close</Button>
-      </div>
-    </dialog>
+    </ViewModal>
   );
 }

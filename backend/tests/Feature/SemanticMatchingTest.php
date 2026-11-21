@@ -38,6 +38,7 @@ class SemanticMatchingTest extends TestCase
 
     public function test_generation_filters_first_freezes_facts_notifies_and_records_empty_generations(): void
     {
+        config(['matching.reranker' => 'off']); // plain cosine path; reranking is covered by SupervisedRerankingTest
         [$student, $opportunity] = $this->context();
         $skill = $student->student->studentCompetencies()->firstOrFail();
         $skill->update(['level' => 82]);

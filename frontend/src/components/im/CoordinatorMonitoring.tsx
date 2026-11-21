@@ -31,36 +31,16 @@ export function CoordinatorMonitoring({ mode }: { mode: "progress" | "evaluation
     setError("");
     setSelected(null);
     async function load() {
-      const result = await api<{ data: Placement[]; last_page: number }>(
-        `/placements?page=${page}`,
+      // One request per page: the server includes progress or submitted evaluations for each row.
+      const result = await api<{
+        data: (Placement & { progress?: Monitoring["progress"]; evaluations?: Assessment[] })[];
+        last_page: number;
+      }>(`/placements?page=${page}&include=${mode}`);
+      const records: RecordRow[] = result.data.map((placement) =>
+        mode === "progress"
+          ? { placement, ...(placement.progress ? { progress: placement.progress } : {}) }
+          : { placement, evaluations: placement.evaluations ?? [] },
       );
-      const records: RecordRow[] = [];
-      for (let i = 0; i < result.data.length; i += 5) {
-        const batch = await Promise.all(
-          result.data.slice(i, i + 5).map(async (placement) => {
-            try {
-              if (mode === "progress") {
-                const detail = await api<Monitoring>(`/placements/${placement.id}/monitoring`);
-                return { placement, progress: detail.progress };
-              }
-              const detail = await api<{ data: Assessment[] }>(
-                `/placements/${placement.id}/evaluations`,
-              );
-              return {
-                placement,
-                evaluations: detail.data.filter((e) => e.status === "submitted"),
-              };
-            } catch (cause) {
-              return {
-                placement,
-                error: cause instanceof Error ? cause.message : "Unable to load details.",
-              };
-            }
-          }),
-        );
-        records.push(...batch);
-        if (!active) return;
-      }
       if (active) {
         setRows(records);
         setLast(result.last_page);
@@ -200,7 +180,7 @@ export function CoordinatorMonitoring({ mode }: { mode: "progress" | "evaluation
                                   aria-label={`${studentName(row.placement.student_enrollment.student.user)} completion`}
                                   max={100}
                                   value={percent}
-                                  className="h-2 w-28 accent-emerald-700"
+                                  className="h-2 w-28 accent-success"
                                 />
                                 <p>{percent.toFixed(0)}%</p>
                               </>

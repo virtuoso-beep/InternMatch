@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, mutate, ApiError } from "@/lib/api";
 import { useSessionUser } from "./SessionGuard";
 import { Button, Pill } from "./ui";
+import { ConfirmButton } from "./actions";
 
 type Conversation = {
   id: number;
@@ -165,7 +166,7 @@ export function ChatWorkspace({ compact = false }: { compact?: boolean }) {
       )}
       {!selected ? (
         <div className="overflow-hidden rounded-2xl border bg-card">
-          <div className="flex items-center justify-between border-b bg-slate-50 p-4">
+          <div className="flex items-center justify-between border-b bg-muted/50 p-4">
             <h2 className="font-semibold">All conversations</h2>
             <span className="text-xs text-muted-foreground">Assigned participants only</span>
           </div>
@@ -185,7 +186,7 @@ export function ChatWorkspace({ compact = false }: { compact?: boolean }) {
               <button
                 key={c.id}
                 onClick={() => choose(c.id)}
-                className="block w-full border-b p-4 text-left last:border-0 hover:bg-blue-50"
+                className="block w-full border-b p-4 text-left last:border-0 hover:bg-brand-soft/40"
               >
                 <span className="flex items-center justify-between gap-2">
                   <strong>
@@ -194,7 +195,7 @@ export function ChatWorkspace({ compact = false }: { compact?: boolean }) {
                       : "Program coordinator"}
                   </strong>
                   {!!c.unread_count && (
-                    <span className="rounded-full bg-brand px-2 py-1 text-xs text-white">
+                    <span className="rounded-full bg-brand px-2 py-1 text-xs text-brand-foreground">
                       {c.unread_count} unread
                     </span>
                   )}
@@ -251,7 +252,7 @@ export function ChatWorkspace({ compact = false }: { compact?: boolean }) {
             </p>
           )}
           <div
-            className={`${compact ? "h-60" : "h-[min(52vh,480px)]"} overflow-y-auto bg-slate-50 p-4`}
+            className={`${compact ? "h-60" : "h-[min(52vh,480px)]"} overflow-y-auto bg-muted/50 p-4`}
             aria-label="Messages"
           >
             {(older.length ? olderAvailable : detail?.has_older) && (
@@ -279,7 +280,7 @@ export function ChatWorkspace({ compact = false }: { compact?: boolean }) {
               </button>
             )}
             {detail && !messages.length && (
-              <p className="rounded-xl bg-blue-50 p-4 text-sm text-slate-600">
+              <p className="rounded-xl bg-info-soft p-4 text-sm text-info">
                 Start a conversation with your assigned participants. Messages do not replace
                 placement approval or official requirements.
               </p>
@@ -290,11 +291,11 @@ export function ChatWorkspace({ compact = false }: { compact?: boolean }) {
                 className={`mb-3 flex ${m.sender_id === user.id ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[90%] rounded-2xl p-3 ${m.sender_id === user.id ? "bg-blue-100" : "border bg-white"}`}
+                  className={`max-w-[90%] rounded-2xl p-3 ${m.sender_id === user.id ? "bg-brand-soft" : "border bg-card"}`}
                 >
                   <p className="text-xs font-bold">{m.sender}</p>
                   <p className="mt-1 whitespace-pre-wrap break-words text-sm">{m.body}</p>
-                  <time className="mt-2 block text-[11px] text-slate-500">
+                  <time className="mt-2 block text-[11px] text-muted-foreground">
                     {new Date(m.created_at).toLocaleString()}
                   </time>
                 </div>
@@ -338,7 +339,6 @@ export function ChatWorkspace({ compact = false }: { compact?: boolean }) {
 export function ChatSettings() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
   useEffect(() => {
     api<{ enabled: boolean }>("/chat/settings")
       .then((v) => setEnabled(v.enabled))
@@ -360,35 +360,28 @@ export function ChatSettings() {
       {enabled === null ? (
         <p>Loading settings…</p>
       ) : (
-        <Button
-          disabled={busy}
-          onClick={async () => {
-            if (
-              enabled &&
-              !window.confirm(
-                "Disable chat for all students, coordinators and supervisors? Existing messages are kept.",
-              )
-            ) {
-              return;
-            }
-            setBusy(true);
-            setError("");
-            try {
-              const v = await mutate<{ enabled: boolean }>(
-                "/chat/settings",
-                { enabled: !enabled },
-                "PUT",
-              );
-              setEnabled(v.enabled);
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Unable to save.");
-            } finally {
-              setBusy(false);
-            }
+        <ConfirmButton
+          variant="primary"
+          tone={enabled ? "danger" : "primary"}
+          title={enabled ? "Disable chat for everyone?" : "Enable chat for everyone?"}
+          description={
+            enabled
+              ? "Students, coordinators and supervisors will no longer be able to send or read messages. Existing messages are kept and chat can be turned back on at any time."
+              : "Students, coordinators and assigned supervisors can send and read messages again in their current conversations."
+          }
+          confirmLabel={enabled ? "Disable chat" : "Enable chat"}
+          success={enabled ? "Chat disabled" : "Chat enabled"}
+          onConfirm={async () => {
+            const v = await mutate<{ enabled: boolean }>(
+              "/chat/settings",
+              { enabled: !enabled },
+              "PUT",
+            );
+            setEnabled(v.enabled);
           }}
         >
           {enabled ? "Disable chat" : "Enable chat"}
-        </Button>
+        </ConfirmButton>
       )}
     </section>
   );

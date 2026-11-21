@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Card, CardTitle, PageHeader } from "@/components/im/ui";
+import { toast } from "sonner";
+import { Button, Card, CardTitle, Modal, PageHeader } from "@/components/im/ui";
 import { api, mutate, upload } from "@/lib/api";
 import { ROLES, type RoleKey } from "@/lib/internmatch";
 import { useSessionUser, useUpdateSessionUser } from "./SessionGuard";
+import { ChangePasswordModal } from "./ChangePassword";
 
 type Profile = {
   id: number;
@@ -54,7 +56,7 @@ const toForm = (profile: Profile): Form => ({
 });
 const inputClass =
   "mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/25";
-const labelClass = "block text-xs font-semibold uppercase tracking-wide text-brand";
+const labelClass = "block text-sm font-medium text-foreground";
 
 /** Compute profile completeness (0–100) from filled fields. */
 function profileCompleteness(profile: Profile, role: RoleKey): number {
@@ -93,6 +95,9 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
   const [saving, setSaving] = useState(false);
   const [retry, setRetry] = useState(0);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [pendingPhoto, setPendingPhoto] = useState<{ file: File; url: string } | null>(null);
+  const [photoError, setPhotoError] = useState("");
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -135,9 +140,10 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
     setMessage(null);
   };
 
-  /** Upload a photo file with validation. */
+  /** Validate a chosen photo, then ask for confirmation with a preview before uploading. */
   const handlePhotoFile = async (file: File) => {
     setError(null);
+    setPhotoError("");
     if (
       !["image/jpeg", "image/png"].includes(file.type) ||
       file.size > 2 * 1024 * 1024 ||
@@ -146,15 +152,25 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
       setError("Choose a JPG or PNG photo up to 2 MB.");
       return;
     }
+    setPendingPhoto({ file, url: URL.createObjectURL(file) });
+  };
+  const closePhoto = () => {
+    if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url);
+    setPendingPhoto(null);
+  };
+  const uploadPhoto = async () => {
+    if (!pendingPhoto || photoBusy) return;
     setPhotoBusy(true);
+    setPhotoError("");
     try {
       const payload = new FormData();
-      payload.set("photo", file);
+      payload.set("photo", pendingPhoto.file);
       const { data } = await upload<{ data: Profile }>("/profile/photo", payload);
       setProfile((current) => current && { ...current, avatar_url: data.avatar_url ?? null });
-      setMessage("Profile photo saved.");
+      closePhoto();
+      toast.success("Profile photo saved");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to upload photo.");
+      setPhotoError(cause instanceof Error ? cause.message : "Unable to upload photo.");
     } finally {
       setPhotoBusy(false);
     }
@@ -216,7 +232,7 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
           <span
             role="status"
             className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-              dirty ? "bg-amber-50 text-amber-700" : "bg-brand px-5 text-brand-foreground"
+              dirty ? "bg-warn-soft text-warn" : "bg-brand px-5 text-brand-foreground"
             }`}
           >
             {saving ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}
@@ -224,17 +240,17 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
         }
       />
       {error && (
-        <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="mb-4 rounded-lg bg-brand-soft p-3 text-sm text-brand">
           {error}
         </p>
       )}
       {message && (
-        <p role="status" className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">
+        <p role="status" className="mb-4 rounded-lg bg-success-soft p-3 text-sm text-success">
           {message}
         </p>
       )}
       <form
-        className="grid gap-5 lg:grid-cols-3"
+        className="grid grid-cols-1 gap-5 lg:grid-cols-3"
         onSubmit={async (event) => {
           event.preventDefault();
           if (saving || locating || photoBusy || !dirty) return;
@@ -427,7 +443,7 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
                   className="h-20 w-20 rounded-full object-cover ring-4 ring-brand/10"
                 />
               ) : (
-                <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand text-xl font-bold text-white ring-4 ring-brand/10">
+                <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand text-xl font-bold text-brand-foreground ring-4 ring-brand/10">
                   {initials(profile.name)}
                 </span>
               )}
@@ -457,6 +473,59 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
                 </p>
               </div>
             </div>
+            <Modal
+              open={pendingPhoto !== null}
+              onClose={closePhoto}
+              size="sm"
+              dismissible={!photoBusy}
+              title="Use this profile photo?"
+              description="The photo replaces your current one everywhere in InternMatch."
+              footer={
+                <>
+                  <Button variant="outline" disabled={photoBusy} onClick={closePhoto} autoFocus>
+                    Cancel
+                  </Button>
+                  <Button disabled={photoBusy} onClick={() => void uploadPhoto()}>
+                    {photoBusy ? "Uploading…" : "Upload photo"}
+                  </Button>
+                </>
+              }
+            >
+              {pendingPhoto && (
+                <div className="flex flex-col items-center gap-3 text-sm">
+                  <img
+                    src={pendingPhoto.url}
+                    alt="Selected profile photo preview"
+                    className="h-28 w-28 rounded-full object-cover ring-4 ring-brand/10"
+                  />
+                  <p className="break-all text-center text-muted-foreground">
+                    {pendingPhoto.file.name} ·{" "}
+                    {pendingPhoto.file.type === "image/png" ? "PNG" : "JPG"} ·{" "}
+                    {(pendingPhoto.file.size / 1024).toFixed(0)} KB (maximum 2 MB)
+                  </p>
+                  {photoError && (
+                    <p
+                      role="alert"
+                      className="w-full rounded-lg border border-brand/20 bg-brand-soft px-3 py-2 text-brand"
+                    >
+                      {photoError}
+                    </p>
+                  )}
+                </div>
+              )}
+            </Modal>
+          </Card>
+
+          {/* Password */}
+          <Card>
+            <CardTitle>Password</CardTitle>
+            <p className="mt-2 mb-3 text-sm text-muted-foreground">
+              Change the password you use to sign in.
+            </p>
+            <Button variant="outline" onClick={() => setPasswordOpen(true)}>
+              Change password
+            </Button>
+            <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
           </Card>
 
           {/* Role card */}
@@ -470,7 +539,7 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
                   className="h-11 w-11 rounded-full object-cover"
                 />
               ) : (
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-sm font-bold text-brand-foreground">
                   {initials(profile.name)}
                 </span>
               )}
@@ -485,13 +554,11 @@ export function ProfileEditor({ role }: { role: RoleKey }) {
               <p className="text-xs text-muted-foreground">Profile completeness</p>
               <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-emerald-600 transition-all duration-500"
+                  className="h-full rounded-full bg-success transition-all duration-500"
                   style={{ width: `${completeness}%` }}
                 />
               </div>
-              <p className="mt-1 text-right text-xs font-medium text-emerald-700">
-                {completeness}%
-              </p>
+              <p className="mt-1 text-right text-xs font-medium text-success">{completeness}%</p>
             </div>
             {profile.student_number && (
               <p className="mt-3 text-xs text-muted-foreground">

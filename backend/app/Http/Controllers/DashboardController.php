@@ -94,7 +94,7 @@ class DashboardController extends Controller
             ->whereDoesntHave('placements', fn ($query) => $query->whereIn('status', ['pending', 'approved', 'active', 'completed']))
             ->with('programTerm.program')->get();
         $readiness = app(PlacementReadiness::class);
-        $incomplete = $awaiting->filter(fn ($enrollment) => $readiness->unmetRequirements($enrollment) !== [])->count();
+        $incomplete = count(array_filter($readiness->unmetRequirementsForMany($awaiting)));
         // Slots per host are shared by its opportunities, so count min(host remaining, sum of opportunity remaining).
         $eligibility = app(OpportunityEligibility::class);
         $slots = 0;
