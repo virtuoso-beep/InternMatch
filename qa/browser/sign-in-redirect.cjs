@@ -1,0 +1,20 @@
+const { chromium } = require('./harness.cjs');
+(async () => {
+  const b = await chromium.launch({ headless: true, channel: 'msedge' });
+  const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
+  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text().slice(0, 150)); });
+  await p.goto('http://localhost:8080/student/requirements', { waitUntil: 'networkidle' });
+  await p.waitForURL(u => new URL(u).pathname === '/auth', { timeout: 60000 });
+  console.log('guard sent to:', p.url().replace('http://localhost:8080', ''));
+  await p.waitForTimeout(1500);
+  await p.locator('#identifier').fill(process.env.QA_STUDENT_EMAIL);
+  await p.locator('#password').fill(process.env.QA_STUDENT_PW);
+  const t = Date.now();
+  await p.getByRole('button', { name: 'Sign in' }).click();
+  await p.waitForURL(u => new URL(u).pathname === '/student/requirements', { timeout: 60000 });
+  console.log('landed on', new URL(p.url()).pathname, 'after', Date.now() - t, 'ms');
+  await p.waitForTimeout(2000);
+  console.log('heading:', await p.locator('h1').first().innerText());
+  console.log('errors:', JSON.stringify(errs.slice(0, 3)));
+  await b.close();
+})().catch(e => { console.error('ERR', e.message.slice(0, 300)); process.exit(1); });

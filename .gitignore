@@ -23,3 +23,8 @@ Thumbs.db
 
 # Source data set (kept outside Git)
 FINAL DATA/
+
+# Browser QA output and runtime files (qa/browser)
+/qa/browser/out/
+/qa/browser/node_modules/
+/qa/browser/*.pdf

@@ -220,6 +220,30 @@ class SyntheticDataTest extends TestCase
         $this->artisan('ml:export-judgments', ['--source' => 'other'])->assertFailed();
     }
 
+    public function test_training_export_caps_synthetic_labels_per_program_balanced_by_class(): void
+    {
+        Storage::fake('local');
+        [, $synthetic] = $this->cohort();
+        $other = StudentEnrollment::factory()->create(['is_synthetic' => true]);
+        $rows = [];
+        foreach ([[$synthetic, 3, 9], [$other, 1, 2]] as [$enrollment, $good, $bad]) {
+            for ($i = 0; $i < $good + $bad; $i++) {
+                $rows[] = ['source_id' => 'CAP-'.$enrollment->id.'-'.$i, 'student_id' => $enrollment->student_id, 'program_id' => $enrollment->programTerm->program_id,
+                    'hte_code' => 'H', 'opportunity_code' => 'O', 'program_match' => 1, 'skill_match_score' => $i < $good ? .9 : .2, 'distance_km' => 3,
+                    'available_slots' => 2, 'has_slot' => 1, 'moa_valid' => 1, 'coordinator_decision' => 'x', 'suitable' => $i < $good, 'is_synthetic' => true];
+            }
+        }
+        DB::table('coordinator_labels')->insert($rows);
+
+        $this->artisan('ml:export-judgments', ['--source' => 'synthetic', '--per-program' => 4])->assertSuccessful();
+        $lines = array_slice(explode("\n", trim(Storage::disk('local')->get('ml/judgment_export.csv'))), 1);
+        $labels = array_map(fn ($line) => explode(',', $line)[4], $lines);
+        // Program 1: 2 suitable + 2 unsuitable of 12. Program 2: all 3 (fewer than the cap).
+        $this->assertCount(7, $lines);
+        $this->assertSame(3, count(array_filter($labels, fn ($l) => $l === '1')));
+        $this->artisan('ml:export-judgments', ['--source' => 'synthetic', '--per-program' => 'x'])->assertFailed();
+    }
+
     public function test_purge_removes_only_synthetic_records_and_keeps_listed_accounts(): void
     {
         config(['internmatch.synthetic_keep_student_numbers' => ['150001']]);

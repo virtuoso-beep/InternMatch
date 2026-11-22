@@ -1,0 +1,13 @@
+{
+  "name": "internmatch-browser-qa",
+  "private": true,
+  "description": "Browser checks and end-to-end flows for InternMatch, run against the local Docker stack.",
+  "scripts": {
+    "modal-sweep": "node modal-sweep.cjs",
+    "page-times": "node page-times.cjs",
+    "sign-in": "node sign-in-states.cjs && node sign-in-redirect.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

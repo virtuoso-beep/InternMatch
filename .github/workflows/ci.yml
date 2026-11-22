@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [default]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests and style
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: internmatch_testing
+          MYSQL_ROOT_PASSWORD: ci-only
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-only --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_mysql, zip, intl, gd
+          coverage: none
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Test environment (throwaway CI database only)
+        run: |
+          {
+            echo "APP_ENV=testing"
+            echo "APP_KEY=base64:$(openssl rand -base64 32)"
+            echo "DB_CONNECTION=mysql"
+            echo "DB_HOST=127.0.0.1"
+            echo "DB_PORT=3306"
+            echo "DB_DATABASE=internmatch_testing"
+            echo "DB_USERNAME=root"
+            echo "DB_PASSWORD=ci-only"
+            echo "ALLOW_TEST_DATABASE_RESET=true"
+          } > .env.testing
+          cp .env.testing .env
+      # Informational until the existing files that predate this check are formatted (78 on 2026-11-22).
+      - name: Code style (Pint, report only)
+        run: ./vendor/bin/pint --test
+        continue-on-error: true
+      - name: Feature tests
+        run: php artisan test
+
+  frontend:
+    name: Frontend type check, lint, unit tests and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Production build
+        run: npm run build
+      - name: Admin bundle build
+        run: npm run build:admin
+
+  ai-service:
+    name: AI service tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai-service/requirements-dev.txt
+      - name: Install dependencies (no PyTorch; the tests do not load the embedding model)
+        run: pip install -r requirements-dev.txt
+      - name: Tests
+        run: python -m pytest -q tests

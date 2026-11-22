@@ -1,0 +1,66 @@
+const { chromium } = require('./harness.cjs');
+const alertText = async (p) => (await p.locator('[role=alert]').first().innerText().catch(() => '')).replace(/\s+/g, ' ');
+(async () => {
+  const b = await chromium.launch({ headless: true, channel: 'msedge' });
+  let ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
+  let p = await ctx.newPage();
+  await p.goto('http://localhost:8080/auth', { waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+  await p.getByRole('button', { name: 'Sign in' }).click();
+  console.log('1 empty submit:', await p.locator('#identifier-error').innerText(), '| focused:', await p.evaluate(() => document.activeElement.id), '| aria-invalid:', await p.locator('#identifier').getAttribute('aria-invalid'));
+  await p.locator('#identifier').fill('12345');
+  console.log('2 live revalidate:', await p.locator('#identifier-error').innerText());
+  await p.locator('#identifier').fill('nobody.qa@internmatch.test');
+  console.log('3 error cleared:', await p.locator('#identifier-error').count() === 0, '| password error:', await p.locator('#password-error').innerText());
+  await p.locator('#password').fill('wrong-password-1');
+  await p.getByRole('button', { name: 'Show password' }).click();
+  console.log('4 toggle type:', await p.locator('#password').getAttribute('type'));
+  await p.getByRole('button', { name: 'Sign in' }).click();
+  await p.waitForTimeout(2500);
+  console.log('5 wrong credentials:', await alertText(p));
+  await p.screenshot({ path: require('path').join(__dirname, 'out', 'login-state-credentials.png') });
+  console.log('6 forgot link:', await p.getByRole('link', { name: 'Forgot password?' }).getAttribute('href'));
+  for (let i = 0; i < 5; i++) { await p.locator('#password').fill('wrong-' + i); await p.getByRole('button', { name: /Sign in/ }).click(); await p.waitForTimeout(1500); }
+  console.log('7 throttled:', await alertText(p), '| button:', await p.locator('button[type=submit]').innerText(), '| disabled:', await p.locator('button[type=submit]').isDisabled());
+  await p.waitForTimeout(2100);
+  console.log('8 countdown ticks:', await p.locator('button[type=submit]').innerText());
+  await p.screenshot({ path: require('path').join(__dirname, 'out', 'login-state-throttled.png') });
+  await ctx.close();
+
+  ctx = await b.newContext({ viewport: { width: 375, height: 812 } });
+  p = await ctx.newPage();
+  await p.goto('http://localhost:8080/auth', { waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+  await p.route('**/api/v1/login', (r) => r.abort('connectionrefused'));
+  await p.locator('#identifier').fill('nobody2.qa@internmatch.test');
+  await p.locator('#password').fill('x');
+  await p.getByRole('button', { name: 'Sign in' }).click();
+  await p.waitForTimeout(1500);
+  console.log('9 unreachable:', await alertText(p));
+  await p.screenshot({ path: require('path').join(__dirname, 'out', 'login-state-network-375.png'), fullPage: true });
+  await ctx.close();
+
+  ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
+  p = await ctx.newPage();
+  await p.goto('http://localhost:8080/student/requirements', { waitUntil: 'networkidle' });
+  await p.waitForTimeout(2000);
+  console.log('10 guard sent to:', p.url().replace('http://localhost:8080', ''));
+  await p.locator('#identifier').fill(process.env.QA_STUDENT_EMAIL);
+  await p.locator('#password').fill(process.env.QA_STUDENT_PW);
+  await p.getByRole('button', { name: 'Sign in' }).click();
+  await p.waitForURL(/student/, { timeout: 30000 });
+  await p.waitForTimeout(1500);
+  console.log('11 after sign-in:', p.url().replace('http://localhost:8080', ''));
+  await ctx.close();
+
+  ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
+  p = await ctx.newPage();
+  await p.goto('http://localhost:8080/auth?redirect=%2Fcoordinator%2Fapprovals', { waitUntil: 'networkidle' });
+  await p.waitForTimeout(1500);
+  await p.locator('#identifier').fill(process.env.QA_STUDENT_EMAIL);
+  await p.locator('#password').fill(process.env.QA_STUDENT_PW);
+  await p.getByRole('button', { name: 'Sign in' }).click();
+  await p.waitForURL(/student/, { timeout: 30000 });
+  console.log('12 other-role redirect ignored:', p.url().replace('http://localhost:8080', ''));
+  await b.close();
+})().catch(e => { console.error('ERR', e.message.slice(0, 300)); process.exit(1); });

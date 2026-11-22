@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
  */
 class ExportJudgmentData extends Command
 {
-    protected $signature = 'ml:export-judgments {--source=real : real, synthetic or all}';
+    protected $signature = 'ml:export-judgments {--source=real : real, synthetic or all} {--per-program= : synthetic labels: at most this many per program, half suitable and half not (lowest IDs first)}';
 
     protected $description = 'Export labelled placement judgments for Logistic Regression training';
 
@@ -32,12 +32,19 @@ class ExportJudgmentData extends Command
             return self::INVALID;
         }
 
+        $perProgram = $this->option('per-program');
+        if ($perProgram !== null && (! ctype_digit((string) $perProgram) || (int) $perProgram < 2)) {
+            $this->error('--per-program must be a whole number of at least 2.');
+
+            return self::INVALID;
+        }
+
         $rows = collect();
         if ($source !== 'synthetic') {
             $rows = $rows->concat($this->realJudgments());
         }
         if ($source !== 'real') {
-            $rows = $rows->concat($this->syntheticLabels());
+            $rows = $rows->concat($this->syntheticLabels($perProgram === null ? null : (int) $perProgram));
         }
 
         if ($rows->isEmpty()) {
@@ -75,9 +82,25 @@ class ExportJudgmentData extends Command
             ]);
     }
 
-    private function syntheticLabels(): Collection
+    /**
+     * Synthetic coordinator labels. With $perProgram, each program contributes at most that many rows, split
+     * evenly between suitable and unsuitable (lowest IDs first), topped up from the other class when one is short.
+     */
+    private function syntheticLabels(?int $perProgram = null): Collection
     {
-        return DB::table('coordinator_labels')->where('is_synthetic', true)->whereNotNull('suitable')->orderBy('id')->get()
+        $labels = DB::table('coordinator_labels')->where('is_synthetic', true)->whereNotNull('suitable')->orderBy('id')->get();
+        if ($perProgram !== null) {
+            $labels = $labels->groupBy('program_id')->flatMap(function (Collection $group) use ($perProgram) {
+                [$suitable, $unsuitable] = $group->partition(fn ($l) => (bool) $l->suitable);
+                $half = intdiv($perProgram, 2);
+                $takeSuitable = min($suitable->count(), max($half, $perProgram - $unsuitable->count()));
+                $takeUnsuitable = min($unsuitable->count(), $perProgram - $takeSuitable);
+
+                return $suitable->take($takeSuitable)->concat($unsuitable->take($takeUnsuitable));
+            })->sortBy('id')->values();
+        }
+
+        return $labels
             ->map(fn ($l) => [
                 'similarity_score' => $l->skill_match_score, 'distance_km' => $l->distance_km, 'capacity_at_time' => $l->available_slots,
                 'moa_active' => $l->moa_valid ? 1 : 0, 'label' => $l->suitable ? 1 : 0, 'is_synthetic' => 1,
