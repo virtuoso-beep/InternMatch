@@ -3,11 +3,19 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
-use App\Models\{Evaluation, EvaluationScore, Placement, ProgramTermRequirement, StudentEnrollment, TimeLog, User};
+use App\Models\Evaluation;
+use App\Models\EvaluationScore;
+use App\Models\Placement;
+use App\Models\ProgramTermRequirement;
+use App\Models\StudentEnrollment;
+use App\Models\TimeLog;
+use App\Models\User;
 use App\Services\ReportBuilder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 class ReportTest extends TestCase
@@ -49,10 +57,10 @@ class ReportTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'report');
         try {
             file_put_contents($path, $xlsx);
-            $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+            $book = IOFactory::load($path);
             $cell = $book->getSheet(0)->getCell('B2');
             $this->assertSame('=Unsafe formula name', $cell->getValue());
-            $this->assertSame(\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING, $cell->getDataType());
+            $this->assertSame(DataType::TYPE_STRING, $cell->getDataType());
             $this->assertSame('Export details', $book->getSheet(1)->getTitle());
             $book->disconnectWorksheets();
         } finally {
@@ -74,7 +82,9 @@ class ReportTest extends TestCase
         $e = StudentEnrollment::factory()->create();
         $coordinator = User::factory()->withRole(Role::Coordinator)->create();
         $dean = User::factory()->withRole(Role::Dean)->create();
-        foreach ([$coordinator, $dean] as $user) { $user->programs()->attach($e->programTerm->program_id); }
+        foreach ([$coordinator, $dean] as $user) {
+            $user->programs()->attach($e->programTerm->program_id);
+        }
         $id = $this->actingAs($coordinator)->postJson('/api/v1/reports', ['program_term_id' => $e->program_term_id, 'kind' => 'summary'])->assertCreated()->json('data.id');
         $this->actingAs($dean)->getJson('/api/v1/reports/'.$id)->assertNotFound();
         $this->getJson('/api/v1/reports/'.$id.'/download')->assertNotFound();

@@ -10,6 +10,7 @@ import { inputClass } from "./formUtils";
 import { EmptyState, ErrorState, KpiCard, SectionHeading } from "./ds";
 import { BarChartView, ChartCard, DonutChartView } from "./charts";
 import { WeeklyActivity, type Week } from "./WeeklyActivity";
+import { SIMILARITY_HELP } from "@/lib/wording";
 
 type Band = { label: string; value: number };
 type Summary = {
@@ -467,14 +468,14 @@ export function ProgramAnalytics({
         <div className="mt-4 grid gap-4 xl:grid-cols-2">
           <ChartCard
             title="Stored recommendations by similarity score"
-            description="Retained recommendation generations, grouped by raw cosine similarity score"
+            description="Saved recommendations, grouped by similarity score"
             loading={loading}
             error={error}
             onRetry={retry}
             isEmpty={!data || data.similarity_bands.every((b) => b.value === 0)}
             emptyTitle="No stored recommendations yet"
             emptyDescription="Scores appear after recommendations are generated for students."
-            footnote="Similarity scores are not placement probabilities."
+            footnote={SIMILARITY_HELP}
           >
             <BarChartView
               title="Stored recommendations by similarity score"

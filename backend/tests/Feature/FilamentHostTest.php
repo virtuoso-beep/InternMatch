@@ -20,8 +20,8 @@ use Tests\TestCase;
 
 class FilamentHostTest extends TestCase
 {
-    use LazilyRefreshDatabase;
     use AcknowledgesPrivacyNotice;
+    use LazilyRefreshDatabase;
 
     private function coordinator(Program $program): User
     {

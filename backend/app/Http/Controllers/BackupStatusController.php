@@ -27,6 +27,7 @@ class BackupStatusController extends Controller
         usort($records, fn ($a, $b) => strcmp($b['id'], $a['id']));
         $scheduleFile = storage_path('app/backups/schedule.json');
         $schedule = is_file($scheduleFile) ? json_decode(ltrim(file_get_contents($scheduleFile), "\xEF\xBB\xBF"), true) : null;
+
         return response()->json(['data' => array_slice($records, 0, 100), 'total' => count($records), 'schedule' => $schedule], headers: ['Cache-Control' => 'no-store']);
     }
 }

@@ -52,7 +52,7 @@ class ProgramAnalyticsController extends Controller
             $q->whereIn('id', DB::table('host_program_capacity')->whereIn('program_id', $programIds)->select('host_establishment_id'))
                 ->orWhereHas('opportunities.programs', fn ($p) => $p->whereIn('programs.id', $programIds))
                 ->orWhereHas('moas.programs', fn ($p) => $p->whereIn('programs.id', $programIds));
-        })->with(['moas' => fn ($q) => $q->where(fn ($m) => $m->where('is_institution_wide', true)->orWhereHas('programs', fn ($p) => $p->whereIn('programs.id', $programIds)))])->orderBy('name')->get();
+        })->with(['moas' => fn ($q) => $q->whereHas('programs', fn ($p) => $p->whereIn('programs.id', $programIds))])->orderBy('name')->get();
         $today = today();
         $inventory = $hosts->map(fn ($host) => [
             'id' => $host->id, 'name' => $host->name, 'industry' => $host->industry, 'city' => $host->city, 'is_active' => $host->is_active,

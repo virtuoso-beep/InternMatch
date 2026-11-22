@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 class ReconcileBsitCatalog extends Command
 {
     protected $signature = 'internmatch:reconcile-bsit {--apply : Apply the reviewed changes after taking a database backup}';
+
     protected $description = 'Reconcile the confirmed BSIT catalog; preserve accounts, operational records, and other programs';
 
     public function handle(): int
@@ -24,6 +25,7 @@ class ReconcileBsitCatalog extends Command
         $this->line(json_encode(['unused_placeholder_requirements' => $types->pluck('code'), 'unconfirmed_bsit_competency_links' => $links->pluck('code')], JSON_PRETTY_PRINT));
         if (! $this->option('apply')) {
             $this->info('Preview only. Take a database backup before using --apply.');
+
             return self::SUCCESS;
         }
         DB::transaction(function () use ($program, $types, $links) {
@@ -44,6 +46,7 @@ class ReconcileBsitCatalog extends Command
             }
         });
         $this->info('Confirmed BSIT catalog reconciled. Accounts and operational records preserved.');
+
         return self::SUCCESS;
     }
 }

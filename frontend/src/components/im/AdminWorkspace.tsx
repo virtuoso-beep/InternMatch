@@ -15,7 +15,7 @@ import {
   Pill,
 } from "./ui";
 import { inputClass, toFormError, type FormError } from "./formUtils";
-import { RankingStatus } from "./RankingStatus";
+import { RecommendationLearning } from "./RecommendationLearning";
 
 type Term = {
   id: number;
@@ -271,7 +271,7 @@ export function AdminSettings() {
   return (
     <>
       <PageHeader title="System Settings" subtitle="Platform identity and display preferences" />
-      <RankingStatus />
+      <RecommendationLearning />
       {message && (
         <p role="status" className="mb-4">
           {message}

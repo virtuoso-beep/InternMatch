@@ -15,6 +15,7 @@ use App\Models\MonitoringFlag;
 use App\Models\OpportunityInterest;
 use App\Models\Placement;
 use App\Models\PlacementDecision;
+use App\Models\Program;
 use App\Models\ProgramTerm;
 use App\Models\ProgramTermRequirement;
 use App\Models\RequirementReview;
@@ -25,6 +26,7 @@ use App\Models\TimeLog;
 use App\Models\User;
 use App\Models\UserProfile;
 use Database\Seeders\InternMatchReferenceSeeder;
+use Database\Seeders\ProgramSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -260,7 +262,7 @@ class InternMatchSchemaTest extends TestCase
 
     public function test_reference_seeding_is_repeatable_without_overwriting_custom_names(): void
     {
-        $this->seed(\Database\Seeders\ProgramSeeder::class);
+        $this->seed(ProgramSeeder::class);
         $this->seed(InternMatchReferenceSeeder::class);
         $competencyCount = Competency::count();
         Competency::where('code', 'web-development')->update(['name' => 'Custom web curriculum']);
@@ -269,7 +271,7 @@ class InternMatchSchemaTest extends TestCase
 
         $this->assertDatabaseCount('competencies', $competencyCount);
         $this->assertDatabaseCount('requirement_types', 15);
-        $this->assertSame(4, \App\Models\Program::where('code', 'BSIT')->firstOrFail()->competencies()->count());
+        $this->assertSame(4, Program::where('code', 'BSIT')->firstOrFail()->competencies()->count());
         $this->assertDatabaseHas('competencies', ['code' => 'web-development', 'name' => 'Custom web curriculum']);
     }
 

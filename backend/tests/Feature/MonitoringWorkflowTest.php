@@ -8,6 +8,7 @@ use App\Models\ProgramTermRequirement;
 use App\Models\RequirementSubmission;
 use App\Models\User;
 use App\Services\ProgressSummary;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -77,7 +78,7 @@ class MonitoringWorkflowTest extends TestCase
 
     public function test_risk_boundaries_use_current_program_hours_and_latest_document_revision(): void
     {
-        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-18 09:00', 'Asia/Manila'));
+        $this->travelTo(CarbonImmutable::parse('2026-11-18 09:00', 'Asia/Manila'));
         [$placement] = $this->context();
         $term = $placement->studentEnrollment->programTerm;
         $quiet = ['behind_schedule_after_days' => 100000, 'max_daily_hours' => 100000, 'no_log_days' => 100000, 'uncertified_days' => 100000, 'weekly_report_grace_days' => 100000]; // isolate the legacy and requirement rules from the spec §13 pace rules

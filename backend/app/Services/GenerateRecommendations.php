@@ -35,17 +35,16 @@ class GenerateRecommendations
             }
             $cached = $this->embeddings->cached($opportunity);
             abort_unless($cached, 409, 'Eligible opportunity embeddings are still processing. Please retry shortly.');
-            // The supervised ranker uses the same facts the coordinator sees: straight-line distance, remaining
-            // capacity and agreement status at generation time.
+            // Only eligible opportunities reach ranking (spec §6). The ranker's features are similarity, distance
+            // and program (spec §9); agreement and capacity are hard constraints, not ranking signals.
             $vectors[] = ['id' => $opportunity->id, 'vector' => json_decode($cached->vector, true, flags: JSON_THROW_ON_ERROR),
-                'distance_km' => $this->distance($profile, $opportunity->hostEstablishment), 'capacity_at_time' => $facts['capacity_remaining'],
-                'moa_status_at_time' => $facts['moa_status']];
+                'distance_km' => $this->distance($profile, $opportunity->hostEstablishment)];
             $sources[$opportunity->id] = $cached;
         }
         abort_if(count($vectors) > 1000, 422, 'This cohort exceeds the configured matching batch limit.');
         [$scores, $mlScores, $method, $ranker] = $vectors === []
             ? [[], [], 'cosine_then_distance', null]
-            : $this->rank(json_decode($studentVector->vector, true, flags: JSON_THROW_ON_ERROR), $vectors, $sources);
+            : $this->rank(json_decode($studentVector->vector, true, flags: JSON_THROW_ON_ERROR), $vectors, $sources, $enrollment->programTerm->program->code);
 
         return DB::transaction(function () use ($actor, $enrollment, $studentVector, $scores, $sources, $mlScores, $method, $ranker) {
             $enrollment = StudentEnrollment::whereKey($enrollment->id)->lockForUpdate()->firstOrFail();
@@ -75,11 +74,7 @@ class GenerateRecommendations
                         'model_name' => config('matching.model'), 'model_version' => config('matching.revision'),
                         'student_source_hash' => $studentVector->source_text_hash, 'opportunity_source_hash' => $sources[$id]->source_text_hash,
                         'distance_kind' => 'straight_line', 'ranking_method' => $method,
-                        'criteria' => $method === 'logistic_regression'
-                            ? 'Logistic Regression suitability probability descending (features: similarity score, straight-line distance, remaining capacity, active agreement, missing-distance flag); ties use similarity score, then opportunity ID. '.(($ranker['synthetic_rows'] ?? 0) > 0
-                                ? 'Model trained on synthetic test labels, not on approved coordinator judgments.'
-                                : 'Model trained on approved coordinator judgments.')
-                            : 'Cosine descending; ties use known distance ascending, then opportunity ID. No requirement-completion ranking feature.']
+                        'criteria' => self::criteria($method, (bool) ($ranker['synthetic'] ?? false))]
                         + ($method === 'logistic_regression' ? ['suitability_probability' => round($mlScores[$id], 4), 'ranker' => $ranker] : [])];
             }
             usort($rows, fn ($a, $b) => $method === 'logistic_regression'
@@ -108,13 +103,13 @@ class GenerateRecommendations
      *
      * @return array{0: array<int, float>, 1: array<int, float>, 2: string, 3: array<string, mixed>|null}
      */
-    private function rank(array $studentVector, array $vectors, array $sources): array
+    private function rank(array $studentVector, array $vectors, array $sources, string $program): array
     {
         $base = rtrim(config('matching.url'), '/');
         if (config('matching.reranker') === 'auto') {
             try {
                 $response = Http::connectTimeout(2)->timeout(7)->post($base.'/recommendations/ml', [
-                    'student_vector' => $studentVector, 'candidates' => $vectors,
+                    'student_vector' => $studentVector, 'program' => $program, 'candidates' => $vectors,
                 ])->throw()->json();
 
                 return $this->readRanking($response, $sources, count($vectors));
@@ -156,5 +151,16 @@ class GenerateRecommendations
     {
         return $profile?->latitude !== null && $profile?->longitude !== null && $host->latitude !== null && $host->longitude !== null
             ? Haversine::kilometers((float) $profile->latitude, (float) $profile->longitude, (float) $host->latitude, (float) $host->longitude) : null;
+    }
+
+    /** Plain-language ranking basis stored with each recommendation and shown to coordinators. */
+    public static function criteria(string $method, bool $testModel = false): string
+    {
+        if ($method !== 'logistic_regression') {
+            return 'Ordered by skills match, then distance.';
+        }
+
+        return 'Ordered by skills match, distance, and past coordinator judgments.'
+            .($testModel ? ' Test mode: rankings use practice data, not real coordinator judgments.' : '');
     }
 }

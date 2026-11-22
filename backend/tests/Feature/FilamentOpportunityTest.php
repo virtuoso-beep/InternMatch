@@ -20,8 +20,8 @@ use Tests\TestCase;
 
 class FilamentOpportunityTest extends TestCase
 {
-    use LazilyRefreshDatabase;
     use AcknowledgesPrivacyNotice;
+    use LazilyRefreshDatabase;
 
     private function setupRecords(): array
     {

@@ -91,35 +91,42 @@ class SyntheticDataTest extends TestCase
 
         $plain = $this->postJson('/api/v1/reports', ['program_term_id' => $real->program_term_id, 'kind' => 'progress'])->assertCreated();
         $plain->assertJsonPath('data.contains_synthetic', false)->assertJsonCount(1, 'data.payload.rows');
-        $this->assertNotContains('synthetic_record', $plain->json('data.payload.columns'));
+        $this->assertNotContains('test_record', $plain->json('data.payload.columns'));
 
         $mixed = $this->postJson('/api/v1/reports', ['program_term_id' => $real->program_term_id, 'kind' => 'progress', 'include_synthetic' => true])->assertCreated();
         $mixed->assertJsonPath('data.contains_synthetic', true)->assertJsonCount(2, 'data.payload.rows');
-        $this->assertSame('synthetic_record', last($mixed->json('data.payload.columns')));
+        $this->assertSame('test_record', last($mixed->json('data.payload.columns')));
         $flags = collect($mixed->json('data.payload.rows'))->mapWithKeys(fn ($row) => [$row[0] => last($row)]);
         $this->assertSame(['yes', 'no'], [$flags[$synthetic->id], $flags[$real->id]]);
         $this->getJson('/api/v1/reports?kind=progress')->assertJsonPath('reports.data.0.contains_synthetic', true);
 
         $id = $mixed->json('data.id');
         $csv = $this->get("/api/v1/reports/{$id}/download")->assertOk();
-        $this->assertStringContainsString('contains-synthetic-data.csv', $csv->headers->get('Content-Disposition'));
-        $this->assertStringContainsString('synthetic_record', $csv->streamedContent());
+        $this->assertStringContainsString('contains-test-data.csv', $csv->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('test_record', $csv->streamedContent());
         $xlsx = $this->get("/api/v1/reports/{$id}/download?format=xlsx")->assertOk()->streamedContent();
         $path = tempnam(sys_get_temp_dir(), 'synthetic');
         try {
             file_put_contents($path, $xlsx);
             $book = IOFactory::load($path);
             $details = collect($book->getSheet(1)->toArray())->mapWithKeys(fn ($row) => [$row[0] => $row[1]]);
-            $this->assertStringStartsWith('Contains synthetic data', $details['Synthetic data']);
+            $this->assertStringStartsWith('Contains test data', $details['Test data']);
             $book->disconnectWorksheets();
         } finally {
             @unlink($path);
         }
         $pdf = $this->get("/api/v1/reports/{$id}/download?format=pdf")->assertOk();
-        $this->assertStringContainsString('contains-synthetic-data.pdf', $pdf->headers->get('Content-Disposition'));
-        $html = view('reports.pdf', ['title' => 'T', 'notice' => 'Contains synthetic data: test', 'details' => [], 'columns' => ['a'], 'rows' => [['b']]])->render();
-        $this->assertStringContainsString('Contains synthetic data: test', $html);
+        $this->assertStringContainsString('contains-test-data.pdf', $pdf->headers->get('Content-Disposition'));
+        $html = view('reports.pdf', ['title' => 'T', 'notice' => 'Contains test data: test', 'details' => [], 'columns' => ['a'], 'rows' => [['b']]])->render();
+        $this->assertStringContainsString('Contains test data: test', $html);
         $this->assertDatabaseHas('audit_logs', ['action' => 'report.generated', 'changes->contains_synthetic' => true]);
+
+        $payload = $mixed->json('data.payload');
+        $payload['columns'][count($payload['columns']) - 1] = 'synthetic_record';
+        DB::table('generated_reports')->where('id', $id)->update(['payload' => json_encode($payload)]); // a report saved before the rename
+        $this->assertSame('test_record', last($this->getJson("/api/v1/reports/{$id}")->json('data.payload.columns')));
+        $this->assertStringContainsString('test_record', $this->get("/api/v1/reports/{$id}/download")->streamedContent());
+        $this->assertSame('synthetic_record', last(json_decode(DB::table('generated_reports')->where('id', $id)->value('payload'), true)['columns']));
     }
 
     /** Text drawn by dompdf: content streams are Flate-compressed; strings are UTF-16BE inside TJ/Tj operators. */
@@ -151,18 +158,18 @@ class SyntheticDataTest extends TestCase
         $plain = $this->postJson('/api/v1/reports', ['program_term_id' => $real->program_term_id, 'kind' => 'progress'])->assertCreated()->json('data.id');
 
         $response = $this->get("/api/v1/reports/{$mixed}/download?format=pdf")->assertOk()->assertHeader('Content-Type', 'application/pdf');
-        $this->assertStringContainsString("internmatch-progress-{$mixed}-contains-synthetic-data.pdf", $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString("internmatch-progress-{$mixed}-contains-test-data.pdf", $response->headers->get('Content-Disposition'));
         $this->assertStringStartsWith('%PDF-', $response->getContent());
         $text = $this->pdfText($response->getContent());
-        $this->assertStringContainsString('Contains synthetic data: this report includes synthetic test records.', $text);
+        $this->assertStringContainsString('Contains test data: this report includes test records.', $text);
         $this->assertStringContainsString('Synthetic Pdf Student', $text);
-        $this->assertStringContainsString('synthetic_record', $text);
+        $this->assertStringContainsString('test_record', $text);
         $this->assertDatabaseHas('audit_logs', ['action' => 'report.exported', 'subject_id' => $mixed, 'changes->format' => 'pdf']);
 
         $clean = $this->get("/api/v1/reports/{$plain}/download?format=pdf")->assertOk();
-        $this->assertStringNotContainsString('contains-synthetic', $clean->headers->get('Content-Disposition'));
+        $this->assertStringNotContainsString('contains-test', $clean->headers->get('Content-Disposition'));
         $cleanText = $this->pdfText($clean->getContent());
-        $this->assertStringNotContainsString('Contains synthetic data', $cleanText);
+        $this->assertStringNotContainsString('Contains test data', $cleanText);
         $this->assertStringNotContainsString('Synthetic Pdf Student', $cleanText);
     }
 
@@ -209,11 +216,12 @@ class SyntheticDataTest extends TestCase
         $this->artisan('ml:export-judgments')->expectsOutputToContain(Storage::disk('local')->path('ml/judgment_export.csv'))->assertSuccessful();
         $this->assertSame(storage_path('app/private'), config('filesystems.disks.local.root')); // ML default input assumes this root
         $rows = array_slice(explode("\n", trim(Storage::disk('local')->get('ml/judgment_export.csv'))), 1);
-        $this->assertSame(['0.8,2,3,1,1,0'], $rows); // the real judgment only
+        $program = $real->programTerm->program->code;
+        $this->assertSame(['S'.$real->student_id.','.$program.',0.8,2,,1,0'], $rows); // the real judgment only
 
         $this->artisan('ml:export-judgments', ['--source' => 'synthetic'])->assertSuccessful();
         $rows = array_slice(explode("\n", trim(Storage::disk('local')->get('ml/judgment_export.csv'))), 1);
-        $this->assertSame(['0.5000,3.20,4,1,1,1'], $rows); // "For Review" (no label) is skipped; synthetic judgment not real
+        $this->assertSame(['T'.$synthetic->student_id.','.$program.',0.5,3.2,,1,1'], $rows); // "For Review" (no label) is skipped; the judgment on a test student is not real
 
         $this->artisan('ml:export-judgments', ['--source' => 'all'])->assertSuccessful();
         $this->assertCount(2, array_slice(explode("\n", trim(Storage::disk('local')->get('ml/judgment_export.csv'))), 1));
@@ -237,7 +245,7 @@ class SyntheticDataTest extends TestCase
 
         $this->artisan('ml:export-judgments', ['--source' => 'synthetic', '--per-program' => 4])->assertSuccessful();
         $lines = array_slice(explode("\n", trim(Storage::disk('local')->get('ml/judgment_export.csv'))), 1);
-        $labels = array_map(fn ($line) => explode(',', $line)[4], $lines);
+        $labels = array_map(fn ($line) => explode(',', $line)[5], $lines); // student,program,similarity,distance,keyword_overlap,label
         // Program 1: 2 suitable + 2 unsuitable of 12. Program 2: all 3 (fewer than the cap).
         $this->assertCount(7, $lines);
         $this->assertSame(3, count(array_filter($labels, fn ($l) => $l === '1')));

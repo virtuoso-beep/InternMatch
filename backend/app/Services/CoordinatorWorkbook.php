@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use Illuminate\Validation\ValidationException;
 
 class CoordinatorWorkbook
 {
@@ -54,9 +54,13 @@ class CoordinatorWorkbook
             $zip = new \ZipArchive;
             if ($zip->open($path) === true) {
                 $size = 0;
-                for ($i = 0; $i < $zip->numFiles; $i++) $size += $zip->statIndex($i)['size'];
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $size += $zip->statIndex($i)['size'];
+                }
                 $zip->close();
-                if ($size > 50 * 1024 * 1024) throw new \RuntimeException('Expanded workbook exceeds 50 MB.');
+                if ($size > 50 * 1024 * 1024) {
+                    throw new \RuntimeException('Expanded workbook exceeds 50 MB.');
+                }
             }
             $type = IOFactory::identify($path, ['Xlsx', 'Xls']);
             $reader = IOFactory::createReader($type);
@@ -67,7 +71,8 @@ class CoordinatorWorkbook
             // Styles retain date and zero-padded ID formats. Never calculate formulas or load charts.
             $reader->setReadEmptyCells(false);
             $book = $reader->load($path);
-            $sheets = []; $nonemptyRows = 0;
+            $sheets = [];
+            $nonemptyRows = 0;
             foreach ($book->getWorksheetIterator() as $sheet) {
                 $matrix = [];
                 $columns = Coordinate::columnIndexFromString($sheet->getHighestDataColumn());
@@ -78,27 +83,47 @@ class CoordinatorWorkbook
                     $cells->setIterateOnlyExistingCells(true);
                     foreach ($cells as $cell) {
                         $value = $cell->getValue();
-                        if ($cell->isFormula()) $value = '[Formula: enter a confirmed value]';
-                        elseif ($value !== null && Date::isDateTime($cell) && is_numeric($value)) $value = Date::excelToDateTimeObject($value)->format('Y-m-d');
-                        elseif ($value !== null) $value = $cell->getFormattedValue();
+                        if ($cell->isFormula()) {
+                            $value = '[Formula: enter a confirmed value]';
+                        } elseif ($value !== null && Date::isDateTime($cell) && is_numeric($value)) {
+                            $value = Date::excelToDateTimeObject($value)->format('Y-m-d');
+                        } elseif ($value !== null) {
+                            $value = $cell->getFormattedValue();
+                        }
                         $values[Coordinate::columnIndexFromString($cell->getColumn()) - 1] = $value === null ? '' : trim((string) $value);
                     }
                     if (array_filter($values, fn ($value) => $value !== '')) {
-                        if (++$nonemptyRows > 10000) throw new \RuntimeException('Limit: 10,000 nonempty rows.');
+                        if (++$nonemptyRows > 10000) {
+                            throw new \RuntimeException('Limit: 10,000 nonempty rows.');
+                        }
                         $matrix[$row->getRowIndex()] = $values;
                     }
                 }
-                $best = 0; $headerRow = 1; $mapping = [];
+                $best = 0;
+                $headerRow = 1;
+                $mapping = [];
                 foreach (array_slice($matrix, 0, 25, true) as $number => $values) {
                     $map = self::detect($values);
-                    if (count($map) > $best) { $best = count($map); $headerRow = $number; $mapping = $map; }
+                    if (count($map) > $best) {
+                        $best = count($map);
+                        $headerRow = $number;
+                        $mapping = $map;
+                    }
                 }
-                if (! $matrix) continue;
-                if (! $best) $headerRow = array_key_first($matrix);
+                if (! $matrix) {
+                    continue;
+                }
+                if (! $best) {
+                    $headerRow = array_key_first($matrix);
+                }
                 $rows = [];
                 foreach ($matrix as $number => $values) {
-                    if ($number <= $headerRow || ! array_filter($values, fn ($v) => $v !== '')) continue;
-                    if (in_array('COLOR KEY', $values, true)) continue;
+                    if ($number <= $headerRow || ! array_filter($values, fn ($v) => $v !== '')) {
+                        continue;
+                    }
+                    if (in_array('COLOR KEY', $values, true)) {
+                        continue;
+                    }
                     $rows[] = ['source_row' => $number, 'cells' => $values];
                 }
                 $sheets[] = ['name' => $sheet->getTitle(), 'header_row' => $headerRow, 'headers' => $matrix[$headerRow], 'mapping' => $mapping, 'rows' => $rows];
@@ -106,10 +131,15 @@ class CoordinatorWorkbook
             $book->disconnectWorksheets();
             unset($book, $sheet, $row, $cells, $cell);
             gc_collect_cycles();
-            if (! $sheets) throw new \RuntimeException('No recognizable student or host columns found. Add a header row such as Student ID, Student Name, HTE Name.');
+            if (! $sheets) {
+                throw new \RuntimeException('No recognizable student or host columns found. Add a header row such as Student ID, Student Name, HTE Name.');
+            }
+
             return $sheets;
         } catch (\Throwable $error) {
-            if (isset($book)) $book->disconnectWorksheets();
+            if (isset($book)) {
+                $book->disconnectWorksheets();
+            }
             throw ValidationException::withMessages(['file' => 'Cannot read this Excel file. Use an unencrypted .xlsx or .xls with at most 10,000 rows and 100 columns. '.$error->getMessage()]);
         }
     }
@@ -119,9 +149,12 @@ class CoordinatorWorkbook
         $mapping = [];
         foreach ($headers as $index => $header) {
             foreach (self::ALIASES as $field => $aliases) {
-                if (in_array(self::key((string) $header), $aliases, true) && ! isset($mapping[$field])) $mapping[$field] = $index;
+                if (in_array(self::key((string) $header), $aliases, true) && ! isset($mapping[$field])) {
+                    $mapping[$field] = $index;
+                }
             }
         }
+
         return $mapping;
     }
 
@@ -130,25 +163,39 @@ class CoordinatorWorkbook
         $normalize = function ($sheet, $map) {
             return array_map(function ($row) use ($sheet, $map) {
                 $data = ['source' => $sheet['name'].':'.$row['source_row']];
-                foreach ($map as $field => $index) if ($index !== null && $index !== '') $data[$field] = $row['cells'][(int) $index] ?? '';
+                foreach ($map as $field => $index) {
+                    if ($index !== null && $index !== '') {
+                        $data[$field] = $row['cells'][(int) $index] ?? '';
+                    }
+                }
+
                 return $data;
             }, $sheet['rows']);
         };
         $rows = $normalize($sheets[$selected], $mapping);
         // Supplement only unique reference rows, joined by identifiers, never by student name.
-        $students = []; $hosts = [];
+        $students = [];
+        $hosts = [];
         foreach ($sheets as $index => $sheet) {
-            if ($index === $selected) continue;
+            if ($index === $selected) {
+                continue;
+            }
             foreach ($normalize($sheet, $sheet['mapping']) as $ref) {
-                if (! empty($ref['student_id']) && empty($ref['host_code']) && (isset($ref['program']) || isset($ref['name']))) $students[$ref['student_id']][] = $ref;
-                if (! empty($ref['host_code']) && ! empty($ref['host_name']) && empty($ref['student_id'])) $hosts[$ref['host_code']][] = $ref;
+                if (! empty($ref['student_id']) && empty($ref['host_code']) && (isset($ref['program']) || isset($ref['name']))) {
+                    $students[$ref['student_id']][] = $ref;
+                }
+                if (! empty($ref['host_code']) && ! empty($ref['host_name']) && empty($ref['student_id'])) {
+                    $hosts[$ref['host_code']][] = $ref;
+                }
             }
         }
         foreach ($rows as &$row) {
             foreach ([$students[$row['student_id'] ?? ''] ?? [], $hosts[$row['host_code'] ?? ''] ?? []] as $matches) {
                 if (count($matches) === 1) {
                     foreach ($matches[0] as $key => $value) {
-                        if ($key !== 'source' && empty($row[$key])) $row[$key] = $value;
+                        if ($key !== 'source' && empty($row[$key])) {
+                            $row[$key] = $value;
+                        }
                     }
                 } elseif (count($matches) > 1) {
                     $row['reference_warning'] = 'Multiple reference rows share this ID; enter confirmed values manually.';
@@ -156,6 +203,7 @@ class CoordinatorWorkbook
             }
             $row['kind'] = isset($mapping['student_id']) || isset($mapping['name']) ? 'student' : 'host';
         }
+
         return $rows;
     }
 }

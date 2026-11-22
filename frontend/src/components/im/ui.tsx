@@ -795,15 +795,15 @@ export function FilterChips({
   );
 }
 
-export function Table({ head, children }: { head: string[]; children: ReactNode }) {
+export function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[520px] text-sm">
         <thead>
           <tr className="border-b border-border text-left">
-            {head.map((h) => (
+            {head.map((h, index) => (
               <th
-                key={h}
+                key={typeof h === "string" ? h : index}
                 scope="col"
                 className="pr-4 pb-2.5 align-bottom text-xs font-semibold text-muted-foreground last:pr-0"
               >

@@ -9,6 +9,7 @@ use App\Models\RequirementType;
 use App\Models\StudentCompetency;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\ProgramSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -18,7 +19,7 @@ class ConfirmedCatalogCleanupTest extends TestCase
 
     public function test_cleanup_preserves_accounts_referenced_requirements_and_competency_evidence(): void
     {
-        $this->seed([DatabaseSeeder::class, \Database\Seeders\ProgramSeeder::class]);
+        $this->seed([DatabaseSeeder::class, ProgramSeeder::class]);
         $bsit = Program::where('code', 'BSIT')->firstOrFail();
         $account = User::where('email', 'student@example.com')->firstOrFail(); // created once by DatabaseSeeder
         $password = $account->password;

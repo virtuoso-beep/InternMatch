@@ -20,15 +20,26 @@ class RecommendationReview
         return implode("\n", [
             'Opportunity: '.($snapshot['opportunity_title'] ?? 'Not recorded'),
             'Host: '.($snapshot['host_name'] ?? 'Not recorded'),
-            'Cosine similarity: '.number_format($record->similarity_score, 4).' (not a placement probability)',
+            'Similarity score: '.number_format($record->similarity_score, 2).' (how closely the skills fit the tasks; not a percentage)',
             'Straight-line distance: '.($record->distance_km === null ? 'Unknown' : number_format($record->distance_km, 2).' km'),
             'Available slots at generation: '.$record->capacity_at_time,
             'Agreement status at generation: '.$record->moa_status_at_time,
             'Rank: '.$record->rank,
             'Tasks: '.($snapshot['tasks'] ?? 'Not recorded'),
-            'Ranking criteria: '.($snapshot['criteria'] ?? $record->ranking_method),
+            'Ranking basis: '.self::rankingBasis($record),
             'Generated: '.$record->generated_at?->toDateTimeString(),
         ]);
+    }
+
+    /** Plain-language ranking basis; recommendations saved before 2026-11-22 stored technical wording. */
+    public static function rankingBasis(Recommendation $record): string
+    {
+        $criteria = (string) ($record->snapshot['criteria'] ?? '');
+        if (str_starts_with($criteria, 'Ordered by')) {
+            return $criteria;
+        }
+
+        return GenerateRecommendations::criteria((string) $record->ranking_method, (bool) ($record->snapshot['ranker']['synthetic'] ?? false));
     }
 
     public static function query(User $actor): Builder

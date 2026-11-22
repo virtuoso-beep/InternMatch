@@ -18,6 +18,7 @@ class ProfileController extends Controller
     {
         $profile = $request->user()->profile;
         abort_unless($profile?->avatar_path && Storage::disk('local')->exists($profile->avatar_path), 404);
+
         return Storage::disk('local')->response($profile->avatar_path, null, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
     }
 
@@ -37,6 +38,7 @@ class ProfileController extends Controller
             Storage::disk('local')->delete($path);
             throw $error;
         }
+
         return $this->resource($request->user());
     }
 

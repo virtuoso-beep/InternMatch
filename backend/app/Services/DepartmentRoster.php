@@ -50,7 +50,9 @@ class DepartmentRoster
                 }
                 if ($user) {
                     self::audit($user, 'account.roster_updated', $user->only(['name', 'email', 'status']) + ['program_ids' => $user->programs()->pluck('programs.id')->all()]);
-                    if ($user->trashed()) $user->restore();
+                    if ($user->trashed()) {
+                        $user->restore();
+                    }
                 } else {
                     $credentials[$email] = Str::random(24);
                     $user = new User(['password' => $credentials[$email]]);
@@ -66,6 +68,7 @@ class DepartmentRoster
                 $user->forceFill(['status' => AccountStatus::Disabled])->save();
                 $user->delete();
             }
+
             return $credentials;
         });
     }

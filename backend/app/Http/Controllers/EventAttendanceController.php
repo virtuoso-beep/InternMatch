@@ -35,8 +35,10 @@ class EventAttendanceController extends Controller
                 'student_enrollment_id' => $student->id, 'program_term_requirement_id' => $requirement->id,
             ], ['program_term_id' => $student->program_term_id, 'attended_on' => $data['attended_on']]);
             Audit::record($request->user(), 'event.attended', $record, ['attended_on' => $data['attended_on']], $student->programTerm->program_id);
+
             return $record;
         });
+
         return response()->json(['data' => $attendance]);
     }
 
@@ -55,8 +57,10 @@ class EventAttendanceController extends Controller
                 $name = $student->programTerm->requirements()->findOrFail($record->program_term_requirement_id)->requirementType->name;
                 $student->student->user->notify(new PortalNotification('Event attendance confirmed', $name.': attendance confirmed.'));
             }
+
             return $record;
         });
+
         return response()->json(['data' => $record]);
     }
 }

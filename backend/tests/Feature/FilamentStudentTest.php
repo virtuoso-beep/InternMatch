@@ -19,8 +19,8 @@ use Tests\TestCase;
 
 class FilamentStudentTest extends TestCase
 {
-    use LazilyRefreshDatabase;
     use AcknowledgesPrivacyNotice;
+    use LazilyRefreshDatabase;
 
     /** Coordinators work through the API/React portal; the Filament panel is admin-only (b097815). */
     private function coordinator(StudentEnrollment $record): User

@@ -55,7 +55,7 @@ export function ProgramMonitoringSettings() {
     <>
       <PageHeader
         title="Monitoring settings"
-        subtitle="Enter department-confirmed settings. No default thresholds or evaluation criteria are assumed."
+        subtitle="Enter department-confirmed settings. No default alert levels or evaluation criteria are assumed."
       />
       {message && (
         <p role="alert">
@@ -85,7 +85,7 @@ export function ProgramMonitoringSettings() {
       </label>
       {!program && config && (
         <p className="mt-6 rounded-lg border border-dashed bg-card p-6 text-sm text-muted-foreground">
-          Choose a program to view or update its monitoring thresholds and evaluation rubric.
+          Choose a program to view or update its monitoring alert levels and evaluation rubric.
         </p>
       )}
       {program && (
@@ -461,10 +461,10 @@ function Settings({
               ))}
             </div>
             <p className="pt-2 text-xs font-semibold text-muted-foreground">
-              Optional legacy hours threshold
+              Optional older hours alert level
             </p>
             <label className="block text-sm">
-              Remaining days threshold
+              Remaining days alert level
               <input
                 type="number"
                 min="0"

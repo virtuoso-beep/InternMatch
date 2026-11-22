@@ -15,8 +15,8 @@ use Tests\TestCase;
 
 class FilamentPanelTest extends TestCase
 {
-    use LazilyRefreshDatabase;
     use AcknowledgesPrivacyNotice;
+    use LazilyRefreshDatabase;
 
     public function test_panel_rejects_operational_roles_and_inactive_accounts(): void
     {

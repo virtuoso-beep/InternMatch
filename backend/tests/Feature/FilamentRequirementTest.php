@@ -15,8 +15,8 @@ use Tests\TestCase;
 
 class FilamentRequirementTest extends TestCase
 {
-    use LazilyRefreshDatabase;
     use AcknowledgesPrivacyNotice;
+    use LazilyRefreshDatabase;
 
     public function test_admin_panel_lists_requirements_but_cannot_review_and_coordinator_review_works_via_api(): void
     {

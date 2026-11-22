@@ -28,7 +28,10 @@ class RecommendationResource extends Resource
         return $user?->role === Role::Coordinator && $user->hasPermission(Permission::DecidePlacements);
     }
 
-    public static function canCreate(): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
 
     public static function getEloquentQuery(): Builder
     {

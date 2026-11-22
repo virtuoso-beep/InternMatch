@@ -66,7 +66,7 @@ export function StudentOverview({
         }
         subtitle={
           recommendations
-            ? "Ranked by competency similarity, with straight-line distance used to break ties."
+            ? "These internships are ordered by how well they fit your skills and how close they are to you. Your coordinator makes the final placement."
             : opportunities
               ? "Explore eligible hosts with valid agreements and available slots for your program."
               : "Your current academic and placement records."

@@ -22,5 +22,3 @@ class RecommendationBatchReportTest extends TestCase
             ->assertJsonStructure(['data', 'total', 'last_page']);
     }
 }
-
-

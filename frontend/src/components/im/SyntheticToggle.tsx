@@ -2,7 +2,7 @@ import { SYNTHETIC_LABEL, SYNTHETIC_ROLES } from "@/lib/synthetic";
 import { useSessionUser } from "./SessionGuard";
 import { Pill } from "./ui";
 
-/** "Include synthetic data" switch; hidden for roles that never see aggregate data. Off by default. */
+/** "Include test data" switch; hidden for roles that never see aggregate data. Off by default. */
 export function SyntheticToggle({
   checked,
   onChange,
@@ -23,7 +23,7 @@ export function SyntheticToggle({
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
-        Include synthetic data
+        Include test data
       </label>
       {checked && <Pill tone="warn">{SYNTHETIC_LABEL}</Pill>}
     </span>

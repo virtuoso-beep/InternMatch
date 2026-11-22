@@ -368,7 +368,7 @@ export function DeanDashboard() {
                   <Row key={r.id}>
                     <td className="font-medium">
                       {KIND[r.kind] ?? r.kind} · #{r.id}{" "}
-                      {r.contains_synthetic && <Pill tone="warn">Contains synthetic data</Pill>}
+                      {r.contains_synthetic && <Pill tone="warn">Contains test data</Pill>}
                     </td>
                     <td className="text-muted-foreground">
                       {cohort

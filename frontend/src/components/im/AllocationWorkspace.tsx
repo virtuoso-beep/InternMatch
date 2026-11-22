@@ -17,6 +17,7 @@ import {
   statusTone,
 } from "./ui";
 import { inputClass as fieldClass } from "./formUtils";
+import { SimilarityScoreLabel } from "./SimilarityScoreLabel";
 
 const PAGE_SIZE = 15;
 const STATUS_TABS: Array<[string, string]> = [
@@ -346,7 +347,7 @@ export function AllocationWorkspace() {
                         </p>
                         {item.similarity_score !== null && (
                           <p className="text-xs text-muted-foreground">
-                            Similarity score {formatSimilarity(item.similarity_score)} ·{" "}
+                            <SimilarityScoreLabel /> {formatSimilarity(item.similarity_score)} ·{" "}
                             {item.distance_km === null
                               ? "Distance unavailable"
                               : `${Number(item.distance_km).toFixed(2)} km straight-line`}

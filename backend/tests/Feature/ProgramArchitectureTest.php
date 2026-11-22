@@ -131,7 +131,7 @@ class ProgramArchitectureTest extends TestCase
         $this->assertNull($opportunity->programs()->find($unknown->id)->pivot->capacity);
     }
 
-    public function test_moa_without_program_coverage_is_not_assumed_institution_wide(): void
+    public function test_moa_covers_only_its_listed_programs_and_ignores_the_old_institution_wide_flag(): void
     {
         $moa = Moa::factory()->create();
         $it = Program::factory()->create();
@@ -140,8 +140,8 @@ class ProgramArchitectureTest extends TestCase
         $moa->programs()->attach($it);
         $this->assertTrue($moa->coversProgram($it->id));
         $this->assertFalse($moa->coversProgram($cs->id));
-        $moa->update(['is_institution_wide' => true]);
-        $this->assertTrue($moa->coversProgram($cs->id));
+        $moa->update(['is_institution_wide' => true]); // spec §5: no "covers everything" case
+        $this->assertFalse($moa->coversProgram($cs->id));
     }
 
     public function test_database_rejects_zero_required_hours(): void

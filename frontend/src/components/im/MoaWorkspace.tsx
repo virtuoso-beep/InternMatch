@@ -30,7 +30,6 @@ type Moa = {
   lifecycle_status?: string;
   effective_on: string | null;
   expires_on: string | null;
-  is_institution_wide: boolean;
   programs: { id: number; code: string }[];
   notes: string | null;
   document: { original_name: string } | null;
@@ -320,10 +319,7 @@ export function MoaWorkspace() {
               )}
               <p>
                 Coverage:{" "}
-                {item.is_institution_wide
-                  ? "Institution-wide"
-                  : item.programs.map((program) => program.code).join(", ") ||
-                    "No programs recorded"}
+                {item.programs.map((program) => program.code).join(", ") || "No programs recorded"}
               </p>
               <p>{item.notes}</p>
               {item.document && (
@@ -336,7 +332,6 @@ export function MoaWorkspace() {
               )}
               {(user.role === "admin" ||
                 (user.role === "coordinator" &&
-                  !item.is_institution_wide &&
                   item.programs.every((program) =>
                     reference?.programs.some((own) => own.id === program.id),
                   )) ||
@@ -523,7 +518,6 @@ function MoaEditor({
     effective_on: record?.effective_on?.slice(0, 10) ?? "",
     expires_on: record?.expires_on?.slice(0, 10) ?? "",
     notes: record?.notes ?? "",
-    is_institution_wide: record?.is_institution_wide ?? false,
     program_ids: record?.programs.map((item) => item.id) ?? ([] as number[]),
   });
   return (
@@ -644,45 +638,26 @@ function MoaEditor({
         </FormField>
       </FormSection>
       <FormSection title="Coverage">
-        {user.role === "admin" && (
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              name="is_institution_wide"
-              checked={form.is_institution_wide}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  is_institution_wide: event.target.checked,
-                  program_ids: [],
-                }))
-              }
-            />
-            Explicit institution-wide coverage
-          </label>
-        )}
-        {!form.is_institution_wide && (
-          <fieldset data-field="program_ids" className="grid gap-2 border-0 p-0 sm:grid-cols-3">
-            <legend className="mb-2 text-sm font-medium">Covered programs</legend>
-            {reference.programs.map((program) => (
-              <label key={program.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.program_ids.includes(program.id)}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      program_ids: event.target.checked
-                        ? [...current.program_ids, program.id]
-                        : current.program_ids.filter((id) => id !== program.id),
-                    }))
-                  }
-                />
-                {program.code}
-              </label>
-            ))}
-          </fieldset>
-        )}
+        <fieldset data-field="program_ids" className="grid gap-2 border-0 p-0 sm:grid-cols-3">
+          <legend className="mb-2 text-sm font-medium">Covered programs</legend>
+          {reference.programs.map((program) => (
+            <label key={program.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.program_ids.includes(program.id)}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    program_ids: event.target.checked
+                      ? [...current.program_ids, program.id]
+                      : current.program_ids.filter((id) => id !== program.id),
+                  }))
+                }
+              />
+              {program.code}
+            </label>
+          ))}
+        </fieldset>
       </FormSection>
     </FormModal>
   );

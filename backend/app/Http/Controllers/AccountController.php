@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\AccountStatus;
 use App\Enums\Permission;
 use App\Enums\Role;
+use App\Http\Resources\AuthenticatedUserResource;
 use App\Models\User;
 use App\Services\Audit;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class AccountController extends Controller
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             ->with(['programs:id,code', 'hostEstablishments:id,name'])->orderBy('name')->paginate(50)->withQueryString();
         $accounts->getCollection()->each(function (User $account) use ($request) {
-            $identity = (new \App\Http\Resources\AuthenticatedUserResource($account))->toArray($request);
+            $identity = (new AuthenticatedUserResource($account))->toArray($request);
             $account->setAttribute('program_label', $identity['program_label']);
         });
 

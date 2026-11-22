@@ -20,8 +20,8 @@ use Tests\TestCase;
 
 class RecommendationReviewTest extends TestCase
 {
-    use LazilyRefreshDatabase;
     use AcknowledgesPrivacyNotice;
+    use LazilyRefreshDatabase;
 
     private function recommendation(StudentEnrollment $enrollment): Recommendation
     {

@@ -48,8 +48,7 @@ class OpportunityEligibility
         $moa = Moa::query()->where('host_establishment_id', $opportunity->host_establishment_id)
             ->where('status', MoaStatus::Active)->whereNull('archived_at')->whereDate('effective_on', '<=', today())
             ->whereDate('expires_on', '>=', today())
-            ->where(fn ($query) => $query->where('is_institution_wide', true)
-                ->orWhereHas('programs', fn ($programs) => $programs->whereKey($programId)))
+            ->whereHas('programs', fn ($programs) => $programs->whereKey($programId)) // spec §5: explicit coverage only
             ->orderByDesc('expires_on')->first();
         if (! $moa) {
             return null;

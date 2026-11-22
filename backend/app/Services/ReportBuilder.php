@@ -2,7 +2,14 @@
 
 namespace App\Services;
 
-use App\Models\{Evaluation, EventAttendance, Placement, ProgramTerm, Recommendation, StudentEnrollment, TimeLog};
+use App\Enums\PlacementStatus;
+use App\Models\Evaluation;
+use App\Models\EventAttendance;
+use App\Models\Placement;
+use App\Models\ProgramTerm;
+use App\Models\Recommendation;
+use App\Models\StudentEnrollment;
+use App\Models\TimeLog;
 use Illuminate\Support\Facades\DB;
 
 class ReportBuilder
@@ -12,7 +19,7 @@ class ReportBuilder
     /**
      * Synthetic test records (student_enrollments.is_synthetic) are left out unless $includeSynthetic is true.
      * When they are included and present, the payload is marked contains_synthetic and every row gains a
-     * trailing synthetic_record column (yes/no), so exports can never pass synthetic data off as real.
+     * trailing test_record column (yes/no), so exports can never pass test data off as real.
      */
     public function build(ProgramTerm $term, string $kind, bool $includeSynthetic = false): array
     {
@@ -25,7 +32,10 @@ class ReportBuilder
         switch ($kind) {
             case 'placement':
                 $columns = ['placement_id', 'enrollment_id', 'student', 'host', 'opportunity', 'status', 'supervisor', 'starts_on', 'ends_on'];
-                foreach ($placements as $p) { $rows[] = [$p->id, $p->student_enrollment_id, $names[$p->student_enrollment_id], $p->hostEstablishment->name, $p->opportunity->title, $p->status->value, $p->supervisor?->name, $p->starts_on?->toDateString(), $p->ends_on?->toDateString()]; $owners[] = $p->student_enrollment_id; }
+                foreach ($placements as $p) {
+                    $rows[] = [$p->id, $p->student_enrollment_id, $names[$p->student_enrollment_id], $p->hostEstablishment->name, $p->opportunity->title, $p->status->value, $p->supervisor?->name, $p->starts_on?->toDateString(), $p->ends_on?->toDateString()];
+                    $owners[] = $p->student_enrollment_id;
+                }
                 break;
             case 'progress':
                 $columns = ['enrollment_id', 'student', 'enrollment_status', 'placement_status', 'required_hours', 'certified_hours', 'remaining_hours', 'attention_conditions'];
@@ -52,10 +62,12 @@ class ReportBuilder
                     foreach ($term->requirements()->with('requirementType')->get() as $r) {
                         if ($r->requirementType->kind === 'event') {
                             $a = EventAttendance::where('student_enrollment_id', $e->id)->where('program_term_requirement_id', $r->id)->first();
-                            $status = $a?->confirmed_at ? 'confirmed' : ($a ? 'awaiting_confirmation' : 'not_attended'); $detail = $a?->attended_on?->toDateString();
+                            $status = $a?->confirmed_at ? 'confirmed' : ($a ? 'awaiting_confirmation' : 'not_attended');
+                            $detail = $a?->attended_on?->toDateString();
                         } else {
                             $s = $e->requirementSubmissions()->where('program_term_requirement_id', $r->id)->latest('revision')->first();
-                            $status = $s?->status->value ?? 'not_submitted'; $detail = $s?->revision;
+                            $status = $s?->status->value ?? 'not_submitted';
+                            $detail = $s?->revision;
                         }
                         $rows[] = [$e->id, $names[$e->id], $r->requirementType->name, $r->requirementType->kind, $r->is_required ? 'yes' : 'no', $status, $detail];
                         $owners[] = $e->id;
@@ -74,7 +86,9 @@ class ReportBuilder
                 $columns = ['recommendation_id', 'student', 'host_at_generation', 'opportunity_at_generation', 'similarity', 'straight_line_km', 'capacity_at_generation', 'moa_at_generation', 'model', 'model_version', 'generated_at'];
                 foreach ($enrollments as $e) {
                     $generation = DB::table('recommendation_generations')->where('student_enrollment_id', $e->id)->orderByDesc('id')->value('generation_id');
-                    if (! $generation) { continue; }
+                    if (! $generation) {
+                        continue;
+                    }
                     foreach (Recommendation::where('generation_id', $generation)->where('student_enrollment_id', $e->id)->orderBy('rank')->get() as $r) {
                         $rows[] = [$r->id, $names[$e->id], $r->snapshot['host_name'] ?? null, $r->snapshot['opportunity_title'] ?? null, $r->similarity_score, $r->distance_km, $r->capacity_at_time, $r->moa_status_at_time, $r->snapshot['model_name'] ?? null, $r->snapshot['model_version'] ?? null, $r->generated_at->toIso8601String()];
                         $owners[] = $e->id;
@@ -83,7 +97,7 @@ class ReportBuilder
                 break;
             case 'summary':
                 $columns = ['program', 'term', 'enrollments', 'students_with_current_or_completed_placement', 'approved', 'active', 'completed', 'required_ojt_hours'];
-                $rows[] = [$term->program->code, $term->academicTerm->name, $enrollments->count(), $placements->whereIn('status', [\App\Enums\PlacementStatus::Approved, \App\Enums\PlacementStatus::Active, \App\Enums\PlacementStatus::Completed])->pluck('student_enrollment_id')->unique()->count(), $placements->where('status', \App\Enums\PlacementStatus::Approved)->count(), $placements->where('status', \App\Enums\PlacementStatus::Active)->count(), $placements->where('status', \App\Enums\PlacementStatus::Completed)->count(), $term->program->required_ojt_hours];
+                $rows[] = [$term->program->code, $term->academicTerm->name, $enrollments->count(), $placements->whereIn('status', [PlacementStatus::Approved, PlacementStatus::Active, PlacementStatus::Completed])->pluck('student_enrollment_id')->unique()->count(), $placements->where('status', PlacementStatus::Approved)->count(), $placements->where('status', PlacementStatus::Active)->count(), $placements->where('status', PlacementStatus::Completed)->count(), $term->program->required_ojt_hours];
                 $owners[] = null;
                 break;
             default: abort(422, 'Unsupported report kind.');
@@ -92,9 +106,9 @@ class ReportBuilder
         $synthetic = $enrollments->pluck('is_synthetic', 'id')->map(fn ($v) => (bool) $v);
         $containsSynthetic = $includeSynthetic && $synthetic->contains(true);
         if ($containsSynthetic) {
-            $columns[] = 'synthetic_record';
+            $columns[] = 'test_record';
             foreach ($rows as $i => $row) {
-                $rows[$i][] = $owners[$i] === null ? 'includes synthetic' : ($synthetic[$owners[$i]] ? 'yes' : 'no');
+                $rows[$i][] = $owners[$i] === null ? 'includes test data' : ($synthetic[$owners[$i]] ? 'yes' : 'no');
             }
         }
 

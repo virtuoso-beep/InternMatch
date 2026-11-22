@@ -1,191 +1,150 @@
+"""Recommendation learning (spec §9): the 30/30 rule, leave-one-student-out evaluation, the install rule,
+the fallback evaluation and the model card gate."""
+import json
 import os
-import pandas as pd
+import random
+
 import pytest
-import joblib
 from fastapi.testclient import TestClient
 
-# Must set before importing main if we want to bypass real models in some cases,
-# but we just test the endpoints.
 from main import app
+from ml import integrate, learning
 
 client = TestClient(app)
 
-def create_dummy_data(path):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    df = pd.DataFrame({
-        'similarity_score': [0.9, 0.1, 0.8, 0.2, 0.95, 0.05],
-        'distance_km': [5.0, 50.0, None, 100.0, 2.0, 200.0],
-        'capacity_at_time': [5, 0, 2, 0, 10, -1],
-        'moa_active': [1, 0, 1, 0, 1, 0],
-        'label': [1, 0, 1, 0, 1, 0]
-    })
-    df.to_csv(path, index=False)
 
-def test_pipeline_stages(tmp_path):
-    raw_path = str(tmp_path / "raw.csv")
-    cleaned_path = str(tmp_path / "cleaned.csv")
-    train_path = str(tmp_path / "train.csv")
-    test_path = str(tmp_path / "test.csv")
-    model_path = str(tmp_path / "model.joblib")
-    scaler_path = str(tmp_path / "scaler.joblib")
-    report_path = str(tmp_path / "report.json")
-    
-    create_dummy_data(raw_path)
-    
-    # 1. Clean Data
-    from ml.clean_data import clean_data
-    clean_data(raw_path, cleaned_path)
-    df_clean = pd.read_csv(cleaned_path)
-    assert 'distance_km_missing' in df_clean.columns
-    assert df_clean['distance_km'].isna().sum() == 0
-    
-    # 2. Split Data
-    from ml.split_data import split_data
-    split_data(cleaned_path, train_path, test_path, test_size=0.33)
-    assert os.path.exists(train_path)
-    assert os.path.exists(test_path)
-    
-    # 3. Train Model
-    from ml.train_model import train_model
-    train_model(train_path, model_path, scaler_path)
-    assert os.path.exists(model_path)
-    assert os.path.exists(scaler_path)
-    
-    # 4. Evaluate Model
-    from ml.evaluate_model import evaluate_model
-    # For dummy data, threshold might fail, so we catch or set threshold to 0.0
-    evaluate_model(test_path, model_path, scaler_path, report_path, threshold=0.0)
-    assert os.path.exists(report_path)
-
-def test_integration_fallback():
-    # If we hit /recommendations/ml without a model, it should fallback to cosine
-    payload = {
-        "student_vector": [0.1] * 768,
-        "candidates": [
-            {
-                "id": 1,
-                "vector": [0.1] * 768,
-                "distance_km": 10.0,
-                "capacity_at_time": 5,
-                "moa_status_at_time": "active"
-            }
-        ]
-    }
-    response = client.post("/recommendations/ml", json=payload)
-    # The app health might fail if engine is none but we're testing just the ml route.
-    # Wait, the lifespan handles engine initialization. If it's loaded, it's fine.
-    # The ml route doesn't use `engine` directly, just `cosine()`.
-    if response.status_code == 200:
-        data = response.json()
-        assert "ranking_method" in data
-        assert "cosine_fallback" in data["ranking_method"] or "logistic_regression" in data["ranking_method"]
+def make_rows(students=16, programs=("BSA", "BSIT"), rule=None, synthetic=False, seed=7):
+    """Five judged opportunities per student. Default rule: suitable needs a close fit AND a short distance,
+    so distance carries information that similarity alone does not."""
+    rng = random.Random(seed)
+    rule = rule or (lambda s, d: s > 0.5 and d < 15)
+    rows = []
+    for n in range(students):
+        program = programs[n % len(programs)]
+        for _ in range(5):
+            s, d = rng.uniform(0.1, 0.95), rng.uniform(1, 30)
+            rows.append({"student": f"S{n}", "program": program, "similarity": round(s, 3), "distance_km": round(d, 2),
+                         "keyword_overlap": round(min(1.0, max(0.0, s + rng.uniform(-0.2, 0.2))), 3),
+                         "label": int(rule(s, d)), "synthetic": synthetic})
+    return rows
 
 
-def test_default_input_points_at_laravel_local_disk():
-    """Regression: ml:export-judgments writes to Laravel's local disk root (storage/app/private)."""
-    from ml.clean_data import DEFAULT_INPUT
-    ml_dir = os.path.join(os.path.dirname(__file__), "..", "ml")
-    resolved = os.path.normpath(os.path.join(ml_dir, DEFAULT_INPUT)).replace("\\", "/")
-    assert resolved.endswith("backend/storage/app/private/ml/judgment_export.csv")
+@pytest.fixture
+def model_dir(tmp_path, monkeypatch):
+    folder = tmp_path / "ranker"
+    monkeypatch.setattr(integrate, "MODEL_DIR", str(folder))
+    integrate.load_ml_assets(str(folder), allow_test_model=False)
+    yield folder
+    integrate.load_ml_assets(str(tmp_path / "none"), allow_test_model=False)
 
 
-# --- Model card gate: only a passing model built from real judgments is ever used -------------------
-
-def _train_into(folder, rows=60, synthetic=False, threshold=0.0):
-    """Run clean -> split -> train -> evaluate on a separable dataset; returns the model folder."""
-    import numpy as np
-    from ml.clean_data import clean_data
-    from ml.split_data import split_data
-    from ml.train_model import train_model
-    from ml.evaluate_model import evaluate_model
-
-    rng = np.random.default_rng(7)
-    good = rng.uniform(0.7, 0.95, rows // 2)
-    bad = rng.uniform(0.05, 0.35, rows // 2)
-    df = pd.DataFrame({
-        "similarity_score": np.concatenate([good, bad]),
-        "distance_km": [3.0 + i % 5 for i in range(rows // 2)] + [None if i % 4 == 0 else 60.0 + i for i in range(rows // 2)],
-        "capacity_at_time": [5] * (rows // 2) + [1] * (rows // 2),
-        "moa_active": [1] * (rows // 2) + [0] * (rows // 2),
-        "label": [1] * (rows // 2) + [0] * (rows // 2),
-        "is_synthetic": [1 if synthetic else 0] * rows,
-    })
-    folder.mkdir(parents=True, exist_ok=True)
-    raw, cleaned = folder / "raw.csv", folder / "cleaned.csv"
-    train, test = folder / "train.csv", folder / "test.csv"
-    models = folder / "models"
-    df.to_csv(raw, index=False)
-    clean_data(str(raw), str(cleaned))
-    split_data(str(cleaned), str(train), str(test), test_size=0.25)
-    train_model(str(train), str(models / "judgment_model.joblib"), str(models / "scaler.joblib"))
-    evaluate_model(str(test), str(models / "judgment_model.joblib"), str(models / "scaler.joblib"),
-                   str(folder / "report.json"), threshold=threshold)
-    return models
-
-
-def _payload(distance=10.0):
-    return {"student_vector": [0.1] * 768, "candidates": [
-        {"id": 1, "vector": [0.1] * 768, "distance_km": distance, "capacity_at_time": 5, "moa_status_at_time": "active"},
-        {"id": 2, "vector": [0.1] * 767 + [-0.1], "distance_km": 80.0, "capacity_at_time": 1, "moa_status_at_time": "expired"},
+def payload(program="BSA"):
+    return {"student_vector": [0.1] * 768, "program": program, "candidates": [
+        {"id": 1, "vector": [0.1] * 768, "distance_km": 3.0},
+        {"id": 2, "vector": [0.1] * 767 + [-0.1], "distance_km": 28.0},
     ]}
 
 
-def test_no_model_means_cosine_fallback_with_reason(tmp_path):
-    from ml import integrate
-    integrate.load_ml_assets(str(tmp_path))
+def test_no_model_ranks_by_similarity_and_says_why(model_dir):
     status = client.get("/recommendations/ml/status").json()
     assert status["active"] is False and "No trained model" in status["reason"]
-    body = client.post("/recommendations/ml", json=_payload()).json()
+    body = client.post("/recommendations/ml", json=payload()).json()
     assert body["ranking_method"] == "cosine_fallback"
     assert body["model_name"] == "intfloat/multilingual-e5-base" and body["model_version"]
 
 
-def test_passing_real_model_is_used_and_reported(tmp_path):
-    from ml import integrate
-    models = _train_into(tmp_path)
-    integrate.load_ml_assets(str(models), allow_synthetic=False)
+def test_not_enough_labels_keeps_the_current_model(model_dir):
+    rows = make_rows(students=40)
+    suitable = [r for r in rows if r["label"] == 1][:29]
+    unsuitable = [r for r in rows if r["label"] == 0][:30]
+    report = client.post("/ml/train", json={"rows": suitable + unsuitable}).json()
+    assert report["result"] == "not_enough_data" and report["metrics"] is None
+    assert report["counts"]["suitable"] == 29
+    assert not model_dir.exists()
+
+
+def test_a_model_better_than_similarity_alone_is_installed_and_used(model_dir):
+    rows = make_rows(students=24)
+    report = client.post("/ml/train", json={"rows": rows}).json()
+    assert report["result"] == "updated", report
+    model, baseline = report["metrics"]["model"], report["metrics"]["similarity_only"]
+    assert model["overall"]["f1"] > baseline["overall"]["f1"]
+    assert set(model["by_program"]) == {"BSA", "BSIT"}
+    assert {"accuracy", "precision", "recall", "f1"} <= set(model["overall"])
+    assert model["students"] == 24
+    card = json.loads((model_dir / "model_card.json").read_text())
+    assert card["synthetic"] is False and card["features"][:2] == ["similarity_score", "distance_km"]
+    assert not (model_dir.parent / ".ranker-staging").exists()
+
     status = client.get("/recommendations/ml/status").json()
-    assert status["active"] is True and status["card"]["synthetic_rows_train"] == 0
-    body = client.post("/recommendations/ml", json=_payload()).json()
+    assert status["active"] is True
+    body = client.post("/recommendations/ml", json=payload()).json()
     assert body["ranking_method"] == "logistic_regression"
-    assert [row["id"] for row in body["data"]] == [1, 2]
-    assert all(0.0 <= row["ml_score"] <= 1.0 for row in body["data"])
-    integrate.load_ml_assets(str(tmp_path / "none"))
+    assert [row["id"] for row in body["data"]] == [1, 2]  # same fit, the nearer one ranks first
 
 
-def test_synthetic_model_is_never_activated_for_real_use(tmp_path):
-    from ml import integrate
-    models = _train_into(tmp_path, synthetic=True)
-    integrate.load_ml_assets(str(models), allow_synthetic=False)
+def test_a_model_no_better_than_similarity_alone_is_refused(model_dir):
+    rows = make_rows(students=24, rule=lambda s, d: s > 0.5)  # distance adds nothing
+    report = client.post("/ml/train", json={"rows": rows}).json()
+    assert report["result"] == "not_reliable" and "not better than similarity alone" in report["reason"]
+    assert not model_dir.exists()
+
+
+def test_every_program_needs_both_labels(model_dir):
+    rows = make_rows(students=24)
+    rows += [{"student": f"C{n}", "program": "BSCRIM", "similarity": 0.9, "distance_km": 2.0, "keyword_overlap": 0.9,
+              "label": 1, "synthetic": False} for n in range(3)]
+    report = client.post("/ml/train", json={"rows": rows}).json()
+    assert report["result"] == "not_reliable" and "BSCRIM" in report["reason"]
+    assert not model_dir.exists()
+
+
+def test_test_data_needs_local_test_mode(model_dir, monkeypatch):
+    rows = make_rows(students=24, synthetic=True)
+    monkeypatch.delenv("ML_ALLOW_SYNTHETIC_MODEL", raising=False)
+    assert client.post("/ml/train", json={"rows": rows}).status_code == 422
+
+    monkeypatch.setenv("ML_ALLOW_SYNTHETIC_MODEL", "1")
+    assert client.post("/ml/train", json={"rows": rows}).json()["result"] == "updated"
+    assert client.get("/recommendations/ml/status").json()["card"]["synthetic"] is True
+
+    integrate.load_ml_assets(str(model_dir), allow_test_model=False)
     status = client.get("/recommendations/ml/status").json()
-    assert status["active"] is False and "synthetic" in status["reason"]
-    integrate.load_ml_assets(str(tmp_path / "none"))
+    assert status["active"] is False and "test data" in status["reason"]
 
 
-def test_tampered_or_failed_model_is_refused(tmp_path):
-    from ml import integrate
-    from ml.evaluate_model import evaluate_model
-    models = _train_into(tmp_path)
-    with open(models / "judgment_model.joblib", "ab") as handle:
+def test_tampered_model_files_are_refused(model_dir):
+    assert client.post("/ml/train", json={"rows": make_rows(students=24)}).json()["result"] == "updated"
+    with open(model_dir / "judgment_model.joblib", "ab") as handle:
         handle.write(b"tamper")
-    integrate.load_ml_assets(str(models), allow_synthetic=False)
+    integrate.load_ml_assets(str(model_dir), allow_test_model=False)
     assert "do not match" in client.get("/recommendations/ml/status").json()["reason"]
 
-    models = _train_into(tmp_path / "second")
-    with pytest.raises(ValueError):
-        evaluate_model(str(tmp_path / "second" / "test.csv"), str(models / "judgment_model.joblib"),
-                       str(models / "scaler.joblib"), str(tmp_path / "second" / "report.json"), threshold=1.01)
-    assert not (models / "model_card.json").exists()
-    integrate.load_ml_assets(str(models), allow_synthetic=False)
-    assert client.get("/recommendations/ml/status").json()["active"] is False
-    integrate.load_ml_assets(str(tmp_path / "none"))
+
+def test_fallback_evaluation_by_hand():
+    rows = [  # one student: similarity order puts the two suitable pairs 1st and 3rd
+        {"student": "A", "program": "BSA", "similarity": 0.9, "distance_km": 9, "keyword_overlap": 0.2, "label": 1},
+        {"student": "A", "program": "BSA", "similarity": 0.8, "distance_km": 1, "keyword_overlap": 0.9, "label": 0},
+        {"student": "A", "program": "BSA", "similarity": 0.7, "distance_km": 2, "keyword_overlap": 0.8, "label": 1},
+        {"student": "A", "program": "BSA", "similarity": 0.2, "distance_km": 3, "keyword_overlap": 0.1, "label": 0},
+        {"student": "B", "program": "BSA", "similarity": 0.5, "distance_km": 3, "keyword_overlap": 0.1, "label": 1},
+    ]
+    result = learning.fallback_evaluation(rows)
+    assert result["students"] == 1  # B has no not-suitable label
+    sim = result["similarity"]
+    assert sim["precision_at_3"] == pytest.approx(2 / 3)
+    assert sim["recall_at_3"] == pytest.approx(1.0)
+    ideal = 1 + 1 / 1.5849625007211562
+    assert sim["ndcg_at_3"] == pytest.approx((1 + 1 / 2) / ideal)
+    assert result["distance_only"]["precision_at_3"] == pytest.approx(1 / 3)  # 1 km, 2 km, 3 km: one suitable
+    assert learning.fallback_evaluation(rows[4:]) is None
 
 
-def test_missing_distance_uses_training_fill_not_zero(tmp_path):
-    from ml import integrate
-    import json
-    models = _train_into(tmp_path)
-    fill = json.loads((models / "model_card.json").read_text())["distance_fill"]
-    assert fill > 0
-    row = {"similarity_score": 0.5, "distance_km": None, "capacity_at_time": 2, "moa_status_at_time": "active"}
-    assert integrate.features_for(row, fill) == [0.5, fill, 2, 1, 1]
+def test_missing_distance_uses_the_training_median():
+    rows = [{"similarity": 0.5, "distance_km": None, "program": "BSA"}]
+    assert learning.features(rows, ["BSA", "BSIT"], 7.5).tolist() == [[0.5, 7.5, 1.0, 0.0]]
+
+
+def test_export_default_location_note():
+    """The research export lives in Laravel's local disk; the AI service no longer reads it."""
+    assert "ml:export-judgments" in open(os.path.join(os.path.dirname(__file__), "..", "ml", "README.md")).read()

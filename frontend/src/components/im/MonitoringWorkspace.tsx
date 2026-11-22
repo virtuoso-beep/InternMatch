@@ -614,7 +614,7 @@ export function PlacementMonitoring({
               <p className="text-sm text-muted-foreground">
                 {progress.method}{" "}
                 {!progress.hours_rule_configured &&
-                  "The program hours-attention thresholds have not been configured."}
+                  "The program alert levels for hours have not been set."}
               </p>
               {progress.flags.map((flag) => (
                 <p key={flag.code} className="rounded border border-warn/40 bg-warn/10 p-3">

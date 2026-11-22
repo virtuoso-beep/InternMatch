@@ -22,7 +22,7 @@ class MoaController extends Controller
         abort_unless(in_array($user->role, [Role::Admin, Role::Coordinator, Role::Supervisor], true), 403);
         $query = Moa::whereIn('host_establishment_id', HostAccess::query($user)->select('id'));
         if ($user->role === Role::Coordinator) {
-            $query->where(fn ($query) => $query->where('is_institution_wide', true)->orWhereHas('programs', fn ($programs) => $programs->whereIn('programs.id', $user->programs()->select('programs.id'))));
+            $query->whereHas('programs', fn ($programs) => $programs->whereIn('programs.id', $user->programs()->select('programs.id')));
         }
 
         return $query;
@@ -32,7 +32,6 @@ class MoaController extends Controller
     {
         abort_if($request->user()->role === Role::Supervisor && $moa->status->value !== 'draft', 403, 'Only draft records may be edited by a host supervisor.');
         if ($request->user()->role === Role::Coordinator) {
-            abort_if($moa->is_institution_wide, 403, 'Institution-wide coverage is maintained by the central registry.');
             HostAccess::authorizePrograms($request->user(), $moa->programs()->pluck('programs.id')->all());
         }
     }
@@ -55,7 +54,8 @@ class MoaController extends Controller
             'status' => ['required', Rule::in(['draft', 'pending_signature', 'active', 'expired', 'terminated'])],
             'effective_on' => ['required_if:status,active', 'nullable', 'date_format:Y-m-d'],
             'expires_on' => ['required_if:status,active', 'nullable', 'date_format:Y-m-d', 'after_or_equal:effective_on'],
-            'is_institution_wide' => ['required', 'boolean'], 'program_ids' => ['present', 'array', 'max:100'],
+            // Spec §5: every agreement lists the programs it covers; there is no "covers everything" option.
+            'program_ids' => ['required', 'array', 'min:1', 'max:100'],
             'program_ids.*' => ['required', 'integer', 'distinct', 'exists:programs,id'], 'notes' => ['nullable', 'string', 'max:10000'],
             'max_interns_per_term' => ['prohibited'], 'document_id' => ['prohibited'],
         ]);
@@ -63,13 +63,7 @@ class MoaController extends Controller
         abort_if($host->archived_at !== null || $existing?->archived_at !== null, 409, 'Restore the archived record before changing it.');
         abort_if($existing && $existing->host_establishment_id !== $host->id, 422, 'An agreement cannot be moved to another host.');
         HostAccess::authorizePrograms($user, $data['program_ids']);
-        abort_if($user->role !== Role::Admin && $data['is_institution_wide'], 403);
         abort_if($user->role === Role::Supervisor && $data['status'] !== 'draft', 403, 'Host supervisors can register draft agreements for institutional review.');
-        abort_if($data['is_institution_wide'] && $data['program_ids'] !== [], 422, 'Choose institution-wide coverage or specific programs, not both.');
-        abort_if(! $data['is_institution_wide'] && $data['program_ids'] === [], 422, 'Specify the programs covered by the agreement.');
-        // Spec §5 (17 Nov 2026): every MOA lists its covered programs; there is no implicit "covers everything" case.
-        // Existing institution-wide records stay readable; new ones are not accepted.
-        abort_if($data['is_institution_wide'] && ! $existing?->is_institution_wide, 422, 'Each agreement must list the programs it covers. Institution-wide coverage is no longer recorded.');
         $record = DB::transaction(function () use ($request, $host, $existing, $data) {
             HostEstablishment::whereKey($host->id)->lockForUpdate()->firstOrFail();
             $record = $existing ? Moa::whereKey($existing->id)->lockForUpdate()->firstOrFail() : new Moa;
@@ -85,16 +79,16 @@ class MoaController extends Controller
                 if ($record->placements()->exists()) {
                     $oldPrograms = $record->programs()->pluck('programs.id')->sort()->values()->all();
                     $newPrograms = collect($data['program_ids'])->map(fn ($id) => (int) $id)->sort()->values()->all();
-                    abort_if($oldPrograms !== $newPrograms || $record->is_institution_wide !== (bool) $data['is_institution_wide']
+                    abort_if($oldPrograms !== $newPrograms
                         || $record->reference_number !== $data['reference_number']
                         || $record->effective_on?->toDateString() !== ($data['effective_on'] ?? null)
                         || $record->expires_on?->toDateString() !== ($data['expires_on'] ?? null), 409, 'An agreement used by placements retains its original coverage and dates. Register a new agreement for changes.');
                 }
             }
             abort_if($data['status'] === 'active' && ! $record->document_id, 422, 'Attach the executed agreement document before recording active status.');
-            $record->fill(collect($data)->except('program_ids')->all())->save();
+            $record->fill(collect($data)->except('program_ids')->all() + ['is_institution_wide' => false])->save();
             $record->programs()->sync($data['program_ids']);
-            Audit::record($request->user(), 'moa.saved', $record, ['status' => $data['status'], 'program_ids' => $data['program_ids'], 'is_institution_wide' => $data['is_institution_wide']], count($data['program_ids']) === 1 ? $data['program_ids'][0] : null);
+            Audit::record($request->user(), 'moa.saved', $record, ['status' => $data['status'], 'program_ids' => $data['program_ids']], count($data['program_ids']) === 1 ? $data['program_ids'][0] : null);
 
             return $record;
         });

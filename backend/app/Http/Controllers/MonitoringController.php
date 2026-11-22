@@ -10,6 +10,7 @@ use App\Models\StudentEnrollment;
 use App\Models\TimeLog;
 use App\Notifications\PortalNotification;
 use App\Services\Audit;
+use App\Services\EvaluationScoring;
 use App\Services\PlacementAccess;
 use App\Services\ProgressSummary;
 use Carbon\CarbonImmutable;
@@ -39,7 +40,7 @@ class MonitoringController extends Controller
             $page->getCollection()->each(fn (Placement $placement) => $placement->setAttribute('progress', $summary->forPlacement($placement)));
         }
         if (in_array('evaluations', $include, true)) {
-            $scoring = app(\App\Services\EvaluationScoring::class);
+            $scoring = app(EvaluationScoring::class);
             $page->getCollection()->each(fn (Placement $placement) => $placement->evaluations->each(fn ($evaluation) => $evaluation->setAttribute('weighted_percentage', $scoring->percentage($evaluation))));
         }
 

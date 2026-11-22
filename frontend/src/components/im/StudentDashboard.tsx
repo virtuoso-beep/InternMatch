@@ -15,6 +15,7 @@ import {
   type ActionItem,
 } from "./ds";
 import { ChartCard, DonutChartView } from "./charts";
+import { SimilarityScoreLabel } from "./SimilarityScoreLabel";
 
 type Enrollment = {
   id: number;
@@ -535,7 +536,9 @@ function EnrollmentDashboard({ enrollment }: { enrollment: Enrollment }) {
                     </p>
                     <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <div>
-                        <dt className="inline">Similarity score </dt>
+                        <dt className="inline">
+                          <SimilarityScoreLabel />{" "}
+                        </dt>
                         <dd className="inline font-semibold text-foreground tabular-nums">
                           {formatSimilarity(item.similarity_score)}
                         </dd>

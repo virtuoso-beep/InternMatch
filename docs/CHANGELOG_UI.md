@@ -247,6 +247,19 @@ Sign-in page: same layout, copy and colours, refined spacing and states.
 - **Production frontend.** The build now targets a Node server (`node .output/server/index.mjs`) to match `docker-compose.production.yml`; previously the compose file served a `dist` folder the build never produced. Production Nginx now also compresses `text/javascript` (the main bundle was sent uncompressed). Public Sans is self-hosted, the 868 KB seal is replaced by 11 KB copies, and the landing page preloads its display font. Production-build Lighthouse (through gzip): sign-in 94 mobile / 100 desktop, landing 84 mobile / 99 desktop; accessibility and SEO 100.
 - **Smaller fixes:** landing page hides the page scrollbar over the hero; Edge's duplicate password-reveal button is hidden; maps use darkened tiles in dark mode; supervisor Attendance & Hours pages 20 logs at a time.
 
+## Recommendation learning, revised to the documented rule (2026-11-22)
+
+Follows spec §9 and Development Guide Phase 9; replaces the earlier F1 0.70 random-split gate.
+
+- **Eligibility (spec §6) is unchanged and verified:** only opportunities that pass the eligibility check (published, valid agreement covering the program, remaining capacity) are sent for ranking. A regression test proves expired agreements, full and closed opportunities never get a score. The institution-wide agreement option is removed (spec §5: every agreement lists its programs).
+- **Model:** one shared Logistic Regression with three features: similarity score, straight-line distance and program. Agreement status and capacity are hard constraints, not features.
+- **Rule:** train only with at least 30 suitable and 30 not-suitable approved coordinator judgments on real students (latest judgment per pair; uncertain excluded). Evaluate with leave-one-student-out; report accuracy, precision, recall and F1, overall and per program. Install only if the model's F1 is better than similarity alone and every program has both labels. Otherwise the current model stays.
+- **Fallback evaluation:** Precision@3, Recall@3 and NDCG@3 for the current ranking against keyword overlap and distance only, shown under Technical details ("Not enough judgments yet" until a student has both labels).
+- **One action:** the administrator's "Update recommendations" button (confirmation modal) and `php artisan ml:retrain` run the same check, train, evaluate and atomic install with reload (no image rebuild or restart). Every run is kept in `ranker_runs` (date, judgments used, result). Coordinators see live counts for their own programs, read only.
+- **Test data:** synthetic labels are used only in local test mode (`ML_ALLOW_SYNTHETIC_MODEL` in `docker-compose.override.yml`, never loaded in production), never count toward the real 30/30 rule, and a test run takes up to 60 per program (30 of each) so the same rule applies.
+- **Wording:** no technical terms on normal screens. Admin card "Recommendation learning"; ranking line "Ranked by skills match and distance" (or "... and past coordinator judgments"); similarity score with a plain help tip; student page intro; landing page matching section in plain words. "Synthetic" reads "test data" on all screens and exports (reports saved earlier are relabelled when shown or exported; stored content is unchanged). Monitoring "thresholds" read "alert levels".
+- **Live check (local):** real judgments 1 suitable, 0 not suitable, so "not enough judgments". A practice run on 30/30 test labels was evaluated (17 students) and not installed: model F1 0.765 was not better than similarity alone (0.787).
+
 ## Known issues and suggestions not implemented
 
 - `LiveDashboard.tsx` was no longer used by any role and was deleted after confirming nothing imports it.

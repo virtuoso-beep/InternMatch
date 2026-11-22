@@ -118,7 +118,6 @@ class RecordArchive
                 ->merge(DB::table('opportunity_program')->whereIn('opportunity_id', Opportunity::where('host_establishment_id', $host->id)->select('id'))->pluck('program_id'))
                 ->merge(DB::table('moa_program')->whereIn('moa_id', Moa::where('host_establishment_id', $host->id)->select('id'))->pluck('program_id'))
                 ->unique()->values()->all();
-            abort_if(Moa::where('host_establishment_id', $host->id)->where('is_institution_wide', true)->exists(), 403, 'This host is covered by an institution-wide agreement and is maintained by the administrator.');
             HostAccess::authorizePrograms($actor, $programs);
         }
 
@@ -134,7 +133,6 @@ class RecordArchive
         }
         $moa = $query->findOrFail($id);
         if ($actor->role === Role::Coordinator) {
-            abort_if($moa->is_institution_wide, 403, 'Institution-wide coverage is maintained by the central registry.');
             HostAccess::authorizePrograms($actor, $moa->programs()->pluck('programs.id')->all());
         }
 

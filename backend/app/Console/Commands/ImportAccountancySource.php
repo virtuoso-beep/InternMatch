@@ -12,6 +12,7 @@ use RuntimeException;
 class ImportAccountancySource extends Command
 {
     protected $signature = 'internmatch:import-accountancy {json : Output of deploy/extract-accountancy.py} {--apply}';
+
     protected $description = 'Import BSA source rows, confirmed hours, hosts and requirement templates without fabricating historical evidence';
 
     public function handle(): int
@@ -23,10 +24,14 @@ class ImportAccountancySource extends Command
             throw new RuntimeException('Student rows do not supply one confirmed positive BSA hours requirement.');
         }
         foreach ($sheets['Students Records'] as $row) {
-            if ($row['values'][1] !== 'BS Accountancy') throw new RuntimeException('Unexpected program in BSA import.');
+            if ($row['values'][1] !== 'BS Accountancy') {
+                throw new RuntimeException('Unexpected program in BSA import.');
+            }
         }
         $this->line(json_encode(['rows' => array_map('count', $sheets), 'bsa_hours' => $hours[0]], JSON_PRETTY_PRINT));
-        if (! $this->option('apply')) return self::SUCCESS;
+        if (! $this->option('apply')) {
+            return self::SUCCESS;
+        }
         DB::transaction(function () use ($source, $sheets, $hours) {
             $program = Program::where('code', 'BSA')->lockForUpdate()->sole();
             $beforeHours = $program->required_ojt_hours;
@@ -70,6 +75,7 @@ class ImportAccountancySource extends Command
                 'changes' => json_encode(['source_sha256' => $source['sha256'], 'hours_before' => $beforeHours, 'hours_after' => $program->required_ojt_hours, 'rows' => array_map('count', $sheets)]), 'created_at' => now()]);
         });
         $this->info('BSA settings and hosts imported; historical source rows retained for review. Other programs hours unchanged.');
+
         return self::SUCCESS;
     }
 }

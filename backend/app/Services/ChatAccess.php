@@ -8,6 +8,7 @@ use App\Models\Placement;
 use App\Models\StudentEnrollment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ChatAccess
@@ -45,7 +46,7 @@ class ChatAccess
         };
     }
 
-    public static function coordinators(StudentEnrollment $enrollment): \Illuminate\Support\Collection
+    public static function coordinators(StudentEnrollment $enrollment): Collection
     {
         return $enrollment->programTerm->program->coordinators
             ->filter(fn ($user) => $user->role === Role::Coordinator && $user->status->value === 'active');

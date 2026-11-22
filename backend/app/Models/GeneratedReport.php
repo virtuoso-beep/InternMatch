@@ -3,14 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class GeneratedReport extends Model
 {
     protected $guarded = ['id'];
 
-    protected function casts(): array { return ['payload' => 'array', 'contains_synthetic' => 'boolean', 'approved_at' => 'immutable_datetime']; }
+    protected function casts(): array
+    {
+        return ['payload' => 'array', 'contains_synthetic' => 'boolean', 'approved_at' => 'immutable_datetime'];
+    }
 
-    public function programTerm(): \Illuminate\Database\Eloquent\Relations\BelongsTo { return $this->belongsTo(ProgramTerm::class); }
+    public function programTerm(): BelongsTo
+    {
+        return $this->belongsTo(ProgramTerm::class);
+    }
 
     protected static function booted(): void
     {

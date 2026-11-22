@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\Role;
 use App\Models\Moa;
 use App\Models\Opportunity;
+use App\Models\Placement;
 use App\Models\ProgramTermRequirement;
 use App\Models\RequirementSubmission;
 use App\Models\StudentEnrollment;
@@ -106,7 +107,7 @@ class CohortAllocationTest extends TestCase
         [$e, $coordinator, $supervisor, $opportunity] = $this->fixture();
         $id = $this->actingAs($coordinator)->postJson('/api/v1/program-terms/'.$e->program_term_id.'/allocation')->assertCreated()->json('id');
         $item = DB::table('placement_proposal_items')->where('placement_proposal_id', $id)->where('student_enrollment_id', $e->id)->first();
-        $placement = \App\Models\Placement::create(['student_enrollment_id' => $e->id, 'host_establishment_id' => $opportunity->host_establishment_id,
+        $placement = Placement::create(['student_enrollment_id' => $e->id, 'host_establishment_id' => $opportunity->host_establishment_id,
             'opportunity_id' => $opportunity->id, 'status' => 'pending', 'starts_on' => today(), 'placement_proposal_item_id' => $item->id]);
         $decision = ['decision' => 'approve', 'reason' => 'Reviewed the imported pending placement.', 'supervisor_id' => $supervisor->id,
             'starts_on' => today()->toDateString(), 'ends_on' => today()->addMonth()->toDateString()];

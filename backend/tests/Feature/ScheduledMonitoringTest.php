@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
-use App\Models\{Placement, User};
+use App\Models\Placement;
+use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -16,7 +18,7 @@ class ScheduledMonitoringTest extends TestCase
     {
         // Fixed Wednesday so working-day arithmetic is deterministic; spec §13 pace rules are turned
         // down for this fixture so the test isolates the scheduler mechanics on the legacy rule.
-        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-18 09:00', 'Asia/Manila'));
+        $this->travelTo(CarbonImmutable::parse('2026-11-18 09:00', 'Asia/Manila'));
         $supervisor = User::factory()->withRole(Role::Supervisor)->create();
         $placement = Placement::factory()->create(['status' => 'active', 'supervisor_id' => $supervisor->id, 'starts_on' => today()->subMonth(), 'ends_on' => today()->addDay()]);
         $supervisor->hostEstablishments()->attach($placement->host_establishment_id);
@@ -45,7 +47,7 @@ class ScheduledMonitoringTest extends TestCase
     public function test_spec_default_rules_are_active_without_department_thresholds(): void
     {
         // Spec §13 (17 Nov 2026): the adopted defaults are active for every program; no thresholds need configuring.
-        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-18 09:00', 'Asia/Manila'));
+        $this->travelTo(CarbonImmutable::parse('2026-11-18 09:00', 'Asia/Manila'));
         $placement = Placement::factory()->create(['status' => 'active', 'supervisor_id' => User::factory()->withRole(Role::Supervisor), 'starts_on' => '2026-10-19', 'ends_on' => '2026-11-18']);
         $placement->studentEnrollment->programTerm->program->update(['required_ojt_hours' => 486]);
         $this->artisan('internmatch:refresh-monitoring')->assertSuccessful();

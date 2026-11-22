@@ -20,8 +20,8 @@ use Tests\TestCase;
 
 class NativeWorkflowTest extends TestCase
 {
-    use LazilyRefreshDatabase;
     use AcknowledgesPrivacyNotice;
+    use LazilyRefreshDatabase;
 
     private function actor(ProgramTerm $term): User
     {

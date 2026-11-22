@@ -48,7 +48,9 @@ class StudentPortalTest extends TestCase
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.eligibility.capacity_remaining', 2);
         $moa->programs()->detach();
         $this->assertNull($service->inspect($student, $opportunity));
-        $moa->update(['is_institution_wide' => true]);
+        $moa->update(['is_institution_wide' => true]); // spec §5: the old flag never makes an agreement eligible
+        $this->assertNull($service->inspect($student, $opportunity));
+        $moa->programs()->attach($student->programTerm->program_id);
         $this->assertNotNull($service->inspect($student, $opportunity));
         $moa->update(['expires_on' => '2026-09-18']);
         $this->assertNull($service->inspect($student, $opportunity));

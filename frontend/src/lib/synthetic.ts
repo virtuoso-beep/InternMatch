@@ -1,7 +1,7 @@
-/** Roles that may opt in to synthetic test data on aggregate screens (backend: App\Support\SyntheticData). */
+/** Roles that may opt in to test data on aggregate screens (backend: App\Support\SyntheticData). */
 export const SYNTHETIC_ROLES = ["coordinator", "dean", "admin"];
 
-export const SYNTHETIC_LABEL = "Contains synthetic data";
+export const SYNTHETIC_LABEL = "Contains test data";
 
 /** Appends include_synthetic=1 to an API path when the switch is on. */
 export function withSynthetic(path: string, include: boolean): string {

@@ -6,6 +6,8 @@ use App\Models\Document;
 use App\Models\Program;
 use App\Models\StudentEnrollment;
 use App\Models\User;
+use Database\Seeders\InternMatchReferenceSeeder;
+use Database\Seeders\ProgramSeeder;
 use Database\Seeders\SyntheticDemoSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +25,7 @@ class SyntheticDemoTest extends TestCase
         foreach (['student', 'coordinator', 'supervisor', 'dean', 'admin'] as $role) {
             User::factory()->create(['email' => $role.'@example.com', 'role' => $role, 'status' => 'active']);
         }
-        $this->seed([\Database\Seeders\ProgramSeeder::class, \Database\Seeders\InternMatchReferenceSeeder::class]);
+        $this->seed([ProgramSeeder::class, InternMatchReferenceSeeder::class]);
         $originalAccounts = User::orderBy('id')->get()->map->getAttributes()->all();
         $this->seed(SyntheticDemoSeeder::class);
         $this->assertSame($originalAccounts, User::orderBy('id')->get()->map->getAttributes()->all());

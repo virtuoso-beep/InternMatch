@@ -14,6 +14,7 @@ import {
 } from "./ui";
 import { inputClass } from "./formUtils";
 import { SyntheticToggle } from "./SyntheticToggle";
+import { SimilarityScoreLabel } from "./SimilarityScoreLabel";
 type Student = {
   id: number;
   status: string;
@@ -49,7 +50,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [results, setResults] = useState<Result[]>([]);
-  // Synthetic students are left out of runs and history unless "Include synthetic data" is on.
+  // Test students are left out of runs and history unless "Include test data" is on.
   const [includeSynthetic, setIncludeSynthetic] = useState(false);
   const [search, setSearch] = useState("");
   const [resultFilter, setResultFilter] = useState("");
@@ -307,7 +308,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
             onClick={() =>
               downloadText(
                 results.some((r) => r.synthetic)
-                  ? "recommendation-batch-results-contains-synthetic-data.json"
+                  ? "recommendation-batch-results-contains-test-data.json"
                   : "recommendation-batch-results.json",
                 JSON.stringify(results, null, 2),
                 "application/json",
@@ -369,7 +370,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
                 {visibleResults.map((r, i) => (
                   <tr key={i} className="border-t">
                     <td className="p-2">
-                      {r.student} {r.synthetic && <Pill tone="warn">Synthetic</Pill>}
+                      {r.student} {r.synthetic && <Pill tone="warn">Test data</Pill>}
                     </td>
                     {[r.previous, r.current].map((match, index) => (
                       <td key={index} className="p-2">
@@ -377,7 +378,7 @@ export function RecommendationBatch({ done }: { done: () => void }) {
                           <>
                             <p className="font-medium">{match.host ?? "Host not recorded"}</p>
                             <p className="text-xs text-muted-foreground">
-                              Similarity score {formatSimilarity(match.similarity)} ·{" "}
+                              <SimilarityScoreLabel /> {formatSimilarity(match.similarity)} ·{" "}
                               {match.distance == null
                                 ? "Distance unknown"
                                 : `${match.distance.toFixed(1)} km straight-line`}

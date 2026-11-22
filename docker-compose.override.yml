@@ -10,6 +10,9 @@ services:
   ai:
     environment:
       ML_ALLOW_SYNTHETIC_MODEL: "1"
+  backend:
+    environment:
+      ML_ALLOW_SYNTHETIC_MODEL: "1"
   mailpit:
     image: axllent/mailpit:v1.21.8
     restart: unless-stopped

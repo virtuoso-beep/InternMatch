@@ -48,7 +48,7 @@ class MoaWorkflowTest extends TestCase
         $this->actingAs($coordinator)->getJson('/api/v1/moas')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $own->id);
         $this->get('/api/v1/moas/'.$other->id.'/document')->assertNotFound();
         $this->putJson('/api/v1/moas/'.$other->id, [])->assertNotFound();
-        $this->postJson('/api/v1/moas', ['host_establishment_id' => $host->id, 'reference_number' => 'QA-WIDE', 'status' => 'draft', 'is_institution_wide' => true, 'program_ids' => []])->assertForbidden();
+        $this->postJson('/api/v1/moas', ['host_establishment_id' => $host->id, 'reference_number' => 'QA-WIDE', 'status' => 'draft', 'is_institution_wide' => true, 'program_ids' => []])->assertUnprocessable(); // spec §5: programs must be listed
     }
 
     public function test_supervisor_can_register_drafts_but_cannot_activate_or_access_other_hosts(): void

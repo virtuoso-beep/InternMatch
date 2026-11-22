@@ -155,7 +155,7 @@ export function ReportWorkspace({
                 return c
                   ? `${c.program.code} · ${c.academic_term.name}`
                   : "the selected program and term";
-              })()}${includeSynthetic ? ", including synthetic test records (labelled on every export)" : ""}. It stays a draft until you approve it for the dean.`}
+              })()}${includeSynthetic ? ", including test records (labelled on every export)" : ""}. It stays a draft until you approve it for the dean.`}
               confirmLabel="Generate report"
               success="Report generated"
               onConfirm={async () => {

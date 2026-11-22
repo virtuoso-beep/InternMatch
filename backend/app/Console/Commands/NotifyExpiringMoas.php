@@ -32,7 +32,7 @@ class NotifyExpiringMoas extends Command
                 $programIds = $moa->programs->pluck('id');
                 $recipients = User::query()->where('role', Role::Admin)->get()->concat(
                     User::query()->where('role', Role::Coordinator)
-                        ->when(! $moa->is_institution_wide, fn ($q) => $q->whereHas('programs', fn ($p) => $p->whereIn('programs.id', $programIds)))
+                        ->whereHas('programs', fn ($p) => $p->whereIn('programs.id', $programIds))
                         ->get());
                 foreach ($recipients->unique('id') as $user) {
                     $already = DB::table('notifications')->where('notifiable_type', $user->getMorphClass())->where('notifiable_id', $user->id)
@@ -42,7 +42,7 @@ class NotifyExpiringMoas extends Command
                     }
                     $user->notify(new PortalNotification('Agreement expiring soon',
                         sprintf('MOA %s with %s (%s) expires on %s.', $moa->reference_number, $moa->hostEstablishment?->name ?? 'a host establishment',
-                            $moa->is_institution_wide ? 'all programs' : $moa->programs->pluck('code')->join(', '), $moa->expires_on->toFormattedDateString()),
+                            $moa->programs->pluck('code')->join(', '), $moa->expires_on->toFormattedDateString()),
                         ['moa_expiring_id' => $moa->id]));
                     $sent++;
                 }

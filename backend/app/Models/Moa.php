@@ -64,7 +64,7 @@ class Moa extends Model
 
     public function coversProgram(int $programId): bool
     {
-        return $this->is_institution_wide || $this->programs()->whereKey($programId)->exists();
+        return $this->programs()->whereKey($programId)->exists(); // spec §5: explicit coverage only
     }
 
     /** @return BelongsTo<HostEstablishment, $this> */

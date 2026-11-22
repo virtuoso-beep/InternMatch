@@ -5,6 +5,7 @@ use App\Models\StudentEnrollment;
 use App\Services\ChatAccess;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('internmatch:refresh-monitoring')->hourly()->withoutOverlapping();
@@ -19,5 +20,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::call(fn () => \Illuminate\Support\Facades\DB::table('import_credential_handoffs')->where('expires_at', '<=', now())->whereNotNull('encrypted_credentials')->update(['encrypted_credentials' => null]))->everyMinute()->name('expire-import-credentials')->withoutOverlapping();
+Schedule::call(fn () => DB::table('import_credential_handoffs')->where('expires_at', '<=', now())->whereNotNull('encrypted_credentials')->update(['encrypted_credentials' => null]))->everyMinute()->name('expire-import-credentials')->withoutOverlapping();
 Schedule::command('internmatch:notify-expiring-moas')->dailyAt('07:00')->withoutOverlapping();

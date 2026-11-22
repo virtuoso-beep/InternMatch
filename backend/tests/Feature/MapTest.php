@@ -3,7 +3,11 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
-use App\Models\{HostEstablishment, Placement, StudentEnrollment, User};
+use App\Models\HostEstablishment;
+use App\Models\Opportunity;
+use App\Models\Placement;
+use App\Models\StudentEnrollment;
+use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -16,7 +20,7 @@ class MapTest extends TestCase
         $e = StudentEnrollment::factory()->create();
         $e->student->user->profile()->create(['latitude' => 7.44, 'longitude' => 125.8]);
         $host = HostEstablishment::factory()->create(['latitude' => 7.45, 'longitude' => 125.8]);
-        $opportunity = \App\Models\Opportunity::factory()->create(['host_establishment_id' => $host->id, 'academic_term_id' => $e->programTerm->academic_term_id]);
+        $opportunity = Opportunity::factory()->create(['host_establishment_id' => $host->id, 'academic_term_id' => $e->programTerm->academic_term_id]);
         Placement::factory()->create(['student_enrollment_id' => $e->id, 'opportunity_id' => $opportunity->id, 'host_establishment_id' => $host->id, 'status' => 'approved']);
         HostEstablishment::factory()->create();
         $result = $this->actingAs($e->student->user)->getJson('/api/v1/map')->assertOk()->assertJsonCount(1, 'hosts')->assertJsonPath('student.latitude', 7.44)->assertJsonPath('hosts.0.id', $host->id)->assertJsonPath('distance_kind', 'straight_line');

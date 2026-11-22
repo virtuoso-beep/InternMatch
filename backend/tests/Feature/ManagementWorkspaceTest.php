@@ -10,8 +10,8 @@ use Tests\TestCase;
 
 class ManagementWorkspaceTest extends TestCase
 {
-    use LazilyRefreshDatabase;
     use AcknowledgesPrivacyNotice;
+    use LazilyRefreshDatabase;
 
     public function test_only_administrators_can_access_the_panel_and_embedded_workspaces(): void
     {

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 class RefreshMonitoringFlags extends Command
 {
     protected $signature = 'internmatch:refresh-monitoring';
+
     protected $description = 'Persist current program monitoring flags and notify only on newly raised conditions';
 
     public function handle(ProgressSummary $progress): int
@@ -40,7 +41,9 @@ class RefreshMonitoringFlags extends Command
                     $count = 0;
                     foreach ($current as $condition) {
                         $code = 'auto:'.$condition['code'];
-                        if ($placement->monitoringFlags()->where('code', $code)->whereNull('resolved_at')->exists()) { continue; }
+                        if ($placement->monitoringFlags()->where('code', $code)->whereNull('resolved_at')->exists()) {
+                            continue;
+                        }
                         $flag = $placement->monitoringFlags()->create(['code' => $code, 'severity' => $condition['severity'] ?? 'warning', 'description' => $condition['description'], 'raised_at' => now()]);
                         $this->audit($flag, $program, 'monitoring.raised');
                         $recipients = collect($condition['notify'] ?? array_keys($byRole))->flatMap(fn ($role) => $byRole[$role] ?? collect());

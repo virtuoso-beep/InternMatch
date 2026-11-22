@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, mutate } from "@/lib/api";
 import { Button, Card, Field, Pill, ViewModal, formatSimilarity } from "./ui";
 import { ConfirmButton } from "./actions";
+import { SimilarityScoreLabel } from "./SimilarityScoreLabel";
 
 type Skill = { name: string; level: number | null; minimum_level: number };
 type Recommendation = {
@@ -149,8 +150,7 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
       {!loading && items && (
         <p className="text-sm text-muted-foreground">
           {sorted.length} available {sorted.length === 1 ? "recommendation" : "recommendations"} ·
-          Distances are straight-line kilometers. Similarity scores show competency similarity, not
-          placement probability.
+          Distances are straight-line kilometers.
         </p>
       )}
       {!loading && sorted.length > 0 && (
@@ -206,7 +206,8 @@ export function StoredRecommendations({ enrollmentId }: { enrollmentId: number }
                   </div>
                   <span className="shrink-0">
                     <Pill tone="muted">
-                      Rank {item.rank} · Similarity score {formatSimilarity(item.similarity_score)}
+                      Rank {item.rank} · <SimilarityScoreLabel />{" "}
+                      {formatSimilarity(item.similarity_score)}
                     </Pill>
                   </span>
                 </div>

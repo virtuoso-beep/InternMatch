@@ -2,12 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Enums\Role;
 use App\Models\Moa;
 use App\Models\Opportunity;
 use App\Models\StudentCompetency;
 use App\Models\StudentEnrollment;
-use App\Models\User;
 use App\Services\SemanticEmbeddings;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
@@ -74,11 +72,13 @@ class SupervisedRerankingTest extends TestCase
             ->assertJsonPath('data.0.opportunity_id', $second->id)->assertJsonPath('data.0.rank', 1)
             ->assertJsonPath('data.0.ranking_method', 'logistic_regression')
             ->assertJsonPath('data.0.snapshot.suitability_probability', 0.91)
+            ->assertJsonPath('data.0.snapshot.criteria', 'Ordered by skills match, distance, and past coordinator judgments.')
             ->assertJsonPath('data.1.opportunity_id', $first->id);
 
+        // Spec §9: features are similarity, distance and program; agreement and capacity are not sent.
         Http::assertSent(fn (ClientRequest $request) => str_ends_with($request->url(), '/recommendations/ml')
-            && array_key_exists('capacity_at_time', $request['candidates'][0])
-            && $request['candidates'][0]['moa_status_at_time'] === 'active');
+            && $request['program'] === $student->programTerm->program->code
+            && array_keys($request['candidates'][0]) === ['id', 'vector', 'distance_km']);
         Http::assertSentCount(1);
     }
 
@@ -131,29 +131,5 @@ class SupervisedRerankingTest extends TestCase
             ['id' => $first->id, 'similarity_score' => 0.7, 'ml_score' => 1.7], ['id' => $second->id, 'similarity_score' => 0.5, 'ml_score' => 0.2],
         ]])]);
         $this->actingAs($student->student->user)->postJson('/api/v1/enrollments/'.$student->id.'/recommendations')->assertStatus(503);
-    }
-
-    public function test_status_reports_method_reason_and_judgment_count_to_staff_only(): void
-    {
-        Http::fake(['*/recommendations/ml/status' => Http::response(['active' => false, 'reason' => 'No trained model is installed.', 'card' => null])]);
-        $coordinator = User::factory()->withRole(Role::Coordinator)->create();
-        $this->actingAs($coordinator)->getJson('/api/v1/matching/status')->assertOk()
-            ->assertJsonPath('active', false)->assertJsonPath('ranking_method', 'cosine_then_distance')
-            ->assertJsonPath('reason', 'No trained model is installed.')->assertJsonStructure(['judgments' => ['total', 'approved']]);
-
-        config(['matching.reranker' => 'off']);
-        $this->actingAs(User::factory()->withRole(Role::Dean)->create())->getJson('/api/v1/matching/status')->assertOk()
-            ->assertJsonPath('active', false)->assertJsonPath('reranker_setting', 'off');
-
-        foreach ([Role::Student, Role::Supervisor] as $role) {
-            $this->actingAs(User::factory()->withRole($role)->create())->getJson('/api/v1/matching/status')->assertForbidden();
-        }
-    }
-
-    public function test_status_reports_an_active_validated_model(): void
-    {
-        Http::fake(['*/recommendations/ml/status' => Http::response(['active' => true, 'reason' => null, 'card' => ['n_train' => 400, 'metrics' => ['f1' => 0.81]]])]);
-        $this->actingAs(User::factory()->withRole(Role::Admin)->create())->getJson('/api/v1/matching/status')->assertOk()
-            ->assertJsonPath('active', true)->assertJsonPath('ranking_method', 'logistic_regression')->assertJsonPath('card.n_train', 400);
     }
 }

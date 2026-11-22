@@ -3,14 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Role;
-use App\Models\Program;
 use App\Models\User;
 use App\Services\Audit;
 use App\Services\CoordinatorAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\ValidationException;
 
 class ProgramAccessController extends Controller
 {

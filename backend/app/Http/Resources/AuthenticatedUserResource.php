@@ -3,10 +3,12 @@
 namespace App\Http\Resources;
 
 use App\Enums\Permission;
+use App\Models\Program;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\DB;
 
 /** @mixin User */
 class AuthenticatedUserResource extends JsonResource
@@ -24,7 +26,7 @@ class AuthenticatedUserResource extends JsonResource
     public function toArray(Request $request): array
     {
         $programs = match ($this->role?->value) {
-            'student' => \App\Models\Program::whereHas('programTerms.enrollments.student', fn ($query) => $query->where('user_id', $this->id))->orderBy('code')->pluck('code')->all(),
+            'student' => Program::whereHas('programTerms.enrollments.student', fn ($query) => $query->where('user_id', $this->id))->orderBy('code')->pluck('code')->all(),
             'coordinator', 'dean' => $this->programs()->orderBy('code')->pluck('code')->all(),
             default => [],
         };
@@ -35,7 +37,7 @@ class AuthenticatedUserResource extends JsonResource
             'email' => $this->email,
             'must_change_password' => (bool) $this->must_change_password,
             // Spec §17B: the current privacy notice version must be acknowledged before using the portal.
-            'privacy_consent_required' => ! \Illuminate\Support\Facades\DB::table('privacy_consents')
+            'privacy_consent_required' => ! DB::table('privacy_consents')
                 ->where('user_id', $this->id)->where('notice_version', config('privacy.version'))->exists(),
             'student_number' => $this->role?->value === 'student' ? $this->student?->student_number : null,
             'role' => $this->role?->value,

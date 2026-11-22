@@ -20,11 +20,12 @@ import {
 } from "./ui";
 import { inputClass, toFormError, type FormError } from "./formUtils";
 import { RecommendationBatch } from "./RecommendationBatch";
-import { RankingStatus } from "./RankingStatus";
+import { RankingSummary } from "./RankingSummary";
 import { ExcelImportButton } from "./ExcelImportButton";
 
 import { ImportHistory } from "./ImportHistory";
 import { StudentHistory } from "./StudentHistory";
+import { SimilarityScoreLabel } from "./SimilarityScoreLabel";
 
 type Enrollment = {
   id: number;
@@ -450,7 +451,7 @@ export function CoordinatorRecommendations() {
       >
         Go to pending approvals →
       </a>
-      <RankingStatus />
+      <RankingSummary />
       {error && (
         <p role="alert">
           {error} <Button onClick={() => setRevision((v) => v + 1)}>Try again</Button>
@@ -560,7 +561,7 @@ export function CoordinatorRecommendations() {
                   "Student",
                   "Program",
                   "Recommended host",
-                  "Similarity score",
+                  <SimilarityScoreLabel key="similarity" />,
                   "Distance",
                   "Slots",
                   "MOA",

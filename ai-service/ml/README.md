@@ -1,48 +1,39 @@
-# ML Ranking Pipeline
+# Recommendation learning (supervised reranking)
 
-This directory contains the ML training pipeline for re-ranking InternMatch recommendations. 
-It requires real approved coordinator judgments to produce a valid model.
+Spec §9 and Development Guide Phase 9. Logistic Regression is used only when the documented rule is met;
+otherwise recommendations use similarity, then distance.
 
-## Requirements
-- Python 3.10+
-- `scikit-learn` and `joblib` (added to `requirements.txt`)
-- A CSV file of approved judgments.
+## How a model is trained and installed
 
-## Pipeline Steps
+Run it from InternMatch, not by hand:
 
-1. **Export Judgments**: Run the Laravel command to export data.
-   ```bash
-   php artisan ml:export-judgments
-   ```
-   This exports to `backend/storage/app/private/ml/judgment_export.csv` (real coordinator judgments only by default; `--source=synthetic` or `--source=all` adds synthetic labels, each row flagged `is_synthetic`).
+- Administrator: **System Settings → Recommendation learning → Update recommendations**
+- Command line: `php artisan ml:retrain`
 
-2. **Clean Data**: Validates ranges and handles missing distances.
-   ```bash
-   python ml/clean_data.py
-   ```
+Laravel collects the approved coordinator judgments (suitable / not suitable; uncertain is excluded), checks
+that there are at least **30 suitable and 30 not-suitable** labels, and sends them to the AI service
+(`POST /ml/train`). The AI service (`ml/learning.py`):
 
-3. **Split Data**: Stratified 80/20 train/test split.
-   ```bash
-   python ml/split_data.py
-   ```
+1. uses three features: similarity score, straight-line distance and program (one shared model);
+2. evaluates with **leave-one-student-out** cross-validation and reports accuracy, precision, recall and F1,
+   overall and per program;
+3. installs the model only if its leave-one-student-out F1 is **better** than a model using similarity
+   alone, and every program in the data has both suitable and not-suitable labels;
+4. evaluates the fallback ranking with Precision@3, Recall@3 and NDCG@3 against keyword-overlap and
+   distance-only baselines.
 
-4. **Train Model**: Trains a LogisticRegression model using standardized features.
-   ```bash
-   python ml/train_model.py
-   ```
+The model is written to `ML_MODEL_DIR` (the `ai_models` volume, `/models/ranker`), swapped in atomically and
+reloaded without restarting the service or rebuilding the image. If the rule is not met or the model does not
+pass, the current model stays. Every run is recorded in Laravel (`ranker_runs`).
 
-5. **Evaluate Model**: Checks F1 score threshold and generates a report.
-   ```bash
-   python ml/evaluate_model.py
-   ```
+## Test data
 
-Or you can run the full orchestrator:
-```bash
-python ml/pipeline.py
-```
+Synthetic labels are test data. They are marked on the model card, never count toward the 30/30 rule for
+real judgments, and a model built from them is used only when `ML_ALLOW_SYNTHETIC_MODEL=1`, which is set in
+`docker-compose.override.yml` for local testing and is never loaded in production. Locally:
+`php artisan ml:retrain --test-data` (up to 60 test labels per program, 30 of each, so the same 30/30 rule applies).
 
-## Integration
-The trained model is placed in `ml/models/`. The `/recommendations/ml` endpoint automatically activates and uses the model if the `.joblib` files are present. Otherwise, it falls back to cosine similarity.
+## Research export
 
-## Note
-To actually use the model in production, ensure `judgment_export.csv` has sufficient real coordinator data.
+`php artisan ml:export-judgments` writes the labelled pairs to `backend/storage/app/private/ml/` as CSV for
+analysis outside the system.

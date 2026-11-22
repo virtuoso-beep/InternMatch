@@ -3,24 +3,30 @@ import { SectionHeading } from "./SectionHeading";
 
 const PARTS = [
   {
-    term: "Semantic similarity",
-    body: "Competency profiles and opportunity tasks are turned into text embeddings with a multilingual model (multilingual-e5-base). Their cosine similarity is reported as a raw score to two decimals, never as a percentage.",
+    term: "Skills match",
+    body: "We compare the skills in each student's profile with the tasks of each internship and give every pair a similarity score. A higher score means a closer fit. It is a way to compare options, not a percentage.",
   },
   {
-    term: "Haversine distance",
-    body: "The straight-line distance between the student's location and the host establishment, in kilometres. It is a guide to travel burden, not road distance or travel time.",
+    term: "Distance",
+    body: "We measure the straight-line distance between the student and the host, in kilometres. It gives a sense of how far the student would go, not the actual travel route or time.",
   },
   {
-    term: "Eligibility first",
-    body: "Only opportunities the student can take are ranked: an active agreement, an open slot for the program and term, and the requirements in place.",
+    term: "Only real options",
+    body: "A student only sees internships they can actually take: the host has a current agreement with the college that covers their program, and there is still a slot for their program this term.",
   },
   {
-    term: "Coordinator approval",
-    body: "Suggestions are decision support. The practicum coordinator approves, changes or rejects every placement, and each decision is recorded with its reason.",
+    term: "A person decides",
+    body: "Suggestions help the practicum coordinator, who approves, changes or rejects every placement and records the reason.",
   },
 ] as const;
 
-/** The bold maroon block: an honest, short technical description of how suggestions are formed. */
+const STEPS = [
+  "Keep only the internships the student can take.",
+  "Compare the student's skills with each internship's tasks.",
+  "Order them by how well they fit, then by distance.",
+];
+
+/** The bold maroon block: a plain, honest description of how suggestions are formed. */
 export function MatchingExplainer() {
   return (
     <section aria-labelledby="matching-title" className="bg-header text-header-foreground">
@@ -32,21 +38,24 @@ export function MatchingExplainer() {
             label="How matching works"
             tone="inverse"
             title="Suggestions you can explain."
-            lead="InternMatch ranks opportunities by meaning, not keywords, then leaves the decision with a person."
+            lead="InternMatch suggests internships by comparing skills with tasks, then leaves the decision with a person."
           />
           <Reveal index={1} className="mt-12">
-            <figure
-              aria-label="Ranking formula"
-              className="rounded-lg border border-header-foreground/15 p-6 font-mono text-sm leading-loose"
+            <ol
+              aria-label="How suggestions are formed"
+              className="space-y-3 rounded-lg border border-header-foreground/15 p-6 text-sm leading-relaxed"
             >
-              <p>
-                similarity = cos(<span className="text-warn-light">e</span>
-                <sub>student</sub>, <span className="text-warn-light">e</span>
-                <sub>task</sub>)
-              </p>
-              <p>distance = haversine(student, host) km</p>
-              <p className="text-header-foreground/70">rank: eligible only, then by similarity</p>
-            </figure>
+              {STEPS.map((step, index) => (
+                <li key={step} className="flex gap-3">
+                  <span className="font-semibold text-warn-light">{index + 1}</span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-4 text-sm leading-relaxed text-header-foreground/75">
+              Once coordinators have recorded enough judgments, the order can also learn from them.
+              Until then, it uses skills match and distance only.
+            </p>
           </Reveal>
         </div>
         <dl className="grid gap-x-12 gap-y-12 sm:grid-cols-2 lg:col-span-6 lg:col-start-7">

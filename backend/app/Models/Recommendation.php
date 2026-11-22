@@ -3,16 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
 class Recommendation extends Model
 {
-    public function studentEnrollment(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function studentEnrollment(): BelongsTo
     {
         return $this->belongsTo(StudentEnrollment::class);
     }
 
-    public function opportunity(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function opportunity(): BelongsTo
     {
         return $this->belongsTo(Opportunity::class);
     }
