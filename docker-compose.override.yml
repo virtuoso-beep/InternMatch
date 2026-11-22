@@ -5,6 +5,11 @@
 # Mailpit catches every e-mail the app sends; nothing reaches real inboxes.
 #   Web inbox: http://localhost:8025    SMTP (inside Docker): mailpit:1025
 services:
+  # Local testing only: let the AI service use a ranker trained on synthetic labels (see ai-service/ml/model_card.py).
+  # Production never loads this file, so a synthetic-trained model is refused there.
+  ai:
+    environment:
+      ML_ALLOW_SYNTHETIC_MODEL: "1"
   mailpit:
     image: axllent/mailpit:v1.21.8
     restart: unless-stopped

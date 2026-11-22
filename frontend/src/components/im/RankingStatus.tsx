@@ -10,6 +10,8 @@ type Status = {
   judgments: { total: number; approved: number };
   card: {
     trained_at?: string;
+    synthetic_rows_train?: number;
+    synthetic_rows_test?: number;
     n_train?: number;
     n_test?: number;
     threshold_f1?: number;
@@ -40,13 +42,19 @@ export function RankingStatus() {
   }, []);
 
   const f1 = status?.card?.metrics?.f1;
+  const synthetic =
+    (status?.card?.synthetic_rows_train ?? 0) + (status?.card?.synthetic_rows_test ?? 0) > 0;
   return (
     <Card className="mb-5">
       <CardTitle
         right={
           status && (
-            <Pill tone={status.active ? "success" : "muted"}>
-              {status.active ? "Logistic Regression" : "Cosine similarity"}
+            <Pill tone={status.active ? (synthetic ? "warn" : "success") : "muted"}>
+              {status.active
+                ? synthetic
+                  ? "Logistic Regression (synthetic test model)"
+                  : "Logistic Regression"
+                : "Cosine similarity"}
             </Pill>
           )
         }
@@ -59,7 +67,9 @@ export function RankingStatus() {
         <div className="space-y-2 text-sm">
           <p>
             {status.active
-              ? "Recommendations are ranked by a Logistic Regression suitability model trained on approved coordinator judgments. The similarity score is still shown for each recommendation."
+              ? synthetic
+                ? "Recommendations are ranked by a Logistic Regression suitability model trained on synthetic test labels, not on approved coordinator judgments. Use it for testing only. The similarity score is still shown for each recommendation."
+                : "Recommendations are ranked by a Logistic Regression suitability model trained on approved coordinator judgments. The similarity score is still shown for each recommendation."
               : "Recommendations are ranked by cosine similarity, with known distance as the tie-breaker."}
           </p>
           {!status.active && status.reason && (
@@ -78,8 +88,10 @@ export function RankingStatus() {
           )}
           <p className="text-muted-foreground">
             Coordinator judgments recorded: {status.judgments.total} (approved{" "}
-            {status.judgments.approved}). A model can be trained once enough approved judgments
-            exist; synthetic test labels are never used for real placements.
+            {status.judgments.approved}).{" "}
+            {status.active && synthetic
+              ? "Replace this test model with one trained on approved coordinator judgments before using recommendations for real placements."
+              : "A model can be trained once enough approved judgments exist; a model built from synthetic test labels is used only when explicitly allowed for local testing."}
           </p>
         </div>
       )}

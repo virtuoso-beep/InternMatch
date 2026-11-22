@@ -76,7 +76,9 @@ class GenerateRecommendations
                         'student_source_hash' => $studentVector->source_text_hash, 'opportunity_source_hash' => $sources[$id]->source_text_hash,
                         'distance_kind' => 'straight_line', 'ranking_method' => $method,
                         'criteria' => $method === 'logistic_regression'
-                            ? 'Logistic Regression suitability probability descending (features: similarity score, straight-line distance, remaining capacity, active agreement, missing-distance flag); ties use similarity score, then opportunity ID. Model trained on approved coordinator judgments.'
+                            ? 'Logistic Regression suitability probability descending (features: similarity score, straight-line distance, remaining capacity, active agreement, missing-distance flag); ties use similarity score, then opportunity ID. '.(($ranker['synthetic_rows'] ?? 0) > 0
+                                ? 'Model trained on synthetic test labels, not on approved coordinator judgments.'
+                                : 'Model trained on approved coordinator judgments.')
                             : 'Cosine descending; ties use known distance ascending, then opportunity ID. No requirement-completion ranking feature.']
                         + ($method === 'logistic_regression' ? ['suitability_probability' => round($mlScores[$id], 4), 'ranker' => $ranker] : [])];
             }

@@ -137,6 +137,7 @@ def recommendations_ml(data: MLRankingInput):
     return {
         "data": sorted(results, key=lambda c: (-c["ml_score"], -c["similarity_score"], c["id"])),
         "ranking_method": "logistic_regression",
-        "ranker": {"trained_at": card.get("trained_at"), "model_sha256": card.get("model_sha256")},
+        "ranker": {"trained_at": card.get("trained_at"), "model_sha256": card.get("model_sha256"),
+                   "synthetic_rows": int(card.get("synthetic_rows_train", 0)) + int(card.get("synthetic_rows_test", 0))},
         **_identity(),
     }

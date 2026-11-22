@@ -5,6 +5,8 @@ services:
       - ai_models:/models
     environment:
       MODEL_REVISION: d128750597153bb5987e10b1c3493a34e5a4502a
+      # Trained ranker (model files and model card) in the ai_models volume.
+      ML_MODEL_DIR: /models/ranker
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
