@@ -149,7 +149,7 @@ export function RecommendationLearning() {
                 checked={practice}
                 onChange={(event) => setPractice(event.target.checked)}
               />
-              Use practice data (local testing only)
+              Use practice data
             </label>
           )}
         </div>

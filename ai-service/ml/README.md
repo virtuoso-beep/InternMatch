@@ -30,8 +30,17 @@ pass, the current model stays. Every run is recorded in Laravel (`ranker_runs`).
 
 Synthetic labels are test data. They are marked on the model card, never count toward the 30/30 rule for
 real judgments, and a model built from them is used only when `ML_ALLOW_SYNTHETIC_MODEL=1`, which is set in
-`docker-compose.override.yml` for local testing and is never loaded in production. Locally:
-`php artisan ml:retrain --test-data` (up to 60 test labels per program, 30 of each, so the same 30/30 rule applies).
+both `docker-compose.override.yml` (local) and `docker-compose.production.yml`. While such a model ranks,
+screens say "Test mode: rankings use practice data, not real coordinator judgments."
+`php artisan ml:retrain --test-data` (or "Use practice data" on the admin card) uses every labelled synthetic
+record that can be scored, with the same 30/30 rule and the same install check.
+
+Test rows are scored the way live ranking scores, so the model learns on the scale it ranks with: similarity
+is the cosine of the stored E5 embeddings of the student and the opportunity, distance is the straight-line
+distance from the student's profile to the host, and keyword overlap is the share of the opportunity's
+competencies the student lists. The source file's own `skill_match_score` and `distance_km` are a different
+measure (0 to 1 skill overlap, not E5 cosine) and are not used. Labels whose opportunity was not imported, or
+that have no current embedding, are skipped and the command reports how many.
 
 ## Research export
 

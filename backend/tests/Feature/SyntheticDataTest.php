@@ -12,12 +12,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Tests\Concerns\MakesSyntheticLabels;
 use Tests\TestCase;
 
 /** Synthetic test data is hidden by default, visible only on request, labelled when shown, and removable. */
 class SyntheticDataTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use LazilyRefreshDatabase, MakesSyntheticLabels;
 
     /** @return array{0: StudentEnrollment, 1: StudentEnrollment, 2: User} real enrollment, synthetic enrollment, coordinator */
     private function cohort(): array
@@ -209,8 +210,9 @@ class SyntheticDataTest extends TestCase
             $rec = DB::table('recommendations')->insertGetId(['generation_id' => $generation, 'student_enrollment_id' => $enrollment->id, 'opportunity_id' => $placement->opportunity_id, 'similarity_score' => .8, 'distance_km' => 2, 'capacity_at_time' => 3, 'moa_status_at_time' => 'active', 'rank' => 1, 'ranking_method' => 'cosine_then_distance', 'snapshot' => '{}', 'generated_at' => now()]);
             DB::table('placement_judgments')->insert(['recommendation_id' => $rec, 'coordinator_id' => $coordinator->id, 'judgment' => $judgment, 'reason' => 'test', 'approved_by' => $coordinator->id, 'approved_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         }
-        $label = fn (?bool $suitable, string $source) => ['source_id' => $source, 'student_id' => $synthetic->student_id, 'program_id' => $synthetic->programTerm->program_id, 'hte_code' => 'HTE-101', 'opportunity_code' => 'OPP-101', 'program_match' => 1, 'skill_match_score' => .5, 'distance_km' => 3.2, 'available_slots' => 4, 'has_slot' => 1, 'moa_valid' => 1, 'coordinator_decision' => $suitable === null ? 'For Review' : 'Suitable', 'suitable' => $suitable, 'is_synthetic' => true];
-        DB::table('coordinator_labels')->insert([$label(true, 'LBL-1'), $label(null, 'LBL-2')]);
+        $this->scorableStudent($synthetic);
+        $opportunity = $this->scorableOpportunity([3, 4], self::STUDENT_AT); // cosine 0.6, same place: 0 km
+        DB::table('coordinator_labels')->insert([$this->syntheticLabel($synthetic, $opportunity, true, 'LBL-1'), $this->syntheticLabel($synthetic, $opportunity, null, 'LBL-2')]);
 
         // Regression: the message must name the file actually written (local disk root), not storage/app/ml.
         $this->artisan('ml:export-judgments')->expectsOutputToContain(Storage::disk('local')->path('ml/judgment_export.csv'))->assertSuccessful();
@@ -221,7 +223,9 @@ class SyntheticDataTest extends TestCase
 
         $this->artisan('ml:export-judgments', ['--source' => 'synthetic'])->assertSuccessful();
         $rows = array_slice(explode("\n", trim(Storage::disk('local')->get('ml/judgment_export.csv'))), 1);
-        $this->assertSame(['T'.$synthetic->student_id.','.$program.',0.5,3.2,,1,1'], $rows); // "For Review" (no label) is skipped; the judgment on a test student is not real
+        // Scored the way live ranking scores (embeddings and coordinates), not with the file's own 0.1234 and 999 km;
+        // "For Review" (no label) is skipped; the judgment on a test student is not real.
+        $this->assertSame(['T'.$synthetic->student_id.','.$program.',0.6,0,,1,1'], $rows);
 
         $this->artisan('ml:export-judgments', ['--source' => 'all'])->assertSuccessful();
         $this->assertCount(2, array_slice(explode("\n", trim(Storage::disk('local')->get('ml/judgment_export.csv'))), 1));
@@ -233,13 +237,14 @@ class SyntheticDataTest extends TestCase
         Storage::fake('local');
         [, $synthetic] = $this->cohort();
         $other = StudentEnrollment::factory()->create(['is_synthetic' => true]);
+        $opportunity = $this->scorableOpportunity([1, 0], self::STUDENT_AT);
         $rows = [];
         foreach ([[$synthetic, 3, 9], [$other, 1, 2]] as [$enrollment, $good, $bad]) {
+            $this->scorableStudent($enrollment);
             for ($i = 0; $i < $good + $bad; $i++) {
-                $rows[] = ['source_id' => 'CAP-'.$enrollment->id.'-'.$i, 'student_id' => $enrollment->student_id, 'program_id' => $enrollment->programTerm->program_id,
-                    'hte_code' => 'H', 'opportunity_code' => 'O', 'program_match' => 1, 'skill_match_score' => $i < $good ? .9 : .2, 'distance_km' => 3,
-                    'available_slots' => 2, 'has_slot' => 1, 'moa_valid' => 1, 'coordinator_decision' => 'x', 'suitable' => $i < $good, 'is_synthetic' => true];
+                $rows[] = $this->syntheticLabel($enrollment, $opportunity, $i < $good, 'CAP-'.$enrollment->id.'-'.$i);
             }
+            $rows[] = $this->syntheticLabel($enrollment, null, true, 'CAP-'.$enrollment->id.'-unscored'); // cannot be scored: never counted
         }
         DB::table('coordinator_labels')->insert($rows);
 

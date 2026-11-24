@@ -1,8 +1,34 @@
 import type { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { ChevronRight, CircleAlert, Inbox, RotateCw, type LucideIcon } from "lucide-react";
 import { cx, Button } from "./ui";
 import type { Tone } from "@/lib/status";
+
+/**
+ * A router link in the portals; a plain link in the admin bundle under /manage, which has no router
+ * (a router Link there throws, so the dashboard crashed whenever it had items to show). The admin bundle
+ * turns clicks on /admin/... links into navigation to the matching /manage page (admin-entry.tsx).
+ */
+function AppLink({
+  to,
+  className,
+  children,
+}: {
+  to: string;
+  className: string;
+  children: ReactNode;
+}) {
+  const router = useRouter({ warn: false });
+  return router ? (
+    <Link to={to} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <a href={to} className={className}>
+      {children}
+    </a>
+  );
+}
 
 /**
  * Shared building blocks for states and dashboards (docs/DESIGN_SYSTEM.md).
@@ -174,7 +200,7 @@ export function KpiCard({
   const frame =
     "block min-w-0 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-xs";
   return to ? (
-    <Link
+    <AppLink
       to={to}
       className={cx(
         frame,
@@ -182,7 +208,7 @@ export function KpiCard({
       )}
     >
       {body}
-    </Link>
+    </AppLink>
   ) : (
     <div className={frame}>{body}</div>
   );
@@ -228,7 +254,7 @@ export function ActionList({
     <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-xs">
       {items.map((item) => (
         <li key={item.id}>
-          <Link
+          <AppLink
             to={item.to}
             className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/60"
           >
@@ -247,7 +273,7 @@ export function ActionList({
               aria-hidden="true"
               className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
             />
-          </Link>
+          </AppLink>
         </li>
       ))}
     </ul>

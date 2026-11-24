@@ -17,12 +17,17 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        // Production runs behind the Nginx TLS proxy: trust its X-Forwarded-* headers so Laravel sees HTTPS,
+        // the client IP and the public host. TRUSTED_PROXIES is "*" or a comma-separated list; unset trusts none.
+        if ($proxies = env('TRUSTED_PROXIES')) {
+            $middleware->trustProxies(at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)));
+        }
         $middleware->alias([
             'account.enabled' => EnsureAccountIsEnabled::class,
             'active' => EnsureActiveAccount::class,
             'role' => EnsureRole::class,
         ]);
-    $middleware->redirectGuestsTo(fn (Request $request) => $request->is('manage/*') ? '/manage/login' : '/auth');
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('manage/*') ? '/manage/login' : '/auth');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

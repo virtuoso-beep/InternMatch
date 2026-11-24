@@ -46,10 +46,37 @@ def backup():
         record['consistency'] = 'Sequential database snapshot and document archive; use a production maintenance window for coordinated consistency.'
         manifest(folder, record)
         print('Backup completed:', stamp)
+        prune(int(os.environ.get('INTERNMATCH_BACKUP_KEEP', '14')))
     except Exception:
         record['status'] = 'failed'
         manifest(folder, record)
         raise
+
+BACKUP_ID = re.compile(r'\d{8}T\d{6}Z-[a-f0-9]{8}')
+
+def prune(keep):
+    """Keep the newest `keep` completed backups; delete older backups (completed or failed). Runs only after a
+    successful backup, never deletes the newest completed ones, and touches only folders named like a backup."""
+    import shutil
+    if keep < 1:
+        raise ValueError('INTERNMATCH_BACKUP_KEEP must be at least 1')
+    folders = sorted((p for p in STORE.iterdir() if p.is_dir() and BACKUP_ID.fullmatch(p.name)), key=lambda p: p.name, reverse=True)
+    def status(folder):
+        try:
+            return json.loads((folder / 'manifest.json').read_text()).get('status')
+        except (OSError, ValueError):
+            return None
+    completed = [p for p in folders if status(p) == 'completed']
+    if not completed:
+        return []
+    kept = set(completed[:keep])
+    oldest_kept = min(p.name for p in kept)
+    removed = [p for p in folders if p not in kept and p.name < oldest_kept]
+    for folder in removed:
+        shutil.rmtree(folder)
+    if removed:
+        print('Removed old backups:', ', '.join(p.name for p in removed))
+    return [p.name for p in removed]
 
 def verify(identifier):
     if not re.fullmatch(r'\d{8}T\d{6}Z-[a-f0-9]{8}', identifier):

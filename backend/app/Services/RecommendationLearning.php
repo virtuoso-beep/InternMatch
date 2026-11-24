@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Opportunity;
+use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -20,15 +23,12 @@ use Illuminate\Support\Facades\Http;
  * service then evaluates with leave-one-student-out and installs the model only if it is better than
  * similarity alone and every program has both labels. Every run is recorded in ranker_runs.
  *
- * Test data (synthetic coordinator labels) can be used only when local test mode allows it; it never counts
- * toward the 30/30 rule for real judgments.
+ * Test data (synthetic coordinator labels) can be used only when ML_ALLOW_SYNTHETIC_MODEL is on; a test run uses
+ * every labelled synthetic record and the same 30/30 rule. Test data never counts toward the real judgments.
  */
 class RecommendationLearning
 {
     public const MIN_PER_CLASS = 30;
-
-    /** Test runs apply the same 30/30 rule, so each program contributes up to 30 suitable and 30 not suitable. */
-    public const TEST_DATA_PER_PROGRAM = 60;
 
     /** Latest approved judgment per recommendation on real students, with what training needs. */
     public function realJudgments(?array $programIds = null): Collection
@@ -91,17 +91,85 @@ class RecommendationLearning
         return round(collect($competencies)->filter(fn ($c) => ($c['level'] ?? null) !== null)->count() / count($competencies), 4);
     }
 
-    /** Test data: synthetic coordinator labels, up to $perProgram per program, half suitable and half not. */
-    public function testRows(int $perProgram = self::TEST_DATA_PER_PROGRAM): array
+    /**
+     * Test data: every labelled synthetic coordinator label (records with no label are skipped). The features are
+     * computed the way live ranking computes them, so a model learns on the same scale it ranks with:
+     * similarity is the cosine of the stored E5 embeddings of the student and the opportunity, distance is the
+     * straight-line distance between the student's profile and the host, and keyword overlap is the share of
+     * the opportunity's competencies the student lists. The source file's own skill_match_score and
+     * distance_km are a different measure and are not used. Labels whose opportunity was not imported, or whose
+     * student or opportunity has no current embedding, cannot be scored and are skipped (see testDataCoverage).
+     * The research export can pass $perProgram to take at most that many per program, balanced by class.
+     */
+    public function testRows(?int $perProgram = null): array
+    {
+        return $this->scoredTestLabels($perProgram)['rows'];
+    }
+
+    /** How many labelled synthetic records could be scored for training, and how many were skipped. */
+    public function testDataCoverage(): array
+    {
+        $scored = $this->scoredTestLabels(null);
+
+        return ['labelled' => $scored['labelled'], 'used' => count($scored['rows']), 'skipped' => $scored['labelled'] - count($scored['rows'])];
+    }
+
+    private function scoredTestLabels(?int $perProgram): array
     {
         $labels = DB::table('coordinator_labels as l')->join('programs as p', 'p.id', '=', 'l.program_id')
             ->where('l.is_synthetic', true)->whereNotNull('l.suitable')->orderBy('l.id')
-            ->get(['l.id', 'l.student_id', 'l.skill_match_score', 'l.distance_km', 'l.suitable', 'p.code as program']);
+            ->get(['l.id', 'l.student_id', 'l.opportunity_id', 'l.suitable', 'p.code as program']);
+        $labelled = $labels->count();
+        $embeddings = app(SemanticEmbeddings::class);
+        $students = Student::with('user.profile')->findMany($labels->pluck('student_id')->unique())->keyBy('id');
+        $opportunities = Opportunity::with(['hostEstablishment', 'competencies'])
+            ->findMany($labels->pluck('opportunity_id')->filter()->unique())->keyBy('id');
+        $vector = function (Student|Opportunity $owner) use ($embeddings): ?array {
+            $cached = $embeddings->cached($owner);
 
-        return self::balancedPerProgram($labels, $perProgram, fn ($l) => (bool) $l->suitable, 'program')
-            ->map(fn ($l) => ['student' => 'T'.$l->student_id, 'program' => $l->program, 'similarity' => (float) $l->skill_match_score,
-                'distance_km' => $l->distance_km === null ? null : (float) $l->distance_km, 'keyword_overlap' => null,
-                'label' => $l->suitable ? 1 : 0, 'synthetic' => true])->values()->all();
+            return $cached ? json_decode($cached->vector, true, flags: JSON_THROW_ON_ERROR) : null;
+        };
+        $studentVectors = $students->map($vector);
+        $opportunityVectors = $opportunities->map($vector);
+        $levels = $students->map(fn (Student $s) => $s->studentCompetencies()->pluck('level', 'competency_id'));
+
+        $rows = $labels->map(function ($l) use ($students, $opportunities, $studentVectors, $opportunityVectors, $levels) {
+            $student = $students->get($l->student_id);
+            $opportunity = $l->opportunity_id ? $opportunities->get($l->opportunity_id) : null;
+            $left = $studentVectors->get($l->student_id);
+            $right = $opportunity ? $opportunityVectors->get($opportunity->id) : null;
+            if (! $student || ! $opportunity || ! $left || ! $right) {
+                return null;
+            }
+            $required = $opportunity->competencies->pluck('id');
+            $has = $levels->get($student->id);
+
+            return ['id' => $l->id, 'student' => 'T'.$l->student_id, 'program' => $l->program, 'similarity' => self::cosine($left, $right),
+                'distance_km' => GenerateRecommendations::distance($student->user?->profile, $opportunity->hostEstablishment),
+                'keyword_overlap' => $required->isEmpty() ? null
+                    // Listed skills count even without a level: synthetic students have no levels; real ones always do.
+                    : round($required->filter(fn ($id) => $has->has($id))->count() / $required->count(), 4),
+                'label' => $l->suitable ? 1 : 0, 'synthetic' => true];
+        })->filter()->values();
+        if ($perProgram !== null) { // capped after scoring, so the cap counts only usable rows
+            $rows = self::balancedPerProgram($rows, $perProgram, fn ($row) => $row['label'] === 1, 'program');
+        }
+
+        return ['labelled' => $labelled, 'rows' => $rows->map(fn ($row) => Arr::except($row, 'id'))->values()->all()];
+    }
+
+    /** Cosine similarity, computed exactly as the AI service does (ai-service/similarity.py). */
+    public static function cosine(array $left, array $right): float
+    {
+        $dot = $a = $b = 0.0;
+        foreach ($left as $i => $x) {
+            $y = (float) $right[$i];
+            $dot += $x * $y;
+            $a += $x * $x;
+            $b += $y * $y;
+        }
+
+        return max(-1.0, min(1.0, $dot / (sqrt($a) * sqrt($b))));
     }
 
     /** At most $perProgram per program, split evenly by class (lowest IDs first), topped up from the other class. */
@@ -126,7 +194,7 @@ class RecommendationLearning
      */
     public function run(?User $actor, string $source, bool $useTestData = false): object
     {
-        abort_if($useTestData && ! self::testModeAllowed(), 422, 'Test data can be used only in local test mode.');
+        abort_if($useTestData && ! self::testModeAllowed(), 422, 'Test data can be used only when learning from test data is switched on.');
         $lock = Cache::lock('recommendation-learning', 300);
         abort_unless($lock->get(), 409, 'An update is already running. Try again in a few minutes.');
         try {

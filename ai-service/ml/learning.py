@@ -11,7 +11,7 @@ Rules (fixed before label collection, spec §9 and Development Guide Phase 9):
   compared with keyword overlap and distance-only baselines.
 
 Synthetic (test) labels are marked on the model card; the service refuses such a model unless explicitly
-allowed for local testing (ML_ALLOW_SYNTHETIC_MODEL=1).
+allowed (ML_ALLOW_SYNTHETIC_MODEL=1).
 """
 from __future__ import annotations
 

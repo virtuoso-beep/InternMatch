@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
+use App\Models\Competency;
 use App\Models\Moa;
 use App\Models\Opportunity;
 use App\Models\Program;
 use App\Models\StudentCompetency;
 use App\Models\StudentEnrollment;
 use App\Models\User;
+use App\Services\Haversine;
 use App\Services\RecommendationLearning;
 use App\Services\SemanticEmbeddings;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -17,12 +19,13 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Tests\Concerns\MakesSyntheticLabels;
 use Tests\TestCase;
 
 /** Recommendation learning (spec §9): live counts, the 30/30 rule, run history, roles and test data. */
 class RecommendationLearningTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use LazilyRefreshDatabase, MakesSyntheticLabels;
 
     private function admin(): User
     {
@@ -154,26 +157,62 @@ class RecommendationLearningTest extends TestCase
         $this->getJson('/api/v1/recommendation-learning')->assertJsonCount(3, 'history')->assertJsonPath('last_run.result', 'failed');
     }
 
-    public function test_test_data_needs_local_test_mode_and_never_counts_as_real_judgments(): void
+    public function test_test_data_needs_its_switch_and_never_counts_as_real_judgments(): void
     {
         config(['matching.allow_test_model' => false]);
         $this->actingAs($this->admin())->postJson('/api/v1/recommendation-learning/update', ['test_data' => true])->assertUnprocessable();
         $this->artisan('ml:retrain', ['--test-data' => true])->assertExitCode(2);
 
-        $program = StudentEnrollment::factory()->create(['is_synthetic' => true]);
+        $enrollment = StudentEnrollment::factory()->create(['is_synthetic' => true]);
+        $this->scorableStudent($enrollment);
+        $close = $this->scorableOpportunity([4, 3], [7.0831, 125.6128]);   // cosine 0.8
+        $far = $this->scorableOpportunity([3, 4], [7.2731, 125.6128]);     // cosine 0.6
         $labels = [];
         for ($i = 0; $i < 80; $i++) {
-            $labels[] = ['source_id' => 'LBL-'.$i, 'student_id' => $program->student_id, 'program_id' => $program->programTerm->program_id, 'hte_code' => 'H',
-                'opportunity_code' => 'O', 'program_match' => 1, 'skill_match_score' => $i % 2 ? .8 : .3, 'distance_km' => 5, 'available_slots' => 2,
-                'has_slot' => 1, 'moa_valid' => 1, 'coordinator_decision' => 'x', 'suitable' => (bool) ($i % 2), 'is_synthetic' => true];
+            $labels[] = $this->syntheticLabel($enrollment, $i % 2 ? $close : $far, (bool) ($i % 2), 'LBL-'.$i);
         }
+        $labels[] = $this->syntheticLabel($enrollment, null, true, 'NO-OPP');       // opportunity not imported: skipped
+        $labels[] = $this->syntheticLabel($enrollment, $close, null, 'FOR-REVIEW'); // no label: never used
         DB::table('coordinator_labels')->insert($labels);
         config(['matching.allow_test_model' => true]);
         Http::fake(['*/ml/train' => Http::response(['result' => 'not_reliable', 'reason' => 'x', 'counts' => [], 'metrics' => null, 'fallback' => null])]);
+
+        $this->assertSame(['labelled' => 81, 'used' => 80, 'skipped' => 1], app(RecommendationLearning::class)->testDataCoverage());
         $this->postJson('/api/v1/recommendation-learning/update', ['test_data' => true])->assertOk()->assertJsonPath('data.used_test_data', true)
-            ->assertJsonPath('data.suitable', 30)->assertJsonPath('data.not_suitable', 30); // capped at 60 per program, balanced
-        Http::assertSent(fn (ClientRequest $request) => collect($request['rows'])->every(fn ($row) => $row['synthetic'] === true));
+            ->assertJsonPath('data.suitable', 40)->assertJsonPath('data.not_suitable', 40); // every usable label, no cap
+        $near = Haversine::kilometers(...self::STUDENT_AT, ...[7.0831, 125.6128]);
+        Http::assertSent(function (ClientRequest $request) use ($near) {
+            $rows = collect($request['rows']);
+            $suitable = $rows->firstWhere('label', 1);
+
+            return $rows->count() === 80 && $rows->every(fn ($row) => $row['synthetic'] === true)
+                && $rows->where('label', 1)->every(fn ($row) => abs($row['similarity'] - 0.8) < 1e-12)
+                && $rows->where('label', 0)->every(fn ($row) => abs($row['similarity'] - 0.6) < 1e-12)
+                && abs($suitable['distance_km'] - $near) < 1e-9 && $near > 1 && $near < 1.2 // the system's distance, not the file's 999
+                && $rows->every(fn ($row) => $row['similarity'] !== 0.1234);
+        });
         $this->assertSame(['suitable' => 0, 'not_suitable' => 0, 'uncertain' => 0], app(RecommendationLearning::class)->counts()['overall']);
+    }
+
+    public function test_keyword_overlap_counts_listed_skills_even_without_a_level(): void
+    {
+        $enrollment = StudentEnrollment::factory()->create(['is_synthetic' => true]);
+        [$listed, $missing] = [Competency::factory()->create(), Competency::factory()->create()];
+        $this->scorableStudent($enrollment, $listed);
+        $opportunity = $this->scorableOpportunity([1, 0], [7.0731, 125.6128], [$listed, $missing]);
+        DB::table('coordinator_labels')->insert([$this->syntheticLabel($enrollment, $opportunity, true, 'KO-1')]);
+
+        $row = app(RecommendationLearning::class)->testRows()[0];
+        $this->assertSame(0.5, $row['keyword_overlap']);
+        $this->assertEqualsWithDelta(1.0, $row['similarity'], 1e-12);
+        $this->assertEqualsWithDelta(0.0, $row['distance_km'], 1e-9);
+    }
+
+    public function test_cosine_matches_the_ai_service(): void
+    {
+        $this->assertSame(0.6, RecommendationLearning::cosine([1, 0, 0], [3, 4, 0]));
+        $this->assertEqualsWithDelta(1 / sqrt(2), RecommendationLearning::cosine([2, 0], [5, 5]), 1e-15);
+        $this->assertSame(-1.0, RecommendationLearning::cosine([1, 0], [-2, 0]));
     }
 
     public function test_command_runs_the_same_action_and_overlapping_runs_are_refused(): void

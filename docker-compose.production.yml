@@ -1,9 +1,14 @@
-version: '3.8'
+# Production overlay: docker compose -f docker-compose.yml -f docker-compose.production.yml ...
+# (deploy/deploy.sh). Needs Docker Compose 2.24 or newer (!reset / !override). Every value comes from the
+# server's .env next to this file; see docs/PRODUCTION_DEPLOYMENT.md for the full list. Values marked :? are
+# required and the deployment stops with that message when one is missing.
 
 services:
   ai:
     environment:
-      - MODEL_REVISION=${AI_MODEL_REVISION:-d128750597153bb5987e10b1c3493a34e5a4502a}
+      MODEL_REVISION: ${AI_MODEL_REVISION:-d128750597153bb5987e10b1c3493a34e5a4502a}
+      # Recommendation learning may use the flagged synthetic (test data) labels. Screens say so while such a model is used.
+      ML_ALLOW_SYNTHETIC_MODEL: "1"
     restart: always
     deploy:
       resources:
@@ -13,12 +18,15 @@ services:
 
   mysql:
     environment:
-      MYSQL_DATABASE: ${DB_DATABASE}
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_USER: ${DB_USERNAME}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE:?Set DB_DATABASE in .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+      MYSQL_USER: ${DB_USERNAME:?Set DB_USERNAME in .env (not root)}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    # Not reachable from outside the server (the base file publishes 3307 for local tools).
+    ports: !reset []
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
     restart: always
-    ports: [] # Ensure port is not exposed externally
     deploy:
       resources:
         limits:
@@ -26,12 +34,24 @@ services:
           memory: 2G
 
   backend:
+    build:
+      context: ./backend
+      target: production
+    # Apache with PHP's production settings; migrates and caches on start (backend/docker-entrypoint.production.sh).
+    command: ["internmatch-production-entrypoint"]
+    # Code and vendor only; the local development PHP settings are not used.
+    volumes: !override
+      - ./backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+    # Only Nginx reaches Laravel; nothing is published on the host.
+    ports: !reset []
     environment: &backend_env
       APP_ENV: production
       APP_DEBUG: "false"
-      APP_URL: ${APP_URL}
-      FRONTEND_URL: ${FRONTEND_URL}
-      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS}
+      APP_KEY: ${APP_KEY:?Set APP_KEY in .env (docs/PRODUCTION_DEPLOYMENT.md, step 2)}
+      APP_URL: ${APP_URL:?Set APP_URL in .env, for example https://internmatch.example.edu}
+      FRONTEND_URL: ${FRONTEND_URL:?Set FRONTEND_URL in .env (usually the same as APP_URL)}
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:?Set SANCTUM_STATEFUL_DOMAINS in .env (the domain name)}
       DB_HOST: mysql
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE}
@@ -39,8 +59,24 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       SESSION_SECURE_COOKIE: "true"
       FORCE_HTTPS: "true"
+      TRUSTED_PROXIES: "*" # Only Nginx can reach Laravel (no published port), so every proxy hop is ours.
       LOG_CHANNEL: stderr
-      TRUSTED_PROXIES: "*" # Or specific NGINX IP
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAIL_MAILER: ${MAIL_MAILER:?Set MAIL_MAILER in .env (smtp); account e-mails need a real mailer}
+      MAIL_SCHEME: ${MAIL_SCHEME:-}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:?Set MAIL_FROM_ADDRESS in .env}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-InternMatch}
+      ML_ALLOW_SYNTHETIC_MODEL: "1" # Recommendation learning may use the flagged synthetic (test data) labels
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8000/up') === false ? 1 : 0);"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
     restart: always
     deploy:
       resources:
@@ -54,7 +90,14 @@ services:
         max-file: "3"
 
   worker:
+    build:
+      context: ./backend
+      target: production
+    user: www-data
     environment: *backend_env
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: always
     deploy:
       resources:
@@ -68,45 +111,77 @@ services:
         max-file: "3"
 
   scheduler:
+    build:
+      context: ./backend
+      target: production
+    user: www-data
     environment: *backend_env
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: always
     deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
-    # Build the TanStack Start app (Nitro node-server preset, see vite.config.ts) and run its Node server
-    # on port 8080; Nginx proxies / to it and /api to Laravel.
-    command: ["sh", "-c", "npm ci && npm run build && node .output/server/index.mjs"]
+    # Build the TanStack Start app (Nitro node-server preset, see vite.config.ts) and the admin bundle
+    # (into backend/public/admin-ui, which is not in git), then run the Node server on 8080.
+    # --include=dev: the build tools are devDependencies, which NODE_ENV=production would otherwise skip.
+    command: ["sh", "-c", "npm ci --include=dev && npm run build && npm run build:admin && node .output/server/index.mjs"]
+    ports: !reset []
     environment:
-      - NODE_ENV=production
-      - PORT=8080
-      - HOST=0.0.0.0
-      - VITE_API_URL=${APP_URL}
+      NODE_ENV: production
+      PORT: "8080"
+      HOST: 0.0.0.0
+      VITE_API_URL: ${APP_URL}
+      # Administrators go to Laravel's /manage on the same public address (frontend/src/lib/management.ts).
+      VITE_MANAGEMENT_URL: ${APP_URL}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 600s
     restart: always
     deploy:
       resources:
         limits:
           cpus: '1.0'
-          memory: 1G
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   nginx:
-    image: nginx:1.24-alpine
+    image: nginx:1.28-alpine
     restart: always
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:?Set DOMAIN_NAME in .env, for example internmatch.example.edu}
     volumes:
-      - ./deploy/nginx.production.conf:/etc/nginx/conf.d/default.conf:ro
+      # The nginx image turns templates/*.template into conf.d/*.conf, filling in ${DOMAIN_NAME}.
+      - ./deploy/nginx.production.conf:/etc/nginx/templates/default.conf.template:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot:ro
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/up || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

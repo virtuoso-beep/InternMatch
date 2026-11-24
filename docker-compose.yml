@@ -32,6 +32,7 @@ services:
   backend:
     build:
       context: ./backend
+      target: development
     working_dir: /var/www/html
     environment: &backend_environment
       APP_NAME: InternMatch
@@ -66,7 +67,9 @@ services:
     command: ["sh", "/var/www/html/docker-entrypoint.sh"]
 
   worker:
-    build: ./backend
+    build:
+      context: ./backend
+      target: development
     restart: unless-stopped
     working_dir: /var/www/html
     environment: *backend_environment
@@ -79,7 +82,9 @@ services:
     command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=100"]
 
   scheduler:
-    build: ./backend
+    build:
+      context: ./backend
+      target: development
     restart: unless-stopped
     working_dir: /var/www/html
     environment: *backend_environment

@@ -45,7 +45,7 @@ This checklist replaces the preliminary greenfield template to reflect the **act
 | **FR-16** | Dashboard and Analytics (role-specific, live scoped data) | [x] | [~] | [x] | — | Partial | **[~] IN PROGRESS** (Coordinator & Dean analytics polish, carried over) |
 | **FR-17** | Report Generation (7 kinds, frozen snapshots, dean approval gate) | [x] | [x] | [x] | — | Verified | **[x] COMPLETED** |
 | **FR-18** | Audit Trail | [x] | [x] | [x] | — | Verified | **[x] COMPLETED** |
-| **FR-19** | Data Backup and Recovery | [x] | [x] | — | — | Local verified | **[~] LOCAL ONLY** (production schedule and restore rehearsal blocked on server) |
+| **FR-19** | Data Backup and Recovery | [x] | [x] | — | — | Local verified | **[~] READY FOR SERVER** (backup, retention and isolated restore drill passed in a production-configuration rehearsal on 2026-11-23; `deploy/install-backup-cron.sh` schedules it; to be installed on the real server at deployment) |
 | **FR-20** | Program-Scoped Messaging (read-only after deployment ends) | [x] | [x] | [x] | — | Verified | **[x] COMPLETED** |
 | **FR-21** | Student Roster Import and Account Provisioning (emailed one-time activation links) | [x] | [x] | [x] | — | Verified | **[x] COMPLETED** (production needs a real mailer) |
 | **FR-22** | Data Export (scoped CSV/XLSX/PDF) | [x] | [x] | [x] | — | Verified | **[x] COMPLETED** |

@@ -38,7 +38,7 @@ class GenerateRecommendations
             // Only eligible opportunities reach ranking (spec §6). The ranker's features are similarity, distance
             // and program (spec §9); agreement and capacity are hard constraints, not ranking signals.
             $vectors[] = ['id' => $opportunity->id, 'vector' => json_decode($cached->vector, true, flags: JSON_THROW_ON_ERROR),
-                'distance_km' => $this->distance($profile, $opportunity->hostEstablishment)];
+                'distance_km' => self::distance($profile, $opportunity->hostEstablishment)];
             $sources[$opportunity->id] = $cached;
         }
         abort_if(count($vectors) > 1000, 422, 'This cohort exceeds the configured matching batch limit.');
@@ -65,7 +65,7 @@ class GenerateRecommendations
                     'level' => $levels->has($skill->id) && $levels[$skill->id] !== null ? (int) $levels[$skill->id] : null,
                     'minimum_level' => (int) $skill->pivot->minimum_level,
                 ])->values()->all();
-                $distance = $this->distance($profile, $host);
+                $distance = self::distance($profile, $host);
                 $rows[] = ['opportunity_id' => $id, 'similarity_score' => $score, 'distance_km' => $distance,
                     'capacity_at_time' => $facts['capacity_remaining'], 'moa_status_at_time' => $facts['moa_status'],
                     'snapshot' => $facts + ['opportunity_title' => $opportunity->title, 'host_name' => $host->name,
@@ -147,9 +147,10 @@ class GenerateRecommendations
         return [$scores, $mlScores, $supervised ? 'logistic_regression' : 'cosine_then_distance', $supervised ? ($response['ranker'] ?? null) : null];
     }
 
-    private function distance(?object $profile, HostEstablishment $host): ?float
+    /** Straight-line distance between a student profile and a host (km); also used to build training rows. */
+    public static function distance(?object $profile, ?HostEstablishment $host): ?float
     {
-        return $profile?->latitude !== null && $profile?->longitude !== null && $host->latitude !== null && $host->longitude !== null
+        return $profile?->latitude !== null && $profile?->longitude !== null && $host?->latitude !== null && $host->longitude !== null
             ? Haversine::kilometers((float) $profile->latitude, (float) $profile->longitude, (float) $host->latitude, (float) $host->longitude) : null;
     }
 

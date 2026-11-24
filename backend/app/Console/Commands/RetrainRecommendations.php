@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
  */
 class RetrainRecommendations extends Command
 {
-    protected $signature = 'ml:retrain {--test-data : Local test mode only: train on test data instead of real coordinator judgments}';
+    protected $signature = 'ml:retrain {--test-data : Train on the flagged synthetic labels instead of real coordinator judgments (needs ML_ALLOW_SYNTHETIC_MODEL=1)}';
 
     protected $description = 'Update recommendations from coordinator judgments (installs the model only if it passes)';
 
@@ -19,9 +19,13 @@ class RetrainRecommendations extends Command
     {
         $testData = (bool) $this->option('test-data');
         if ($testData && ! RecommendationLearning::testModeAllowed()) {
-            $this->error('Test data can be used only in local test mode (ML_ALLOW_SYNTHETIC_MODEL=1).');
+            $this->error('Test data can be used only when learning from test data is switched on (ML_ALLOW_SYNTHETIC_MODEL=1).');
 
             return self::INVALID;
+        }
+        if ($testData) {
+            $coverage = $learning->testDataCoverage();
+            $this->line("Test data: {$coverage['used']} of {$coverage['labelled']} labelled records can be scored with the system's own similarity and distance; {$coverage['skipped']} skipped (opportunity not imported or no embedding).");
         }
         $run = $learning->run(null, 'command', $testData);
         $this->line(($testData ? 'Test data' : 'Coordinator judgments').": suitable {$run->suitable}, not suitable {$run->not_suitable}, uncertain {$run->uncertain}.");

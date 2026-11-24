@@ -35,7 +35,9 @@ class ManagementPanelProvider extends PanelProvider
             ->brandName('InternMatch Administration')
             ->brandLogo(fn () => view('filament.brand'))
             ->brandLogoHeight('2.25rem')
-            ->favicon(asset('images/umtc-seal.png'))
+            // Relative on purpose: the panel is registered before the proxy headers and FORCE_HTTPS apply, so
+            // asset() here would produce an http:// link that browsers block on the HTTPS site.
+            ->favicon('/images/umtc-seal.png')
             // Styling only: the UM maroon, Public Sans (as in the portal) and a small stylesheet; no build step.
             ->colors(['primary' => [
                 50 => 'oklch(0.97 0.012 20)', 100 => 'oklch(0.94 0.025 20)', 200 => 'oklch(0.88 0.05 20)',

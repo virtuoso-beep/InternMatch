@@ -2,8 +2,8 @@
 
 ml/learning.py writes the card together with the model files, and only for a model that passed the
 documented rule (spec §9). The service uses a model only when the card exists, passed, matches the files on
-disk (SHA-256), and was not built from synthetic test labels, unless that is explicitly allowed for local
-testing.
+disk (SHA-256), and was not built from synthetic test labels, unless ML_ALLOW_SYNTHETIC_MODEL=1 allows
+it.
 """
 import hashlib
 import json

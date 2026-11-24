@@ -119,7 +119,7 @@ def ml_status():
 def ml_train(data: TrainingInput):
     rows = [r.model_dump() for r in data.rows]
     if any(r["synthetic"] for r in rows) and not allow_synthetic():
-        raise HTTPException(422, "Test data can be used for training only in local test mode.")
+        raise HTTPException(422, "Test data can be used for training only when ML_ALLOW_SYNTHETIC_MODEL=1.")
     if not _training.acquire(blocking=False):
         raise HTTPException(409, "An update is already running.")
     try:

@@ -11,6 +11,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 
@@ -29,6 +30,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (config('app.force_https')) {
+            URL::forceScheme('https');
+        }
         StudentEnrollment::created(fn ($enrollment) => ChatAccess::ensure($enrollment));
         Placement::saved(fn ($placement) => ChatAccess::ensure($placement->studentEnrollment, $placement));
         // This first-party SPA uses sessions only; no personal access tokens are issued.

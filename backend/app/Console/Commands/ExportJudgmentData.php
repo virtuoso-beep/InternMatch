@@ -45,7 +45,7 @@ class ExportJudgmentData extends Command
             $rows = $rows->concat($learning->realRows());
         }
         if ($source !== 'real') {
-            $rows = $rows->concat($learning->testRows($perProgram === null ? PHP_INT_MAX : (int) $perProgram));
+            $rows = $rows->concat($learning->testRows($perProgram === null ? null : (int) $perProgram));
         }
 
         if ($rows->isEmpty()) {
