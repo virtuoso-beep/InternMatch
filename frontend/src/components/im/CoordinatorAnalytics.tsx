@@ -83,25 +83,27 @@ export function CoordinatorAnalytics() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <KpiCard
             label="Placement rate"
-            value={rate(placed) ?? "No records"}
+            value={rate(placed)}
             icon={Percent}
             tone="info"
             loading={loading}
-            hint="Approved, active or completed placements"
+            hint={
+              rate(placed) === null
+                ? "No enrollment records yet"
+                : "Approved, active or completed placements"
+            }
           />
           <KpiCard
             label="Completion rate"
-            value={rate(completed) ?? "No records"}
+            value={rate(completed)}
             icon={TrendingUp}
             tone="success"
             loading={loading}
-            hint="Completed placements"
+            hint={rate(completed) === null ? "No enrollment records yet" : "Completed placements"}
           />
           <KpiCard
             label="Average evaluation"
-            value={
-              evaluationAverage === null ? "No evaluations" : `${evaluationAverage.toFixed(1)}%`
-            }
+            value={evaluationAverage === null ? null : `${evaluationAverage.toFixed(1)}%`}
             icon={ClipboardCheck}
             loading={loading}
             hint={evaluationCount ? `${evaluationCount} submitted` : "None submitted yet"}
@@ -110,11 +112,16 @@ export function CoordinatorAnalytics() {
             label="Median straight-line distance"
             value={
               data?.equity.median_km === null || data === null
-                ? "Not recorded"
+                ? null
                 : `${data.equity.median_km} km`
             }
             icon={Route}
             loading={loading}
+            hint={
+              data?.equity.median_km === null || data === null
+                ? "No placement with saved locations yet"
+                : undefined
+            }
           />
           <KpiCard
             label="Missing coordinates"

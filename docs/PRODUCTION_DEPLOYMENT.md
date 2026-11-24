@@ -45,6 +45,7 @@ needs Docker, Git, Python 3 and certbot.
    | `MAIL_FROM_NAME` | default `InternMatch` |
    | `LOG_LEVEL` | default `info` |
    | `AI_MODEL_REVISION` | optional; default is the pinned E5 revision |
+   | `VITE_PREVIEW_NOTICE` | optional; `1` only on a staging copy for UAT (shows the "Development preview" banner); leave unset on the live site |
 
    Generate `APP_KEY` (prints a value; copy it into `.env` as `APP_KEY=base64:...`):
 

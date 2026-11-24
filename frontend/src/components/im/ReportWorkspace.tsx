@@ -170,6 +170,11 @@ export function ReportWorkspace({
             >
               Generate report
             </ConfirmButton>
+            {!cohort && (
+              <p className="w-full text-xs text-muted-foreground">
+                Choose a program cohort to generate a report.
+              </p>
+            )}
           </>
         )}
         <Button

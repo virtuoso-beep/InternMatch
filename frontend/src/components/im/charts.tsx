@@ -167,30 +167,34 @@ function DataTable({
   categoryLabel: string;
   series: Series[];
 }) {
+  // The hidden class sits on a wrapper: a table never shrinks below its content, so an sr-only table
+  // still widened the page on phones (dean Analytics scrolled sideways).
   return (
-    <table className="sr-only">
-      <caption>{caption}</caption>
-      <thead>
-        <tr>
-          <th scope="col">{categoryLabel}</th>
-          {series.map((s) => (
-            <th key={s.key} scope="col">
-              {s.label}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((row, i) => (
-          <tr key={i}>
-            <th scope="row">{String(row[categoryKey])}</th>
+    <div className="sr-only">
+      <table>
+        <caption>{caption}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{categoryLabel}</th>
             {series.map((s) => (
-              <td key={s.key}>{number(row[s.key])}</td>
+              <th key={s.key} scope="col">
+                {s.label}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={i}>
+              <th scope="row">{String(row[categoryKey])}</th>
+              {series.map((s) => (
+                <td key={s.key}>{number(row[s.key])}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -496,25 +500,27 @@ export function DonutChartView({
           </li>
         ))}
       </ul>
-      <table className="sr-only">
-        <caption>{title}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Part</th>
-            <th scope="col">Count</th>
-            <th scope="col">Share</th>
-          </tr>
-        </thead>
-        <tbody>
-          {slices.map((s) => (
-            <tr key={s.label}>
-              <th scope="row">{s.label}</th>
-              <td>{s.value}</td>
-              <td>{share(s.value)}%</td>
+      <div className="sr-only">
+        <table>
+          <caption>{title}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Part</th>
+              <th scope="col">Count</th>
+              <th scope="col">Share</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {slices.map((s) => (
+              <tr key={s.label}>
+                <th scope="row">{s.label}</th>
+                <td>{s.value}</td>
+                <td>{share(s.value)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

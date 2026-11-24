@@ -144,6 +144,8 @@ services:
       VITE_API_URL: ${APP_URL}
       # Administrators go to Laravel's /manage on the same public address (frontend/src/lib/management.ts).
       VITE_MANAGEMENT_URL: ${APP_URL}
+      # "1" only on a staging copy used for UAT: shows the "Development preview" banner. Unset on the live site.
+      VITE_PREVIEW_NOTICE: ${VITE_PREVIEW_NOTICE:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
       interval: 15s

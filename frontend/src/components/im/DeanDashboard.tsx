@@ -237,18 +237,26 @@ export function DeanDashboard() {
           />
           <KpiCard
             label="Placement rate"
-            value={rate(placed, enrollments) ?? "No records"}
+            value={rate(placed, enrollments)}
             icon={Percent}
             loading={analytics.loading}
-            hint="Share of enrollment records"
+            hint={
+              rate(placed, enrollments) === null
+                ? "No enrollment records yet"
+                : "Share of enrollment records"
+            }
           />
           <KpiCard
             label="Completion rate"
-            value={rate(completed, enrollments) ?? "No records"}
+            value={rate(completed, enrollments)}
             icon={TrendingUp}
             tone="success"
             loading={analytics.loading}
-            hint="Share of enrollment records"
+            hint={
+              rate(completed, enrollments) === null
+                ? "No enrollment records yet"
+                : "Share of enrollment records"
+            }
           />
         </div>
       </section>

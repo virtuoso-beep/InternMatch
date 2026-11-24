@@ -261,6 +261,16 @@ Follows spec §9 and Development Guide Phase 9; replaces the earlier F1 0.70 ran
 - **Wording:** no technical terms on normal screens. Admin card "Recommendation learning"; ranking line "Ranked by skills match and distance" (or "... and past coordinator judgments"); similarity score with a plain help tip; student page intro; landing page matching section in plain words. "Synthetic" reads "test data" on all screens and exports (reports saved earlier are relabelled when shown or exported; stored content is unchanged). Monitoring "thresholds" read "alert levels".
 - **Live check (local):** real judgments 1 suitable, 0 not suitable, so "not enough judgments". A practice run on 30/30 test labels was evaluated (17 students) and not installed: model F1 0.765 was not better than similarity alone (0.787).
 
+## FR-16 dashboards and analytics finished (2026-11-24)
+
+Coordinator and dean dashboards and analytics checked in a browser at 1440 px and 390 px with no console or API errors.
+
+- **Dean Analytics scrolled sideways on phones (77 px):** the screen-reader data tables behind each chart were hidden with `sr-only` on the `<table>` itself, and a table never shrinks below its content. The hidden class is now on a wrapper (`charts.tsx`), for every chart.
+- **Empty statistics:** "No records", "No evaluations" and "Not recorded" were printed at number size (and wrapped). The cards now show a dash with the reason underneath ("No enrollment records yet", "None submitted yet", "No placement with saved locations yet"), on the coordinator Analytics page and the dean dashboard.
+- **Generate report:** the button stays disabled until a cohort is chosen; a line now says so.
+- **Development preview banner:** it said "Production deployment and final user acceptance are pending" on every page, including on the live site. It now shows only in local development, or on a staging copy built with `VITE_PREVIEW_NOTICE=1`.
+- **UAT checklist rewritten** (`docs/UAT_CHECKLIST.md`): the old one described features this system does not have (applying, job posting, impersonation, a `/login` page). It now follows the real flows in order, 49 scenarios across the five roles plus access, privacy, browser, phone, speed and HTTPS checks, with a results summary and sign-off.
+
 ## Production deployment readiness (2026-11-23)
 
 A full production rehearsal (a fresh-clone copy started with `docker-compose.production.yml` under a separate project, self-signed certificate, empty database) found and fixed these. Each would have stopped or broken a first deployment:

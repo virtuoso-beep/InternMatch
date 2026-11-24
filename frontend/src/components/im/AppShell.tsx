@@ -689,10 +689,13 @@ function AuthenticatedShell({ role }: { role: RoleKey }) {
           tabIndex={-1}
           className="mx-auto w-full max-w-[1400px] min-w-0 flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8"
         >
-          <p className="mb-5 rounded border border-warn/40 bg-warn/10 p-3 text-sm">
-            Development preview: records labelled Test data are fictional. Production deployment and
-            final user acceptance are pending.
-          </p>
+          {/* Local development only (or a staging copy built with VITE_PREVIEW_NOTICE=1); never on the live site. */}
+          {(import.meta.env.DEV || import.meta.env["VITE_PREVIEW_NOTICE"] === "1") && (
+            <p className="mb-5 rounded border border-warn/40 bg-warn/10 p-3 text-sm">
+              Development preview: records labelled Test data are fictional. Production deployment
+              and final user acceptance are pending.
+            </p>
+          )}
           <Outlet />
         </main>
       </div>
